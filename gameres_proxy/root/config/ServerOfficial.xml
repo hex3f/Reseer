@@ -1,0 +1,66 @@
+<!--官服代理模式 - 连接官服但经过本地代理记录流量-->
+<config>
+	<newsversion>20250307</newsversion>
+	<regversion>20250403</regversion>
+	<dailyTask>2</dailyTask>
+	<superNoNo>1</superNoNo>
+	<uiversion>20250307</uiversion>
+	<fightVersion>20250307</fightVersion>
+	<ipConfig>
+		<http url="/ip.txt"/>
+        <EmailLogin url="http://127.0.0.1:8211/"/>
+		<!-- 官服代理模式：Socket 连接指向本地代理（会转发到官服） -->
+		<Email ip="127.0.0.1" port="1863"/>
+		<DirSer ip="127.0.0.1" port="1863"/>
+		<Visitor ip="127.0.0.1" port="1863"/>
+		<SubServer ip="127.0.0.1" port="1863"/>
+		<RegistSer ip="127.0.0.1" port="1863"/>
+	</ipConfig>
+	<ServerList max="300">
+		<!-- 服务器列表由官服返回，这里只是占位 -->
+		<list name="官服1"/>
+		<list name="官服2"/>
+		<list name="官服3"/>
+	</ServerList>
+	<Res url="resource/" />
+	<Npc url="resource/npc/" />
+	<AppModule url="module/com/robot/module/app/" />
+	<TaskModule url="module/com/robot/module/task/" />
+	<BookModule url="module/com/robot/module/book/" />
+	<GameModule url="module/com/robot/module/game/" />
+	<HelpModule url="module/com/robot/module/help/" />
+	<TaskItemIconURL url="resource/item/task/icon/" />
+	<MailTemplateURL url="resource/mail/" />
+	<ClothLight url="resource/eff/clothLight/" />
+	<Transform url="resource/transform/movie/" />
+</config>
+****
+<root>
+	<loading>
+		<list str = "官服代理模式 - 流量记录中"/>
+		<list str = "所有请求都会被记录"/>
+	</loading>
+	<blue>
+		<list str = "！"/>
+	</blue>
+	<green>
+		<list str = "……"/>
+	</green>
+	<brother>
+		<list str = "！"/>
+	</brother>
+	<map>
+		<list str = "◎ 封印"/>
+		<list str = "官服代理模式"/>
+	</map>
+	<news>
+		<list str = "官服代理模式"/>
+		<list str = "流量记录中"/>
+	</news>
+	<newsChangeMap>
+		<list id = "5"/>
+		<list id = "326"/>
+		<list id = "103"/>
+		<list id = "326"/>
+	</newsChangeMap>
+</root>

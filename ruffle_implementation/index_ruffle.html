@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>赛尔号 - Ruffle 测试</title>
+    <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #container {
+            text-align: center;
+        }
+        #ruffle-container {
+            width: 960px;
+            height: 560px;
+            background: #1a1a1a;
+        }
+        .info {
+            color: #fff;
+            margin: 20px;
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            max-width: 960px;
+        }
+        .warning {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        .note {
+            color: #51cf66;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="info">
+            <h2>赛尔号 - Ruffle.js 兼容性测试</h2>
+            <p class="warning">⚠️ 警告：Ruffle 不支持 Socket 连接，游戏无法连接服务器！</p>
+            <p class="note">✓ 可以测试：UI 加载、图形渲染、音频播放</p>
+            <p class="note">✗ 无法测试：登录、游戏逻辑、网络通信</p>
+        </div>
+        
+        <div id="ruffle-container"></div>
+        
+        <div class="info">
+            <h3>预期结果</h3>
+            <p>• 游戏会加载到登录界面</p>
+            <p>• 点击登录后会卡住（因为无法连接 Socket）</p>
+            <p>• 控制台会显示 Socket 相关错误</p>
+        </div>
+    </div>
+
+    <script>
+        window.RufflePlayer = window.RufflePlayer || {};
+        window.RufflePlayer.config = {
+            "autoplay": "on",
+            "unmuteOverlay": "hidden",
+            "logLevel": "warn",
+            "letterbox": "on",
+            "warnOnUnsupportedContent": true,
+            "contextMenu": true,
+            "showSwfDownload": true,
+            "upgradeToHttps": false,
+            "maxExecutionDuration": 15,
+            "base": "http://127.0.0.1:32400/",
+            "allowScriptAccess": true,
+            "parameters": {
+                "allowScriptAccess": "always",
+                "allowNetworking": "all"
+            }
+        };
+
+        const ruffle = window.RufflePlayer.newest();
+        const player = ruffle.createPlayer();
+        const container = document.getElementById("ruffle-container");
+        container.appendChild(player);
+
+        // 加载 SWF
+        player.load({
+            url: "http://127.0.0.1:32400/Client.swf",
+            parameters: {
+                "allowScriptAccess": "always",
+                "allowNetworking": "all"
+            }
+        });
+
+        // 监听错误
+        player.addEventListener("error", (e) => {
+            console.error("Ruffle Error:", e);
+        });
+
+        // 监听加载完成
+        player.addEventListener("loadeddata", () => {
+            console.log("SWF loaded successfully");
+        });
+    </script>
+</body>
+</html>

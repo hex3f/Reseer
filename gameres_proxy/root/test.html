@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赛尔号 - 系统测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .test-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .test-item {
+            padding: 10px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .test-item .status {
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: #51cf66;
+            color: white;
+        }
+        
+        .status.error {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .status.pending {
+            background: #ffd43b;
+            color: #333;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .log {
+            background: #1a1a1a;
+            color: #51cf66;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+        }
+        
+        .log-entry.error {
+            color: #ff6b6b;
+        }
+        
+        .log-entry.info {
+            color: #51cf66;
+        }
+        
+        .log-entry.warn {
+            color: #ffd43b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 赛尔号系统测试</h1>
+            <p>测试服务器各项功能是否正常运行</p>
+        </div>
+        
+        <div class="test-section">
+            <h2>1. 服务器连接测试</h2>
+            <div class="test-item">
+                <span>资源服务器 (端口 32400)</span>
+                <span class="status pending" id="status-ressrv">待测试</span>
+            </div>
+            <div class="test-item">
+                <span>API 服务器 (端口 8211)</span>
+                <span class="status pending" id="status-api">待测试</span>
+            </div>
+            <button onclick="testServers()">开始测试</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>2. 模式检测</h2>
+            <div class="test-item">
+                <span>当前运行模式</span>
+                <span class="status pending" id="status-mode">检测中...</span>
+            </div>
+            <div class="test-item">
+                <span>登录服务器地址</span>
+                <span id="login-server">-</span>
+            </div>
+            <div class="test-item">
+                <span>游戏服务器地址</span>
+                <span id="game-server">-</span>
+            </div>
+            <button onclick="detectMode()">检测模式</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>3. 资源加载测试</h2>
+            <div class="test-item">
+                <span>Client1.swf</span>
+                <span class="status pending" id="status-swf">待测试</span>
+            </div>
+            <div class="test-item">
+                <span>ServerR.xml</span>
+                <span class="status pending" id="status-xml">待测试</span>
+            </div>
+            <button onclick="testResources()">测试资源</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>4. 登录功能测试</h2>
+            <div style="margin-bottom: 15px;">
+                <input type="text" id="username" placeholder="用户名" value="test@qq.com" 
+                       style="padding: 8px; width: 200px; margin-right: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="password" id="password" placeholder="密码" value="123456" 
+                       style="padding: 8px; width: 200px; margin-right: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="test-item">
+                <span>POST /seer/login</span>
+                <span class="status pending" id="status-login">待测试</span>
+            </div>
+            <div class="test-item">
+                <span>GET /seer/customer/info</span>
+                <span class="status pending" id="status-userinfo">待测试</span>
+            </div>
+            <button onclick="testLogin()">测试登录</button>
+            <button onclick="testUserInfo()">测试用户信息</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>5. API 接口测试</h2>
+            <div class="test-item">
+                <span>GET /api/mode</span>
+                <span class="status pending" id="status-api-mode">待测试</span>
+            </div>
+            <div class="test-item">
+                <span>GET /api/config</span>
+                <span class="status pending" id="status-api-config">待测试</span>
+            </div>
+            <button onclick="testAPI()">测试 API</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>6. 测试日志</h2>
+            <div class="log" id="log"></div>
+            <button onclick="clearLog()">清除日志</button>
+            <button onclick="runAllTests()">运行所有测试</button>
+        </div>
+    </div>
+    
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function setStatus(id, status, text) {
+            const el = document.getElementById(id);
+            el.className = 'status ' + status;
+            el.textContent = text || (status === 'success' ? '✓ 正常' : '✗ 失败');
+        }
+        
+        async function testServers() {
+            log('开始测试服务器连接...', 'info');
+            
+            // 测试资源服务器
+            try {
+                const res = await fetch('/');
+                if (res.ok) {
+                    setStatus('status-ressrv', 'success');
+                    log('资源服务器连接成功', 'info');
+                } else {
+                    setStatus('status-ressrv', 'error');
+                    log('资源服务器响应异常: ' + res.status, 'error');
+                }
+            } catch (error) {
+                setStatus('status-ressrv', 'error');
+                log('资源服务器连接失败: ' + error.message, 'error');
+            }
+            
+            // 测试 API 服务器
+            try {
+                const res = await fetch('http://127.0.0.1:8211/api/mode');
+                if (res.ok) {
+                    setStatus('status-api', 'success');
+                    log('API 服务器连接成功', 'info');
+                } else {
+                    setStatus('status-api', 'error');
+                    log('API 服务器响应异常: ' + res.status, 'error');
+                }
+            } catch (error) {
+                setStatus('status-api', 'error');
+                log('API 服务器连接失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function detectMode() {
+            log('开始检测服务器模式...', 'info');
+            
+            try {
+                const res = await fetch('http://127.0.0.1:8211/api/mode');
+                const data = await res.json();
+                
+                const mode = data.local_server_mode ? '本地模式' : '官服模式';
+                const modeClass = data.local_server_mode ? 'success' : 'error';
+                
+                setStatus('status-mode', modeClass, mode);
+                document.getElementById('login-server').textContent = data.server_info.login_server;
+                document.getElementById('game-server').textContent = data.server_info.game_server;
+                
+                log('当前模式: ' + mode, 'info');
+                log('登录服务器: ' + data.server_info.login_server, 'info');
+                log('游戏服务器: ' + data.server_info.game_server, 'info');
+            } catch (error) {
+                setStatus('status-mode', 'error', '检测失败');
+                log('模式检测失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function testResources() {
+            log('开始测试资源加载...', 'info');
+            
+            // 测试 SWF
+            try {
+                const res = await fetch('/Client1.swf', { method: 'HEAD' });
+                if (res.ok) {
+                    setStatus('status-swf', 'success');
+                    log('Client1.swf 可访问', 'info');
+                } else {
+                    setStatus('status-swf', 'error');
+                    log('Client1.swf 不可访问: ' + res.status, 'warn');
+                }
+            } catch (error) {
+                setStatus('status-swf', 'error');
+                log('Client1.swf 加载失败: ' + error.message, 'error');
+            }
+            
+            // 测试 XML
+            try {
+                const res = await fetch('/config/ServerR.xml');
+                if (res.ok) {
+                    setStatus('status-xml', 'success');
+                    log('ServerR.xml 可访问', 'info');
+                } else {
+                    setStatus('status-xml', 'error');
+                    log('ServerR.xml 不可访问: ' + res.status, 'error');
+                }
+            } catch (error) {
+                setStatus('status-xml', 'error');
+                log('ServerR.xml 加载失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function testAPI() {
+            log('开始测试 API 接口...', 'info');
+            
+            // 测试 /api/mode
+            try {
+                const res = await fetch('http://127.0.0.1:8211/api/mode');
+                const data = await res.json();
+                if (res.ok && data.local_server_mode !== undefined) {
+                    setStatus('status-api-mode', 'success');
+                    log('GET /api/mode 正常', 'info');
+                } else {
+                    setStatus('status-api-mode', 'error');
+                    log('GET /api/mode 响应异常', 'error');
+                }
+            } catch (error) {
+                setStatus('status-api-mode', 'error');
+                log('GET /api/mode 失败: ' + error.message, 'error');
+            }
+            
+            // 测试 /api/config
+            try {
+                const res = await fetch('http://127.0.0.1:8211/api/config');
+                const data = await res.json();
+                if (res.ok && data.servers) {
+                    setStatus('status-api-config', 'success');
+                    log('GET /api/config 正常', 'info');
+                } else {
+                    setStatus('status-api-config', 'error');
+                    log('GET /api/config 响应异常', 'error');
+                }
+            } catch (error) {
+                setStatus('status-api-config', 'error');
+                log('GET /api/config 失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function testLogin() {
+            log('开始测试登录功能...', 'info');
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            log(`用户名: ${username}, 密码: ${password}`, 'info');
+            
+            try {
+                const res = await fetch('http://127.0.0.1:8211/seer/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok && data.code === 200) {
+                    setStatus('status-login', 'success');
+                    log('登录成功! Session: ' + data.session, 'info');
+                    log('响应: ' + JSON.stringify(data), 'info');
+                } else {
+                    setStatus('status-login', 'error');
+                    log('登录失败: ' + JSON.stringify(data), 'error');
+                }
+            } catch (error) {
+                setStatus('status-login', 'error');
+                log('登录请求失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function testUserInfo() {
+            log('开始测试用户信息接口...', 'info');
+            
+            try {
+                const res = await fetch('http://127.0.0.1:8211/seer/customer/info');
+                const data = await res.json();
+                
+                if (res.ok && data.code === 200) {
+                    setStatus('status-userinfo', 'success');
+                    log('获取用户信息成功', 'info');
+                    log('用户数据: ' + JSON.stringify(data.data), 'info');
+                } else {
+                    setStatus('status-userinfo', 'error');
+                    log('获取用户信息失败', 'error');
+                }
+            } catch (error) {
+                setStatus('status-userinfo', 'error');
+                log('用户信息请求失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function runAllTests() {
+            log('========== 开始运行所有测试 ==========', 'info');
+            clearLog();
+            await testServers();
+            await detectMode();
+            await testResources();
+            await testAPI();
+            await testLogin();
+            await testUserInfo();
+            log('========== 所有测试完成 ==========', 'info');
+        }
+        
+        // 页面加载时自动运行测试
+        window.addEventListener('load', async () => {
+            log('系统测试页面已加载', 'info');
+            await testServers();
+            await detectMode();
+        });
+    </script>
+</body>
+</html>

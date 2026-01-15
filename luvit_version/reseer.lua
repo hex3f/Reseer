@@ -1,0 +1,212 @@
+-- RecSeer Main (Seer Private Server)
+-- 改自 RecMole (摩尔庄园私服)
+
+-- 初始化日志系统
+local Logger = require("./logger")
+Logger.init()
+
+print("\27[36m╔════════════════════════════════════════════════════════════╗\27[0m")
+print("\27[36m║           赛尔号本地服务器 - RecSeer v2.0                 ║\27[0m")
+print("\27[36m╚════════════════════════════════════════════════════════════╝\27[0m")
+print("")
+
+local conf = {
+    -- ============================================================
+    -- 目录配置
+    -- ============================================================
+    res_dir = "../gameres/root",           -- 资源缓存目录（从官服下载的资源保存位置）
+    res_proxy_dir = "../gameres_proxy/root", -- 本地代理资源目录（优先使用）
+    
+    -- ============================================================
+    -- 官服地址配置
+    -- ============================================================
+    res_official_address = "http://192.158.229.131:18888",  -- 官服资源服务器
+    official_api_server = "http://45.125.46.70:8211",     -- 官服 API 服务器
+    official_login_server = "45.125.46.70",               -- 官服登录/游戏服务器 IP
+    official_login_port = 12345,                          -- 官服 WebSocket 端口
+    
+    -- ============================================================
+    -- 本地服务器端口配置
+    -- ============================================================
+    ressrv_port = 32400,      -- 主资源服务器端口（访问 http://127.0.0.1:32400）
+    ressrv_port_80 = 80,      -- 备用资源服务器端口（用于 www.51seer.com 域名）
+    loginip_port = 32401,     -- ip.txt 服务端口
+    login_port = 1863,        -- 本地登录代理端口（WebSocket）
+    gameserver_port = 5000,   -- 本地游戏代理起始端口（5001, 5002, ...）
+    
+    -- 返回给 Flash 的登录服务器地址（本地代理）
+    login_server_address = "127.0.0.1:1863",
+    
+    -- ============================================================
+    -- 运行模式配置
+    -- ============================================================
+    
+    -- [核心开关] 本地模式 vs 官服代理模式
+    -- true  = 本地模式：使用本地数据库，不连接官服（开发/测试用）
+    -- false = 官服代理模式：所有请求转发到官服，记录流量（抓包分析用）
+    local_server_mode = true,
+    
+    -- [资源模式] 是否从官服下载资源
+    -- true  = 从官服下载资源并缓存到 res_dir
+    -- false = 仅使用本地资源（需要提前准备好资源文件）
+    use_official_resources = true,
+    
+    -- [流量记录] 是否启用流量记录（仅在官服代理模式下有效）
+    -- true  = 记录所有 Flash ↔ 官服 的通信到控制台和文件
+    -- false = 不记录流量（使用简单代理）
+    trafficlogger = true,
+    
+    -- [游戏服务器代理] 是否代理游戏服务器连接
+    -- true  = 拦截服务器列表，将游戏服务器 IP 替换为本地代理
+    -- false = 不修改服务器列表，直接连接官服游戏服务器
+    proxy_game_server = true,
+    
+    -- [纯官服模式] 完全使用官服资源，不做任何修改
+    -- true  = 所有资源直接从官服获取，包括 ServerR.xml 和 ip.txt
+    -- false = 使用本地代理的配置文件
+    pure_official_mode = false,
+    
+    -- ============================================================
+    -- 日志过滤配置
+    -- ============================================================
+    
+    -- [隐藏杂包] 是否隐藏频繁的杂包日志
+    -- true  = 隐藏 hide_cmd_list 中的命令日志
+    -- false = 显示所有命令日志
+    hide_frequent_cmds = true,
+    
+    -- [隐藏命令列表] 要隐藏的命令ID列表
+    -- 2101 = PEOPLE_WALK (移动)
+    -- 1002 = SYSTEM_TIME (系统时间)
+    hide_cmd_list = {
+        2101,  -- PEOPLE_WALK (移动包，非常频繁)
+        1002,  -- SYSTEM_TIME (系统时间，每秒一次)
+    },
+}
+_G.conf = conf
+
+-- 打印配置信息
+print("\27[33m========== 运行模式 ==========\27[0m")
+if conf.local_server_mode then
+    print("🎮 模式: 本地服务器模式")
+    print("📦 资源: " .. (conf.use_official_resources and "从官服下载并缓存" or "仅使用本地资源"))
+else
+    print("🎮 模式: 官服代理模式 (流量记录" .. (conf.trafficlogger and "已启用" or "已禁用") .. ")")
+    print("📦 资源: " .. (conf.use_official_resources and "从官服下载并缓存" or "仅使用本地资源"))
+    print("🔄 游戏服务器代理: " .. (conf.proxy_game_server and "已启用" or "已禁用"))
+end
+print("")
+
+-- 生成前端配置文件
+local function generateFrontendConfig()
+    local fs = require('fs')
+    local json = require('json')
+    
+    -- 生成 server-config.js（用于简化版前端）
+    local config = {
+        local_server_mode = conf.local_server_mode,
+        use_official_resources = conf.use_official_resources,
+        server_info = {
+            login_server = conf.local_server_mode and ("127.0.0.1:" .. conf.login_port) or conf.login_server_address,
+            game_server = conf.local_server_mode and ("127.0.0.1:" .. conf.gameserver_port) or conf.login_server_address,
+            api_server = "http://127.0.0.1:8211",
+            resource_server = conf.local_server_mode and "http://127.0.0.1:" .. conf.ressrv_port or conf.res_official_address
+        }
+    }
+    
+    local configJs = string.format([[
+// 自动生成的配置文件 - 请勿手动编辑
+// 生成时间: %s
+window.SEER_SERVER_CONFIG = %s;
+]], os.date("%Y-%m-%d %H:%M:%S"), json.stringify(config))
+    
+    local configPath = conf.res_proxy_dir .. "/js/server-config.js"
+    fs.writeFileSync(configPath, configJs)
+    print("\27[36m[CONFIG] 已生成前端配置: " .. configPath .. "\27[0m")
+    
+    -- 生成 application-config.js（用于官服 Vue 应用）
+    local apiServer = "http://127.0.0.1:8211"  -- 始终使用本地 API 服务器（会代理到官服）
+    local website = "http://127.0.0.1:" .. conf.ressrv_port .. "/"
+    
+    local appConfigJs = string.format([[
+// 自动生成的配置文件 - 请勿手动编辑
+// 生成时间: %s
+var applicationConfig = {
+  version: {
+    win: '1.0.6.8',
+    mac: '1.0.6.8',
+    mobile: '1.0.1.1',
+  },
+  ruffleSrc: './assets/js/ruffle.js',
+  maintenance: false,
+  VITE_APP_BASE_API: '%s',  // 本地 API 服务器（代理到官服）
+  website: '%s',
+}
+window.getS = () => {
+  const str = '88b69df269060c5b0b0fb276267f20b3,17eb96fd6e1b5ceab90f90f67b6c4e1c,9d50c6981b408bc91f478072dc59e41a,88e49e61160379f7c13521cd90f93c64'
+  return str
+}
+]], os.date("%Y-%m-%d %H:%M:%S"), apiServer, website)
+    
+    local appConfigPath = conf.res_proxy_dir .. "/assets/js/application-config.js"
+    
+    -- 确保目录存在
+    local dirPath = conf.res_proxy_dir .. "/assets/js"
+    if not fs.existsSync(dirPath) then
+        fs.mkdirSync(dirPath, {recursive = true})
+    end
+    
+    fs.writeFileSync(appConfigPath, appConfigJs)
+    print("\27[36m[CONFIG] 已生成 Vue 应用配置: " .. appConfigPath .. "\27[0m")
+end
+
+generateFrontendConfig()
+
+require "./buffer_extension"
+require "./ressrv"
+require "./loginip"
+require "./oauthserver"
+require "./apiserver"  -- API 服务器（提供配置管理和模式切换）
+
+-- 根据模式选择登录服务器
+if conf.local_server_mode then
+    -- 本地模式：使用 WebSocket 登录服务器（与官服架构一致）
+    print("\27[33m========== LOCAL SERVER MODE (WebSocket) ==========\27[0m")
+    local lgs = require "./gameserver/localgameserver"
+    lgs.LocalGameServer:new()
+    local wsLogin = require "./loginserver/websocket_login"
+    wsLogin.start(conf.login_port)  -- 启动 WebSocket 登录服务器在端口 1863
+else
+    -- 官服模式：使用流量记录代理
+    print("\27[35m╔════════════════════════════════════════════════════════════╗\27[0m")
+    print("\27[35m║           官服代理模式 - 所有请求将被记录                  ║\27[0m")
+    print("\27[35m╠════════════════════════════════════════════════════════════╣\27[0m")
+    print("\27[35m║  📡 登录服务器: " .. (conf.official_login_server or "101.43.19.60") .. ":" .. (conf.official_login_port or 1863) .. "                    ║\27[0m")
+    print("\27[35m║  🎮 游戏服务器: 动态分配（根据服务器列表）                 ║\27[0m")
+    print("\27[35m║  📝 流量记录: " .. (conf.trafficlogger and "已启用" or "已禁用") .. "                                       ║\27[0m")
+    print("\27[35m╚════════════════════════════════════════════════════════════╝\27[0m")
+    print("")
+    print("\27[36m[提示] 所有 Flash ↔ 官服 的通信都会在控制台显示\27[0m")
+    print("\27[36m[提示] 日志格式: [Flash→官服] 发送 / [官服→Flash] 接收\27[0m")
+    print("")
+    
+    local gs = conf.trafficlogger and require "./gameserver/trafficlogger" or require "./gameserver/gameserver"
+    gs.GameServer:new()
+    local _ = conf.trafficlogger and require "./loginserver/trafficloggerlogin" or require "./loginserver/login"
+end
+
+-- 定时器保持进程活跃
+local timer = require("timer")
+timer.setInterval(1000 * 60, function() end)
+
+-- 全局错误捕获
+process:on("uncaughtException", function(err)
+    print("\27[31m[CRITICAL] Uncaught Exception: " .. tostring(err) .. "\27[0m")
+    print(debug.traceback())
+end)
+
+print("\27[32m========== SERVER READY ==========\27[0m")
+print("")
+print("\27[36m访问地址: http://127.0.0.1:" .. conf.ressrv_port .. "/\27[0m")
+print("\27[36m当前模式: " .. (conf.local_server_mode and "本地服务器" or "官服代理") .. "\27[0m")
+print("")
