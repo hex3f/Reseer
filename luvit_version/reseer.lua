@@ -21,7 +21,7 @@ local conf = {
     -- 官服地址配置
     -- ============================================================
     res_official_address = "http://192.158.229.131:18888",  -- 官服资源服务器
-    official_api_server = "http://45.125.46.70:8211",     -- 官服 API 服务器
+    official_api_server = "http://115.238.192.7:9999",     -- 官服 API 服务器
     official_login_server = "45.125.46.70",               -- 官服登录/游戏服务器 IP
     official_login_port = 12345,                          -- 官服 WebSocket 端口
     
