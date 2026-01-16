@@ -456,7 +456,7 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(userData.posX or 300)                -- posX
     responseBody = responseBody .. writeUInt32BE(userData.posY or 200)                -- posY
     responseBody = responseBody .. writeUInt32BE(userData.timeToday or 0)             -- timeToday
-    responseBody = responseBody .. writeUInt32BE(userData.timeLimit or 0)             -- timeLimit
+    responseBody = responseBody .. writeUInt32BE(userData.timeLimit or 86400)         -- timeLimit (24小时=86400秒)
     
     -- 2. halfDayFlags (4个byte)
     responseBody = responseBody .. string.char(
