@@ -3333,12 +3333,41 @@ function LocalGameServer:handleLeaveRoom(clientData, cmdId, userId, seqId, body)
 end
 
 -- CMD 10006: 正在使用的家具 (FITMENT_USERING)
--- 注意: 此命令由房间服务器处理，游戏服务器只保留壳
+-- 游戏服务器处理此命令，返回用户正在使用的家具列表
 -- 请求: targetUserId(4)
 -- 响应: ownerUserId(4) + visitorUserId(4) + count(4) + [FitmentInfo]...
+-- FitmentInfo: id(4) + x(4) + y(4) + dir(4) + status(4) = 20 bytes
 function LocalGameServer:handleFitmentUsering(clientData, cmdId, userId, seqId, body)
-    tprint("\27[33m[LocalGame] CMD 10006: 正在使用的家具 - 此命令应由房间服务器处理\27[0m")
-    -- 房间服务器会处理此命令，游戏服务器不做任何处理
+    local targetUserId = userId
+    if #body >= 4 then
+        targetUserId = readUInt32BE(body, 1)
+    end
+    
+    tprint(string.format("\27[36m[LocalGame] 处理 CMD 10006: 获取用户 %d 正在使用的家具\27[0m", targetUserId))
+    
+    -- 从数据库获取家具数据
+    local fitments = {}
+    if self.userdb then
+        local db = self.userdb:new()
+        local gameData = db:getOrCreateGameData(targetUserId)
+        fitments = gameData.fitments or {}
+    end
+    
+    local responseBody = writeUInt32BE(targetUserId)  -- ownerUserId
+    responseBody = responseBody .. writeUInt32BE(userId)  -- visitorUserId
+    responseBody = responseBody .. writeUInt32BE(#fitments)  -- count
+    
+    -- 写入每个家具信息
+    for _, fitment in ipairs(fitments) do
+        responseBody = responseBody .. writeUInt32BE(fitment.id or 500001)  -- id
+        responseBody = responseBody .. writeUInt32BE(fitment.x or 0)        -- x
+        responseBody = responseBody .. writeUInt32BE(fitment.y or 0)        -- y
+        responseBody = responseBody .. writeUInt32BE(fitment.dir or 0)      -- dir
+        responseBody = responseBody .. writeUInt32BE(fitment.status or 0)   -- status
+    end
+    
+    tprint(string.format("\27[32m[LocalGame] → FITMENT_USERING: %d 个家具\27[0m", #fitments))
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
 -- CMD 10007: 所有家具 (FITMENT_ALL)
