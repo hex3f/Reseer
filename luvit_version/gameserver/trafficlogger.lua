@@ -458,13 +458,13 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
         
         -- 生成 HEX 字符串
         local function toHexString(data, maxLen)
-            maxLen = maxLen or 64
+            -- maxLen = nil 表示不限制长度，显示完整数据
             local hexStr = ""
-            local len = math.min(#data, maxLen)
+            local len = maxLen and math.min(#data, maxLen) or #data
             for i = 1, len do
                 hexStr = hexStr .. string.format("%02X ", data:byte(i))
             end
-            if #data > maxLen then
+            if maxLen and #data > maxLen then
                 hexStr = hexStr .. "..."
             end
             return hexStr
@@ -532,10 +532,10 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                     tprint(string.format("%s[%s] CMD %d (%s) UID=%d LEN=%d\27[0m", 
                         color, dirStr, header.cmdId, cmdName, header.userId, header.length))
                     
-                    -- 显示 HEX 数据 (body 部分)
+                    -- 显示 HEX 数据 (body 部分，完整显示)
                     if #decryptedData > 17 then
                         local bodyData = decryptedData:sub(18)
-                        tprint(string.format("\27[90m  HEX: %s\27[0m", toHexString(bodyData, 48)))
+                        tprint(string.format("\27[90m  HEX: %s\27[0m", toHexString(bodyData)))
                     end
                 end
                 

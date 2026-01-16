@@ -165,12 +165,12 @@ end
 -- 初始化数据库
 UserDB:load()
 
--- 如果没有用户，创建默认测试用户
-if next(UserDB.users) == nil then
-    UserDB:createUser("test", "123456", "test@local.seer")
-    UserDB:createUser("admin", "admin", "admin@local.seer")
-    print("\27[33m[UserDB] 已创建默认测试用户: test/123456, admin/admin\27[0m")
-end
+-- 如果没有用户，创建默认测试用户 (可选，注释掉则不自动创建)
+-- if next(UserDB.users) == nil then
+--     UserDB:createUser("test", "123456", "test@local.seer")
+--     UserDB:createUser("admin", "admin", "admin@local.seer")
+--     print("\27[33m[UserDB] 已创建默认测试用户: test/123456, admin/admin\27[0m")
+-- end
 
 print("\27[36m[API-SERVER] Starting API server...\27[0m")
 

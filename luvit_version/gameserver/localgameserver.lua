@@ -677,7 +677,9 @@ end
 -- CMD 2002: 离开地图
 function LocalGameServer:handleLeaveMap(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2002: 离开地图\27[0m")
-    self:sendResponse(clientData, cmdId, userId, 0, "")
+    -- 官服响应包含 userId
+    local responseBody = writeUInt32BE(userId)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
 -- CMD 2051: 获取简单用户信息
@@ -814,24 +816,25 @@ function LocalGameServer:handleCompleteTask(clientData, cmdId, userId, seqId, bo
     local responseBody = ""
     
     if taskId == 85 then  -- 0x55 - 新手任务1 (领取服装)
-        -- 官服响应: 00 00 00 55 00 00 00 00 00 00 00 00 00 00 00 08 
-        --           00 01 86 BB 00 00 00 01  (100027, 1)
-        --           00 01 86 BC 00 00 00 01  (100028, 1)
-        --           00 07 A1 21 00 00 00 01  (500001, 1)
-        --           00 04 96 6A 00 00 00 03  (300650, 3)
-        --           ... 还有4个物品
+        -- 官服给8个物品:
+        -- 100027, 100028 (服装)
+        -- 500001 (1个)
+        -- 300650 (3个)
+        -- 300025 (3个)
+        -- 300035 (3个)
+        -- 500502, 500503 (各1个)
         
         -- 保存物品到数据库
         if self.userdb then
             local db = self.userdb:new()
-            db:addItem(userId, 0x0186BB, 1)  -- 100027 服装
-            db:addItem(userId, 0x0186BC, 1)  -- 100028 服装
-            db:addItem(userId, 0x07A121, 1)  -- 500001
-            db:addItem(userId, 0x04966A, 3)  -- 300650
-            db:addItem(userId, 0x0186A1, 1)  -- 100001
-            db:addItem(userId, 0x0186A2, 1)  -- 100002
-            db:addItem(userId, 0x0186A3, 1)  -- 100003
-            db:addItem(userId, 0x0186A4, 1)  -- 100004
+            db:addItem(userId, 100027, 1)   -- 0x0186BB 服装
+            db:addItem(userId, 100028, 1)   -- 0x0186BC 服装
+            db:addItem(userId, 500001, 1)   -- 0x07A121
+            db:addItem(userId, 300650, 3)   -- 0x04966A
+            db:addItem(userId, 300025, 3)   -- 0x0493F9
+            db:addItem(userId, 300035, 3)   -- 0x049403
+            db:addItem(userId, 500502, 1)   -- 0x07A316
+            db:addItem(userId, 500503, 1)   -- 0x07A317
             tprint(string.format("\27[32m[LocalGame] 任务85: 已保存8个物品到数据库\27[0m"))
         end
         
@@ -839,14 +842,14 @@ function LocalGameServer:handleCompleteTask(clientData, cmdId, userId, seqId, bo
             writeUInt32BE(0) ..  -- petID: 无精灵奖励
             writeUInt32BE(0) ..  -- captureTm: 无
             writeUInt32BE(8) ..  -- itemCount: 8个物品
-            writeUInt32BE(0x0186BB) .. writeUInt32BE(1) ..  -- 100027 服装
-            writeUInt32BE(0x0186BC) .. writeUInt32BE(1) ..  -- 100028 服装
-            writeUInt32BE(0x07A121) .. writeUInt32BE(1) ..  -- 500001
-            writeUInt32BE(0x04966A) .. writeUInt32BE(3) ..  -- 300650
-            writeUInt32BE(0x0186A1) .. writeUInt32BE(1) ..  -- 100001
-            writeUInt32BE(0x0186A2) .. writeUInt32BE(1) ..  -- 100002
-            writeUInt32BE(0x0186A3) .. writeUInt32BE(1) ..  -- 100003
-            writeUInt32BE(0x0186A4) .. writeUInt32BE(1)     -- 100004
+            writeUInt32BE(100027) .. writeUInt32BE(1) ..  -- 服装
+            writeUInt32BE(100028) .. writeUInt32BE(1) ..  -- 服装
+            writeUInt32BE(500001) .. writeUInt32BE(1) ..
+            writeUInt32BE(300650) .. writeUInt32BE(3) ..
+            writeUInt32BE(300025) .. writeUInt32BE(3) ..
+            writeUInt32BE(300035) .. writeUInt32BE(3) ..
+            writeUInt32BE(500502) .. writeUInt32BE(1) ..
+            writeUInt32BE(500503) .. writeUInt32BE(1)
             
     elseif taskId == 86 then  -- 0x56 - 新手任务2 (选择精灵)
         -- 官服响应: 00 00 00 56 00 00 00 04 69 69 C4 5E 00 00 00 00
@@ -1060,19 +1063,20 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sp
     responseBody = responseBody .. writeUInt32BE(skillCount) -- skillNum
     
-    -- 4个技能槽 (id + pp)
+    -- 4个技能槽 (id + pp) - 官服 PP: 30, 35, 0, 0
+    local ppValues = {30, 35, 0, 0}
     for i = 1, 4 do
         local skillId = skills[i] or 0
         if type(skillId) == "table" then
             skillId = skillId.id or 0
         end
-        responseBody = responseBody .. writeUInt32BE(skillId) .. writeUInt32BE(30)  -- pp 默认30
+        responseBody = responseBody .. writeUInt32BE(skillId) .. writeUInt32BE(ppValues[i])
     end
     
     responseBody = responseBody .. writeUInt32BE(catchId)    -- catchTime
-    responseBody = responseBody .. writeUInt32BE(301)        -- catchMap
+    responseBody = responseBody .. writeUInt32BE(0)          -- catchMap (官服=0)
     responseBody = responseBody .. writeUInt32BE(0)          -- catchRect
-    responseBody = responseBody .. writeUInt32BE(petLevel)   -- catchLevel
+    responseBody = responseBody .. writeUInt32BE(0)          -- catchLevel (官服=0)
     responseBody = responseBody .. writeUInt16BE(0)          -- effectCount
     responseBody = responseBody .. writeUInt32BE(0)          -- peteffect
     responseBody = responseBody .. writeUInt32BE(0)          -- skinID
@@ -1405,36 +1409,41 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     
     -- 获取精灵数据
     local petLevel = 5
-    local stats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 100, maxHp = 100}
+    local petDv = 31
+    local petNature = math.random(0, 24)  -- 随机性格
+    local stats = SeerMonsters.calculateStats(petId, petLevel, petDv) or {hp = 20, maxHp = 20}
     local skills = SeerMonsters.getBattleSkills(petId, petLevel)
     local skillCount = 0
     for _, s in ipairs(skills) do
         if s > 0 then skillCount = skillCount + 1 end
     end
     
+    -- 计算经验信息
+    local expInfo = SeerMonsters.getExpInfo(petId, petLevel, 0)
+    
     local responseBody = ""
     
-    -- PetTakeOutInfo 结构
-    responseBody = responseBody .. writeUInt32BE(100)        -- homeEnergy
-    responseBody = responseBody .. writeUInt32BE(os.time())  -- firstPetTime
+    -- PetTakeOutInfo 结构 (官服格式)
+    responseBody = responseBody .. writeUInt32BE(0)          -- homeEnergy (官服=0)
+    responseBody = responseBody .. writeUInt32BE(catchId)    -- firstPetTime (官服=catchId)
     responseBody = responseBody .. writeUInt32BE(1)          -- flag (有精灵信息)
     
     -- PetInfo (完整版)
     responseBody = responseBody .. writeUInt32BE(petId)      -- id (使用正确的精灵ID)
     responseBody = responseBody .. writeFixedString("", 16)  -- name (16字节)
-    responseBody = responseBody .. writeUInt32BE(31)         -- dv (个体值)
-    responseBody = responseBody .. writeUInt32BE(0)          -- nature (性格)
+    responseBody = responseBody .. writeUInt32BE(petDv)      -- dv (个体值=31)
+    responseBody = responseBody .. writeUInt32BE(petNature)  -- nature (随机性格)
     responseBody = responseBody .. writeUInt32BE(petLevel)   -- level
     responseBody = responseBody .. writeUInt32BE(0)          -- exp
     responseBody = responseBody .. writeUInt32BE(0)          -- lvExp
-    responseBody = responseBody .. writeUInt32BE(1000)       -- nextLvExp
+    responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp (官服=114)
     responseBody = responseBody .. writeUInt32BE(stats.hp)   -- hp
     responseBody = responseBody .. writeUInt32BE(stats.maxHp) -- maxHp
-    responseBody = responseBody .. writeUInt32BE(stats.attack or 39)   -- attack
-    responseBody = responseBody .. writeUInt32BE(stats.defence or 35)  -- defence
-    responseBody = responseBody .. writeUInt32BE(stats.spAtk or 78)    -- s_a (特攻)
-    responseBody = responseBody .. writeUInt32BE(stats.spDef or 36)    -- s_d (特防)
-    responseBody = responseBody .. writeUInt32BE(stats.speed or 39)    -- speed
+    responseBody = responseBody .. writeUInt32BE(stats.attack or 12)   -- attack
+    responseBody = responseBody .. writeUInt32BE(stats.defence or 12)  -- defence
+    responseBody = responseBody .. writeUInt32BE(stats.spAtk or 11)    -- s_a (特攻)
+    responseBody = responseBody .. writeUInt32BE(stats.spDef or 10)    -- s_d (特防)
+    responseBody = responseBody .. writeUInt32BE(stats.speed or 12)    -- speed
     responseBody = responseBody .. writeUInt32BE(0)          -- addMaxHP
     responseBody = responseBody .. writeUInt32BE(0)          -- addMoreMaxHP
     responseBody = responseBody .. writeUInt32BE(0)          -- addAttack
@@ -1448,16 +1457,16 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sa
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sd
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sp
-    responseBody = responseBody .. writeUInt32BE(skillCount) -- skillNum
-    -- 4个技能槽 (id + pp)
-    responseBody = responseBody .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(35)
-    responseBody = responseBody .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(25)
-    responseBody = responseBody .. writeUInt32BE(skills[3] or 0) .. writeUInt32BE(20)
+    responseBody = responseBody .. writeUInt32BE(skillCount) -- skillNum (官服=实际技能数)
+    -- 4个技能槽 (id + pp) - 官服 PP: 30, 35
+    responseBody = responseBody .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(30)
+    responseBody = responseBody .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(35)
+    responseBody = responseBody .. writeUInt32BE(skills[3] or 0) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(skills[4] or 0) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(catchId)    -- catchTime
-    responseBody = responseBody .. writeUInt32BE(515)        -- catchMap
+    responseBody = responseBody .. writeUInt32BE(0)          -- catchMap (官服=0)
     responseBody = responseBody .. writeUInt32BE(0)          -- catchRect
-    responseBody = responseBody .. writeUInt32BE(petLevel)   -- catchLevel
+    responseBody = responseBody .. writeUInt32BE(0)          -- catchLevel (官服=0)
     responseBody = responseBody .. writeUInt16BE(0)          -- effectCount
     responseBody = responseBody .. writeUInt32BE(0)          -- peteffect
     responseBody = responseBody .. writeUInt32BE(0)          -- skinID
@@ -1468,8 +1477,8 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     -- 保存精灵到数据库
     if self.userdb and flag == 1 then  -- flag=1 表示从仓库释放到背包
         local db = self.userdb:new()
-        db:addPet(userId, petId, catchId, petLevel, 31, 0)
-        tprint(string.format("\27[32m[LocalGame] 精灵已保存到数据库: petId=%d, catchId=0x%08X\27[0m", petId, catchId))
+        db:addPet(userId, petId, catchId, petLevel, petDv, petNature)
+        tprint(string.format("\27[32m[LocalGame] 精灵已保存到数据库: petId=%d, catchId=0x%08X, nature=%d\27[0m", petId, catchId, petNature))
     end
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
@@ -1499,15 +1508,15 @@ end
 function LocalGameServer:initBattle(userId, userData, enemyPetId)
     local petId = userData.currentPetId or 7
     local petLevel = 5
-    local enemyLevel = 5
+    local enemyLevel = 1  -- 官服新手教程比比鼠是 level=1
     
     -- 获取玩家精灵数据
-    local playerStats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 21, maxHp = 21}
+    local playerStats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 20, maxHp = 20}
     local playerSkills = SeerMonsters.getBattleSkills(petId, petLevel)
     local playerMonster = SeerMonsters.get(petId)
     
     -- 获取敌方精灵数据
-    local enemyStats = SeerMonsters.calculateStats(enemyPetId, enemyLevel, 15) or {hp = 21, maxHp = 21}
+    local enemyStats = SeerMonsters.calculateStats(enemyPetId, enemyLevel, 15) or {hp = 12, maxHp = 12}
     local enemySkills = SeerMonsters.getBattleSkills(enemyPetId, enemyLevel)
     local enemyMonster = SeerMonsters.get(enemyPetId)
     
@@ -1575,8 +1584,8 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
         if s > 0 then skillCount = skillCount + 1 end
     end
     
-    -- 计算精灵属性
-    local stats = SeerMonsters.calculateStats(petId, petLevel, 15) or {hp = 21, maxHp = 21}
+    -- 计算精灵属性 (玩家 dv=31)
+    local stats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 20, maxHp = 20}
     
     tprint(string.format("\27[36m[LocalGame] 精灵 %d (%s) Lv%d, HP=%d, 实际技能=%d个, 发送skillNum=4\27[0m", 
         petId, SeerMonsters.getName(petId), petLevel, stats.hp, skillCount))
@@ -1603,13 +1612,13 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     responseBody = responseBody .. writeUInt32BE(stats.maxHp)
     -- 官服始终发送 skillNum=4，即使精灵只有2个技能
     responseBody = responseBody .. writeUInt32BE(4)
-    -- 4个技能槽 (id + pp)
-    responseBody = responseBody .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(35)
-    responseBody = responseBody .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(25)
-    responseBody = responseBody .. writeUInt32BE(skills[3] or 0) .. writeUInt32BE(20)
+    -- 4个技能槽 (id + pp) - 官服 PP 值: 30, 35, 0, 0
+    responseBody = responseBody .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(30)
+    responseBody = responseBody .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(35)
+    responseBody = responseBody .. writeUInt32BE(skills[3] or 0) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(skills[4] or 0) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(catchTime)
-    responseBody = responseBody .. writeUInt32BE(515)
+    responseBody = responseBody .. writeUInt32BE(0)  -- catchMap=0 (官服)
     responseBody = responseBody .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(petLevel)
     responseBody = responseBody .. writeUInt32BE(0)
@@ -1621,11 +1630,11 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     -- petCount
     responseBody = responseBody .. writeUInt32BE(1)
     
-    -- BOSS精灵 (新手教程=13 比比鼠)
+    -- BOSS精灵 (新手教程=13 比比鼠, 官服 level=1)
     local enemyPetId = 13
-    local enemyLevel = 5
+    local enemyLevel = 1  -- 官服比比鼠是 level=1
     local enemySkills = SeerMonsters.getBattleSkills(enemyPetId, enemyLevel)
-    local enemyStats = SeerMonsters.calculateStats(enemyPetId, enemyLevel, 10) or {hp = 21, maxHp = 21}
+    local enemyStats = SeerMonsters.calculateStats(enemyPetId, enemyLevel, 15) or {hp = 12, maxHp = 12}
     local enemySkillCount = 0
     for _, s in ipairs(enemySkills) do
         if s > 0 then enemySkillCount = enemySkillCount + 1 end
@@ -1637,12 +1646,13 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     responseBody = responseBody .. writeUInt32BE(enemyStats.maxHp)
     -- 官服始终发送 skillNum=4
     responseBody = responseBody .. writeUInt32BE(4)
-    responseBody = responseBody .. writeUInt32BE(enemySkills[1] or 0) .. writeUInt32BE(30)
-    responseBody = responseBody .. writeUInt32BE(enemySkills[2] or 0) .. writeUInt32BE(35)
+    -- 官服敌人技能 PP: 10001(35pp), 其他为0
+    responseBody = responseBody .. writeUInt32BE(enemySkills[1] or 0) .. writeUInt32BE(35)
+    responseBody = responseBody .. writeUInt32BE(enemySkills[2] or 0) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(enemySkills[3] or 0) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(enemySkills[4] or 0) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(enemyCatchTime)  -- 敌人也需要唯一的 catchTime
-    responseBody = responseBody .. writeUInt32BE(515)
+    responseBody = responseBody .. writeUInt32BE(0)  -- catchMap=0 (官服)
     responseBody = responseBody .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(enemyLevel)
     responseBody = responseBody .. writeUInt32BE(0)
@@ -1713,13 +1723,14 @@ function LocalGameServer:sendNoteStartFight(clientData, userId, userData)
     local bossId = userData.currentBossId or 13  -- 新手教程BOSS=比比鼠(13)
     local enemyCatchTime = userData.enemyCatchTime or 0x69690000  -- 敌人的 catchTime
     local petLevel = 5
+    local enemyLevel = 1  -- 官服比比鼠是 level=1
     
     tprint(string.format("\27[33m[LocalGame] 2504: 玩家 petId=%d catchTime=0x%08X, 敌人 bossId=%d catchTime=0x%08X\27[0m", 
         petId, catchTime, bossId, enemyCatchTime))
     
-    -- 从精灵数据库获取属性
-    local myStats = SeerMonsters.calculateStats(petId, petLevel, 15) or {hp = 21, maxHp = 21}
-    local enemyStats = SeerMonsters.calculateStats(bossId, petLevel, 10) or {hp = 21, maxHp = 21}
+    -- 从精灵数据库获取属性 (玩家 dv=31, 敌人 dv=15)
+    local myStats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 20, maxHp = 20}
+    local enemyStats = SeerMonsters.calculateStats(bossId, enemyLevel, 15) or {hp = 12, maxHp = 12}
     
     local responseBody = ""
     
@@ -1744,8 +1755,8 @@ function LocalGameServer:sendNoteStartFight(clientData, userId, userData)
     responseBody = responseBody .. writeUInt32BE(enemyCatchTime)              -- catchTime (必须与 2503 中一致)
     responseBody = responseBody .. writeUInt32BE(enemyStats.hp)               -- hp
     responseBody = responseBody .. writeUInt32BE(enemyStats.maxHp)            -- maxHP
-    responseBody = responseBody .. writeUInt32BE(petLevel)                    -- lv
-    responseBody = responseBody .. writeUInt32BE(1)                           -- catchable (可捕捉)
+    responseBody = responseBody .. writeUInt32BE(enemyLevel)                  -- lv (敌人等级=1)
+    responseBody = responseBody .. writeUInt32BE(0)                           -- catchable (新手教程不可捕捉)
     responseBody = responseBody .. string.char(0, 0, 0, 0, 0, 0)              -- battleLv (6字节)
     
     tprint(string.format("\27[33m[LocalGame] 2504 包体大小: %d bytes\27[0m", #responseBody))
@@ -2102,32 +2113,53 @@ end
 function LocalGameServer:sendNoteUpdateProp(clientData, userId, userData)
     tprint("\27[36m[LocalGame] 发送 CMD 2508: 精灵属性更新\27[0m")
     
-    local petId = userData.currentPetId or 4
+    local petId = userData.currentPetId or 7
     local catchTime = userData.catchId or 0x6969C45E
+    local petLevel = 5
+    local petDv = 31
     
-    -- 官服日志: 00 00 00 00 00 00 00 01 69 69 C4 5E 00 00 00 04 00 00 00 05 00 00 00 08 00 00 00 4C 00 00 00 72 00 00 00 15 00 00 00 0B 00 00 00 0B 00 00 00 0C ...
-    -- addition=0, petCount=1, catchTime=0x6969C45E, id=4, level=5, exp=8, currentLvExp=76, nextLvExp=114, maxHp=21, attack=11, defence=11, sa=12...
+    -- 计算精灵属性
+    local stats = SeerMonsters.calculateStats(petId, petLevel, petDv) or {
+        hp = 20, maxHp = 20, attack = 12, defence = 12, spAtk = 11, spDef = 10, speed = 12
+    }
+    
+    -- 战斗获得的经验 (官服新手教程=8)
+    local gainedExp = 8
+    
+    -- 从数据库读取当前经验
+    local currentExp = 0
+    if self.userdb then
+        local db = self.userdb:new()
+        local pet = db:getPetByCatchTime(userId, catchTime)
+        if pet then
+            currentExp = pet.exp or 0
+        end
+    end
+    
+    -- 计算新的累计经验
+    local newTotalExp = currentExp + gainedExp
+    local expInfo = SeerMonsters.getExpInfo(petId, petLevel, newTotalExp)
     
     local responseBody = ""
     
     responseBody = responseBody .. writeUInt32BE(0)          -- addition (无加成)
     responseBody = responseBody .. writeUInt32BE(1)          -- petCount
     
-    -- UpdatePropInfo (官服数据)
+    -- UpdatePropInfo
     responseBody = responseBody .. writeUInt32BE(catchTime)  -- catchTime
-    responseBody = responseBody .. writeUInt32BE(petId)      -- id=4
-    responseBody = responseBody .. writeUInt32BE(5)          -- level=5
-    responseBody = responseBody .. writeUInt32BE(8)          -- exp=8
-    responseBody = responseBody .. writeUInt32BE(76)         -- currentLvExp=76 (0x4C)
-    responseBody = responseBody .. writeUInt32BE(114)        -- nextLvExp=114 (0x72)
-    responseBody = responseBody .. writeUInt32BE(21)         -- maxHp=21 (0x15)
-    responseBody = responseBody .. writeUInt32BE(11)         -- attack=11 (0x0B)
-    responseBody = responseBody .. writeUInt32BE(11)         -- defence=11 (0x0B)
-    responseBody = responseBody .. writeUInt32BE(12)         -- sa=12 (0x0C)
-    responseBody = responseBody .. writeUInt32BE(11)         -- sd=11
-    responseBody = responseBody .. writeUInt32BE(12)         -- sp=12
+    responseBody = responseBody .. writeUInt32BE(petId)      -- id
+    responseBody = responseBody .. writeUInt32BE(petLevel)   -- level
+    responseBody = responseBody .. writeUInt32BE(gainedExp)  -- exp (本次战斗获得的经验)
+    responseBody = responseBody .. writeUInt32BE(expInfo.lvExp)      -- currentLvExp (累计经验)
+    responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp
+    responseBody = responseBody .. writeUInt32BE(stats.maxHp)        -- maxHp
+    responseBody = responseBody .. writeUInt32BE(stats.attack)       -- attack
+    responseBody = responseBody .. writeUInt32BE(stats.defence)      -- defence
+    responseBody = responseBody .. writeUInt32BE(stats.spAtk)        -- sa
+    responseBody = responseBody .. writeUInt32BE(stats.spDef)        -- sd
+    responseBody = responseBody .. writeUInt32BE(stats.speed)        -- sp
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_hp
-    responseBody = responseBody .. writeUInt32BE(0)          -- ev_a
+    responseBody = responseBody .. writeUInt32BE(1)          -- ev_a (官服=1)
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_d
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sa
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sd
@@ -2141,10 +2173,10 @@ function LocalGameServer:sendNoteUpdateProp(clientData, userId, userData)
         local pet = db:getPetByCatchTime(userId, catchTime)
         if pet then
             db:updatePet(userId, catchTime, {
-                exp = 8,  -- 战斗获得的经验
-                level = 5
+                exp = newTotalExp,
+                level = petLevel
             })
-            tprint(string.format("\27[32m[LocalGame] 精灵经验已保存: catchTime=0x%08X, exp=8\27[0m", catchTime))
+            tprint(string.format("\27[32m[LocalGame] 精灵经验已保存: catchTime=0x%08X, exp=%d\27[0m", catchTime, newTotalExp))
         end
     end
 end
@@ -2269,8 +2301,25 @@ end
 function LocalGameServer:handleMapHot(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 1004: 地图热度\27[0m")
     
-    -- 返回空地图热度列表
-    local responseBody = writeUInt32BE(0)  -- count = 0
+    -- 返回一些常用地图的热度
+    local hotMaps = {
+        {1, 5},      -- 新手村
+        {5, 5},      -- 克洛斯星
+        {4, 5},      -- 赫尔卡星
+        {5, 15},     -- 
+        {325, 1},    -- 
+        {6, 1},      -- 
+        {7, 1},      -- 
+        {102, 10},   -- 实验室
+        {301, 5},    -- 
+        {515, 20},   -- 新手教程地图
+    }
+    
+    local responseBody = writeUInt32BE(#hotMaps)
+    for _, map in ipairs(hotMaps) do
+        responseBody = responseBody .. writeUInt32BE(map[1]) .. writeUInt32BE(map[2])
+    end
+    
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
