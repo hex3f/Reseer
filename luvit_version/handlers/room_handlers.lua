@@ -101,24 +101,21 @@ end
 
 -- CMD 10002: GET_ROOM_ADDRES (获取房间地址)
 -- 请求: targetUserId(4)
--- 响应: targetUserId(4) + 加密数据(32 bytes) + 端口相关(6 bytes)
--- 官服响应格式: userID(4) + encryptedData(32) + portData(6)
+-- 官服响应: userID(4) + encryptedData(26 bytes) = 30 bytes total
 local function handleGetRoomAddress(ctx)
     local targetUserId = ctx.userId
     if #ctx.body >= 4 then
         targetUserId = readUInt32BE(ctx.body, 1)
     end
     
-    -- 构建响应 (模拟官服格式)
-    local body = writeUInt32BE(targetUserId)           -- targetUserId (4)
-    -- 加密数据 (32 bytes) - 官服返回的是加密的房间服务器信息
+    -- 构建响应 (与官服格式一致: 4 + 26 = 30 bytes)
+    local body = writeUInt32BE(targetUserId)     -- targetUserId (4)
+    -- 加密数据 (26 bytes) - 官服返回的是加密的房间服务器信息
     -- 本地服务器不需要真正的加密，填充占位数据
-    body = body .. string.rep("\0", 32)
-    -- 端口数据 (6 bytes)
-    body = body .. string.rep("\0", 6)
+    body = body .. string.rep("\0", 26)
     
     ctx.sendResponse(buildResponse(10002, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → GET_ROOM_ADDRES response (target=%d)\27[0m", targetUserId))
+    print(string.format("\27[32m[Handler] → GET_ROOM_ADDRES response (target=%d, size=30)\27[0m", targetUserId))
     return true
 end
 
@@ -157,7 +154,7 @@ end
 
 -- CMD 10006: FITMENT_USERING (正在使用的家具)
 -- 返回正在使用的家具列表
--- 响应格式: userID(4) + roomID(4) + count(4) + [FitmentInfo]...
+-- 官服响应格式: userID(4) + visitorId(4) + count(4) + [FitmentInfo]...
 -- FitmentInfo: id(4) + x(4) + y(4) + dir(4) + status(4)
 local function handleFitmentUsering(ctx)
     -- 从请求中读取目标用户ID (可能是访问别人的家)
@@ -166,39 +163,27 @@ local function handleFitmentUsering(ctx)
         targetUserId = readUInt32BE(ctx.body, 1)
     end
     
-    -- 房间ID = 用户ID (每个用户有自己的房间)
-    local roomId = targetUserId
-    
     -- 获取用户的家具数据
     local user = ctx.getOrCreateUser(targetUserId)
     local fitments = user.fitments or {}
     
-    -- 构建响应
-    local body = writeUInt32BE(targetUserId) ..  -- userID
-                 writeUInt32BE(roomId)           -- roomID
+    -- 构建响应 (与官服格式一致)
+    local body = writeUInt32BE(targetUserId) ..  -- userID (房主)
+                 writeUInt32BE(ctx.userId) ..    -- visitorId (访问者，通常是自己)
+                 writeUInt32BE(#fitments)        -- count
     
-    -- 如果没有家具，添加默认房间样式 (500001)
-    if #fitments == 0 then
-        -- 添加默认房间样式
-        body = body .. writeUInt32BE(1)          -- count = 1
-        body = body .. writeUInt32BE(500001)     -- id (默认房间样式)
-        body = body .. writeUInt32BE(0)          -- x
-        body = body .. writeUInt32BE(0)          -- y
-        body = body .. writeUInt32BE(0)          -- dir
-        body = body .. writeUInt32BE(0)          -- status
-    else
-        body = body .. writeUInt32BE(#fitments)  -- count
-        for _, fitment in ipairs(fitments) do
-            body = body .. writeUInt32BE(fitment.id or 0)
-            body = body .. writeUInt32BE(fitment.x or 0)
-            body = body .. writeUInt32BE(fitment.y or 0)
-            body = body .. writeUInt32BE(fitment.dir or 0)
-            body = body .. writeUInt32BE(fitment.status or 0)
-        end
+    -- 添加家具列表
+    for _, fitment in ipairs(fitments) do
+        body = body .. writeUInt32BE(fitment.id or 0)
+        body = body .. writeUInt32BE(fitment.x or 0)
+        body = body .. writeUInt32BE(fitment.y or 0)
+        body = body .. writeUInt32BE(fitment.dir or 0)
+        body = body .. writeUInt32BE(fitment.status or 0)
     end
     
     ctx.sendResponse(buildResponse(10006, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → FITMENT_USERING response (user=%d, room=%d)\27[0m", targetUserId, roomId))
+    print(string.format("\27[32m[Handler] → FITMENT_USERING response (owner=%d, visitor=%d, count=%d)\27[0m", 
+        targetUserId, ctx.userId, #fitments))
     return true
 end
 

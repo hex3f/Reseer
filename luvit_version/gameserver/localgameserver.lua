@@ -121,6 +121,13 @@ function LocalGameServer:removeClient(clientData)
         clientData.heartbeatTimer = nil
     end
     
+    -- 设置用户离线状态 (用于好友系统)
+    if clientData.userId and self.userdb then
+        local db = self.userdb:new()
+        db:setUserOffline(clientData.userId)
+        tprint(string.format("\27[36m[LocalGame] 用户 %d 已离线\27[0m", clientData.userId))
+    end
+    
     for i, c in ipairs(self.clients) do
         if c == clientData then
             table.remove(self.clients, i)
@@ -226,6 +233,11 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2104] = self.handleAimat,             -- 瞄准/交互
         [2111] = self.handlePeopleTransform,   -- 变身
         [2150] = self.handleGetRelationList,   -- 获取好友/黑名单列表
+        [2151] = self.handleFriendAdd,         -- 添加好友请求
+        [2152] = self.handleFriendAnswer,      -- 回应好友请求
+        [2153] = self.handleFriendRemove,      -- 删除好友
+        [2154] = self.handleBlackAdd,          -- 添加黑名单
+        [2155] = self.handleBlackRemove,       -- 移除黑名单
         [2201] = self.handleAcceptTask,        -- 接受任务
         [2202] = self.handleCompleteTask,      -- 完成任务
         [2203] = self.handleGetTaskBuf,        -- 获取任务缓存
@@ -661,6 +673,14 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
     
     tprint(string.format("\27[32m[LocalGame] ✓ 用户 %d 登录成功，响应大小: %d bytes\27[0m", userId, 17 + #responseBody))
+    
+    -- 记录用户当前所在服务器 (用于好友系统)
+    if self.userdb then
+        local db = self.userdb:new()
+        local serverId = conf.server_id or 1  -- 当前服务器ID
+        db:setUserServer(userId, serverId)
+        tprint(string.format("\27[36m[LocalGame] 用户 %d 登录到服务器 %d\27[0m", userId, serverId))
+    end
     
     -- 登录成功后启动心跳定时器 (官服每6秒发送一次心跳)
     clientData.loggedIn = true
@@ -2749,25 +2769,170 @@ end
 function LocalGameServer:handleGetRelationList(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2150: 获取好友/黑名单列表\27[0m")
     
-    local userData = self:getOrCreateUser(userId)
-    local friends = userData.friends or {}
-    local blacklist = userData.blacklist or {}
+    -- 从数据库获取好友和黑名单
+    local friends = {}
+    local blacklist = {}
+    
+    if self.userdb then
+        local db = self.userdb:new()
+        friends = db:getFriends(userId)
+        blacklist = db:getBlacklist(userId)
+    end
     
     local responseBody = ""
     
     -- 好友列表
     responseBody = responseBody .. writeUInt32BE(#friends)
     for _, friend in ipairs(friends) do
-        responseBody = responseBody .. writeUInt32BE(friend.userID or friend.id or 0)
+        responseBody = responseBody .. writeUInt32BE(friend.userID or 0)
         responseBody = responseBody .. writeUInt32BE(friend.timePoke or 0)
     end
     
     -- 黑名单
     responseBody = responseBody .. writeUInt32BE(#blacklist)
     for _, black in ipairs(blacklist) do
-        responseBody = responseBody .. writeUInt32BE(black.userID or black.id or black)
+        responseBody = responseBody .. writeUInt32BE(black.userID or 0)
     end
     
+    tprint(string.format("\27[36m[LocalGame] 好友数: %d, 黑名单数: %d\27[0m", #friends, #blacklist))
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2151: 添加好友请求
+-- 请求: targetUserId(4)
+-- 响应: result(4) - 0=成功
+function LocalGameServer:handleFriendAdd(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 2151: 添加好友请求\27[0m")
+    
+    local targetUserId = 0
+    if #body >= 4 then
+        targetUserId = readUInt32BE(body, 1)
+    end
+    
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 请求添加好友 %d\27[0m", userId, targetUserId))
+    
+    local result = 0
+    if self.userdb then
+        local db = self.userdb:new()
+        
+        -- 检查目标用户是否存在
+        local targetUser = db:findByUserId(targetUserId)
+        if not targetUser then
+            result = 1  -- 用户不存在
+        elseif db:isBlacklisted(targetUserId, userId) then
+            result = 2  -- 被对方拉黑
+        elseif db:isFriend(userId, targetUserId) then
+            result = 3  -- 已经是好友
+        else
+            -- 直接添加好友（简化处理，跳过请求确认）
+            db:addFriend(userId, targetUserId)
+            db:addFriend(targetUserId, userId)  -- 双向添加
+        end
+    end
+    
+    local responseBody = writeUInt32BE(result)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2152: 回应好友请求
+-- 请求: targetUserId(4) + accept(4)
+-- 响应: result(4)
+function LocalGameServer:handleFriendAnswer(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 2152: 回应好友请求\27[0m")
+    
+    local targetUserId = 0
+    local accept = 0
+    if #body >= 4 then
+        targetUserId = readUInt32BE(body, 1)
+    end
+    if #body >= 8 then
+        accept = readUInt32BE(body, 5)
+    end
+    
+    tprint(string.format("\27[36m[LocalGame] 用户 %d %s 好友请求 from %d\27[0m", 
+        userId, accept == 1 and "接受" or "拒绝", targetUserId))
+    
+    local result = 0
+    if accept == 1 and self.userdb then
+        local db = self.userdb:new()
+        db:addFriend(userId, targetUserId)
+        db:addFriend(targetUserId, userId)
+    end
+    
+    local responseBody = writeUInt32BE(result)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2153: 删除好友
+-- 请求: targetUserId(4)
+-- 响应: result(4)
+function LocalGameServer:handleFriendRemove(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 2153: 删除好友\27[0m")
+    
+    local targetUserId = 0
+    if #body >= 4 then
+        targetUserId = readUInt32BE(body, 1)
+    end
+    
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 删除好友 %d\27[0m", userId, targetUserId))
+    
+    local result = 0
+    if self.userdb then
+        local db = self.userdb:new()
+        db:removeFriend(userId, targetUserId)
+        db:removeFriend(targetUserId, userId)  -- 双向删除
+    end
+    
+    local responseBody = writeUInt32BE(result)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2154: 添加黑名单
+-- 请求: targetUserId(4)
+-- 响应: result(4)
+function LocalGameServer:handleBlackAdd(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 2154: 添加黑名单\27[0m")
+    
+    local targetUserId = 0
+    if #body >= 4 then
+        targetUserId = readUInt32BE(body, 1)
+    end
+    
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 拉黑 %d\27[0m", userId, targetUserId))
+    
+    local result = 0
+    if self.userdb then
+        local db = self.userdb:new()
+        db:addBlacklist(userId, targetUserId)
+        -- 同时删除好友关系
+        db:removeFriend(userId, targetUserId)
+        db:removeFriend(targetUserId, userId)
+    end
+    
+    local responseBody = writeUInt32BE(result)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2155: 移除黑名单
+-- 请求: targetUserId(4)
+-- 响应: result(4)
+function LocalGameServer:handleBlackRemove(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 2155: 移除黑名单\27[0m")
+    
+    local targetUserId = 0
+    if #body >= 4 then
+        targetUserId = readUInt32BE(body, 1)
+    end
+    
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 移除黑名单 %d\27[0m", userId, targetUserId))
+    
+    local result = 0
+    if self.userdb then
+        local db = self.userdb:new()
+        db:removeBlacklist(userId, targetUserId)
+    end
+    
+    local responseBody = writeUInt32BE(result)
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 

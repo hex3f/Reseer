@@ -97,25 +97,37 @@ function lpp.makeSrvList(servers)
     return tostring(list)
 end
 
-function lpp.makeGoodSrvList(servers)
+function lpp.makeGoodSrvList(servers, userId)
     -- CMD 105 响应格式:
-    -- maxOnlineID(4) + isVIP(4) + onlineCnt(4) + [ServerInfo](30 * onlineCnt)
+    -- maxOnlineID(4) + isVIP(4) + onlineCnt(4) + [ServerInfo](30 * onlineCnt) + friendData
     -- ServerInfo: onlineID(4) + userCnt(4) + ip(16) + port(2) + friends(4) = 30 bytes
+    -- friendData: friendCount(4) + [userID(4) + timePoke(4)]... + blackCount(4) + [userID(4)]...
     
-    local totalSize = 8 + 4 + (#servers * 30)  -- meta(8) + count(4) + servers
+    -- 获取用户好友列表和黑名单
+    local friends = {}
+    local blacklist = {}
+    
+    if userId and userId > 0 then
+        friends = userDB:getFriends(userId)
+        blacklist = userDB:getBlacklist(userId)
+    end
+    
+    -- 计算 friendData 大小
+    local friendDataSize = 4 + (#friends * 8) + 4 + (#blacklist * 4)
+    local totalSize = 12 + (#servers * 30) + friendDataSize
     local body = buffer.Buffer:new(totalSize)
     
     -- 写入 meta
     body:writeUInt32BE(1, srv.getMaxServerID())  -- maxOnlineID
-    body:writeUInt32BE(5, 0)  -- isVIP
-    body:writeUInt32BE(9, #servers)  -- onlineCnt
+    body:writeUInt32BE(5, 0)                      -- isVIP
+    body:writeUInt32BE(9, #servers)               -- onlineCnt
     
     -- 写入服务器列表
-    local offset = 12  -- 从第13字节开始
+    local offset = 12
     for i = 1, #servers do
         local s = servers[i]
-        body:writeUInt32BE(offset + 1, s.id)           -- onlineID (4)
-        body:writeUInt32BE(offset + 5, s.userCount)    -- userCnt (4)
+        body:writeUInt32BE(offset + 1, s.id)
+        body:writeUInt32BE(offset + 5, s.userCount)
         
         -- IP (16字节)
         local ip = s.ip or "127.0.0.1"
@@ -127,14 +139,29 @@ function lpp.makeGoodSrvList(servers)
             end
         end
         
-        body:writeUInt16BE(offset + 25, s.port or 5000)  -- port (2)
-        body:writeUInt32BE(offset + 27, s.friends or 0)  -- friends (4)
+        body:writeUInt16BE(offset + 25, s.port or 5000)
+        body:writeUInt32BE(offset + 27, s.friends or 0)
         
         offset = offset + 30
     end
     
-    tprint(string.format("\27[36m[CMD-105] 生成响应: maxOnlineID=%d, serverCount=%d, totalSize=%d\27[0m", 
-        srv.getMaxServerID(), #servers, totalSize))
+    -- 写入 friendData
+    body:writeUInt32BE(offset + 1, #friends)
+    offset = offset + 4
+    
+    for _, friend in ipairs(friends) do
+        body:writeUInt32BE(offset + 1, friend.userID or 0)
+        body:writeUInt32BE(offset + 5, friend.timePoke or 0)
+        offset = offset + 8
+    end
+    
+    body:writeUInt32BE(offset + 1, #blacklist)
+    offset = offset + 4
+    
+    for _, black in ipairs(blacklist) do
+        body:writeUInt32BE(offset + 1, black.userID or 0)
+        offset = offset + 4
+    end
     
     return tostring(body)
 end
@@ -456,7 +483,7 @@ lpp.handler[105] = function(socket,userId,buf,length)
     tprint(string.format("\27[36m[CMD-105] 获取推荐服务器列表: userId=%d\27[0m", userId))
     local servers = srv.getGoodSrvList()
     tprint(string.format("\27[36m[CMD-105] 服务器数量: %d\27[0m", #servers))
-    local body = lpp.makeGoodSrvList(servers)
+    local body = lpp.makeGoodSrvList(servers, userId)
     socket:write(lpp.makeHead(105,userId,0,#body))
     socket:write(body)
 end

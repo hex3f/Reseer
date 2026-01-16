@@ -320,4 +320,176 @@ function UserDB:removePet(userId, catchTime)
     return false
 end
 
+-- ==================== 好友管理 ====================
+
+-- 添加好友
+function UserDB:addFriend(userId, friendId)
+    local data = self:getOrCreateGameData(userId)
+    data.friends = data.friends or {}
+    
+    -- 检查是否已经是好友
+    for _, friend in ipairs(data.friends) do
+        if friend.userID == friendId then
+            return false, "已经是好友"
+        end
+    end
+    
+    table.insert(data.friends, {
+        userID = friendId,
+        timePoke = 0,  -- 戳一戳时间
+        addTime = os.time()
+    })
+    self:saveGameData(userId, data)
+    
+    print(string.format("\27[32m[UserDB] 添加好友: userId=%d, friendId=%d\27[0m", userId, friendId))
+    return true
+end
+
+-- 删除好友
+function UserDB:removeFriend(userId, friendId)
+    local data = self:getOrCreateGameData(userId)
+    data.friends = data.friends or {}
+    
+    for i, friend in ipairs(data.friends) do
+        if friend.userID == friendId then
+            table.remove(data.friends, i)
+            self:saveGameData(userId, data)
+            print(string.format("\27[32m[UserDB] 删除好友: userId=%d, friendId=%d\27[0m", userId, friendId))
+            return true
+        end
+    end
+    return false
+end
+
+-- 获取好友列表
+function UserDB:getFriends(userId)
+    local data = self:getOrCreateGameData(userId)
+    return data.friends or {}
+end
+
+-- 检查是否是好友
+function UserDB:isFriend(userId, friendId)
+    local friends = self:getFriends(userId)
+    for _, friend in ipairs(friends) do
+        if friend.userID == friendId then
+            return true
+        end
+    end
+    return false
+end
+
+-- 更新戳一戳时间
+function UserDB:updatePoke(userId, friendId)
+    local data = self:getOrCreateGameData(userId)
+    data.friends = data.friends or {}
+    
+    for _, friend in ipairs(data.friends) do
+        if friend.userID == friendId then
+            friend.timePoke = os.time()
+            self:saveGameData(userId, data)
+            return true
+        end
+    end
+    return false
+end
+
+-- ==================== 黑名单管理 ====================
+
+-- 添加黑名单
+function UserDB:addBlacklist(userId, targetId)
+    local data = self:getOrCreateGameData(userId)
+    data.blacklist = data.blacklist or {}
+    
+    -- 检查是否已在黑名单
+    for _, black in ipairs(data.blacklist) do
+        if black.userID == targetId then
+            return false, "已在黑名单"
+        end
+    end
+    
+    -- 如果是好友，先删除好友关系
+    self:removeFriend(userId, targetId)
+    
+    table.insert(data.blacklist, {
+        userID = targetId,
+        addTime = os.time()
+    })
+    self:saveGameData(userId, data)
+    
+    print(string.format("\27[32m[UserDB] 添加黑名单: userId=%d, targetId=%d\27[0m", userId, targetId))
+    return true
+end
+
+-- 移除黑名单
+function UserDB:removeBlacklist(userId, targetId)
+    local data = self:getOrCreateGameData(userId)
+    data.blacklist = data.blacklist or {}
+    
+    for i, black in ipairs(data.blacklist) do
+        if black.userID == targetId then
+            table.remove(data.blacklist, i)
+            self:saveGameData(userId, data)
+            print(string.format("\27[32m[UserDB] 移除黑名单: userId=%d, targetId=%d\27[0m", userId, targetId))
+            return true
+        end
+    end
+    return false
+end
+
+-- 获取黑名单
+function UserDB:getBlacklist(userId)
+    local data = self:getOrCreateGameData(userId)
+    return data.blacklist or {}
+end
+
+-- 检查是否在黑名单
+function UserDB:isBlacklisted(userId, targetId)
+    local blacklist = self:getBlacklist(userId)
+    for _, black in ipairs(blacklist) do
+        if black.userID == targetId then
+            return true
+        end
+    end
+    return false
+end
+
+-- ==================== 在线状态管理 ====================
+
+-- 记录用户当前所在服务器
+function UserDB:setUserServer(userId, serverId)
+    local data = self:getOrCreateGameData(userId)
+    data.currentServer = serverId
+    data.lastOnline = os.time()
+    self:saveGameData(userId, data)
+end
+
+-- 获取用户当前所在服务器
+function UserDB:getUserServer(userId)
+    local data = self:getOrCreateGameData(userId)
+    return data.currentServer or 0
+end
+
+-- 用户下线
+function UserDB:setUserOffline(userId)
+    local data = self:getOrCreateGameData(userId)
+    data.currentServer = 0
+    data.lastOnline = os.time()
+    self:saveGameData(userId, data)
+end
+
+-- 获取好友在各服务器的数量
+function UserDB:getFriendsOnServers(userId)
+    local friends = self:getFriends(userId)
+    local serverCounts = {}  -- serverId -> count
+    
+    for _, friend in ipairs(friends) do
+        local serverId = self:getUserServer(friend.userID)
+        if serverId and serverId > 0 then
+            serverCounts[serverId] = (serverCounts[serverId] or 0) + 1
+        end
+    end
+    
+    return serverCounts
+end
+
 return UserDB
