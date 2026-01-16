@@ -157,6 +157,11 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2101] = self.handlePeopleWalk,        -- 人物移动
         [2102] = self.handleChat,              -- 聊天
         [2103] = self.handleDanceAction,       -- 舞蹈动作
+        [2157] = self.handleSeeOnline,         -- 查看在线状态
+        [2201] = self.handleAcceptTask,        -- 接受任务
+        [2324] = self.handlePetRoomList,       -- 房间精灵列表
+        [9003] = self.handleNonoInfo,          -- NONO信息
+        [80008] = self.handleHeartbeat,        -- 心跳包
     }
     
     local handler = handlers[cmdId]
@@ -311,10 +316,12 @@ end
 -- ==================== 命令处理器 ====================
 
 -- CMD 10001: 房间登录 (ROOM_LOGIN)
--- 请求: session(24) + catchTime(4) + flag(4) + mapId(4) + x(4) + y(4)
+-- 请求: targetUserId(4) + session(24) + catchTime(4) + flag(4) + mapId(4) + x(4) + y(4)
+-- 注意: mapId 实际上是房主的 userId
 function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     tprint("\27[35m[RoomServer] 处理 CMD 10001: 房间登录\27[0m")
     
+    local targetUserId = userId
     local catchTime = 0
     local flag = 0
     local mapId = 500001
@@ -322,62 +329,62 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     local y = 200
     
     -- 解析请求参数
-    -- session 在前 24 字节，跳过
-    if #body >= 28 then catchTime = readUInt32BE(body, 25) end
-    if #body >= 32 then flag = readUInt32BE(body, 29) end
-    if #body >= 36 then mapId = readUInt32BE(body, 33) end
-    if #body >= 40 then x = readUInt32BE(body, 37) end
-    if #body >= 44 then y = readUInt32BE(body, 41) end
+    if #body >= 4 then targetUserId = readUInt32BE(body, 1) end
+    -- session 在 5-28 字节，跳过
+    if #body >= 32 then catchTime = readUInt32BE(body, 29) end
+    if #body >= 36 then flag = readUInt32BE(body, 33) end
+    if #body >= 40 then mapId = readUInt32BE(body, 37) end  -- 实际是房主ID
+    if #body >= 44 then x = readUInt32BE(body, 41) end
+    if #body >= 48 then y = readUInt32BE(body, 45) end
     
     clientData.loggedIn = true
     clientData.roomId = mapId
     clientData.userId = userId
+    clientData.targetUserId = targetUserId
     
-    tprint(string.format("\27[35m[RoomServer] 用户 %d 进入房间 mapId=%d pos=(%d,%d)\27[0m", 
+    tprint(string.format("\27[35m[RoomServer] 用户 %d 进入房间 (房主=%d) pos=(%d,%d)\27[0m", 
         userId, mapId, x, y))
     
-    -- 返回空响应表示成功
-    self:sendResponse(clientData, cmdId, userId, 0, "")
-    
-    -- 发送 ENTER_MAP 响应让客户端进入家园地图
+    -- 获取用户数据
     local userData = self:getOrCreateUser(userId)
     local nickname = userData.nick or userData.nickname or ("赛尔" .. userId)
     local clothes = userData.clothes or {}
     local teamInfo = userData.teamInfo or {}
     
+    -- 先发送 ENTER_MAP 响应
     local enterMapBody = ""
-    enterMapBody = enterMapBody .. writeUInt32BE(os.time())
-    enterMapBody = enterMapBody .. writeUInt32BE(userId)
-    enterMapBody = enterMapBody .. writeFixedString(nickname, 16)
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.color or 0xFFFFFF)
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.texture or 0)
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.vip and 1 or 0)
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.vipStage or 1)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- actionType
-    enterMapBody = enterMapBody .. writeUInt32BE(x)
-    enterMapBody = enterMapBody .. writeUInt32BE(y)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- action
-    enterMapBody = enterMapBody .. writeUInt32BE(1)  -- direction
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- changeShape
-    enterMapBody = enterMapBody .. writeUInt32BE(catchTime)
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.spiritID or 0)
-    enterMapBody = enterMapBody .. writeUInt32BE(31) -- petDV
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- petSkin
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- fightFlag
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- teacherID
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- studentID
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- nonoState
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- nonoColor
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- superNono
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- playerForm
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- transTime
+    enterMapBody = enterMapBody .. writeUInt32BE(os.time())                 -- sysTime
+    enterMapBody = enterMapBody .. writeUInt32BE(userId)                    -- userID
+    enterMapBody = enterMapBody .. writeFixedString(nickname, 16)           -- nick
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.color or 0x0F)    -- color
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.texture or 0)     -- texture
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.vip and 1 or 0)   -- vipFlags
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.vipStage or 1)    -- vipStage
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- actionType
+    enterMapBody = enterMapBody .. writeUInt32BE(x)                         -- posX
+    enterMapBody = enterMapBody .. writeUInt32BE(y)                         -- posY
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- action
+    enterMapBody = enterMapBody .. writeUInt32BE(2)                         -- direction
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- changeShape
+    enterMapBody = enterMapBody .. writeUInt32BE(catchTime)                 -- spiritTime
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.spiritID or 0)    -- spiritID
+    enterMapBody = enterMapBody .. writeUInt32BE(31)                        -- petDV
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- petSkin
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- fightFlag
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- teacherID
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- studentID
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoState or 1)   -- nonoState
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoColor or 0)   -- nonoColor
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.superNono or 0)   -- superNono
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- playerForm
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- transTime
     -- TeamInfo
     enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.id or 0)
     enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.coreCount or 0)
     enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.isShow or 0)
     enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoBg or 0)
     enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoIcon or 0)
-    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoColor or 0)
+    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoColor or 0xFFFFFF)
     enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.txtColor or 0)
     enterMapBody = enterMapBody .. writeFixedString(teamInfo.logoWord or "", 4)
     -- clothes
@@ -386,10 +393,14 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
         enterMapBody = enterMapBody .. writeUInt32BE(cloth.id or cloth[1] or 0)
         enterMapBody = enterMapBody .. writeUInt32BE(cloth.level or cloth[2] or 0)
     end
-    enterMapBody = enterMapBody .. writeUInt32BE(0)  -- curTitle
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- curTitle
     
     self:sendResponse(clientData, 2001, userId, 0, enterMapBody)
-    tprint(string.format("\27[32m[RoomServer] → ENTER_MAP (家园 %d)\27[0m", mapId))
+    tprint(string.format("\27[32m[RoomServer] → ENTER_MAP (家园)\27[0m"))
+    
+    -- 然后发送 ROOM_LOGIN 空响应
+    self:sendResponse(clientData, cmdId, userId, 0, "")
+    tprint(string.format("\27[32m[RoomServer] → ROOM_LOGIN 成功\27[0m"))
 end
 
 -- CMD 10003: 离开房间 (LEAVE_ROOM)
@@ -733,6 +744,58 @@ function LocalRoomServer:handleDanceAction(clientData, cmdId, userId, seqId, bod
         writeUInt32BE(actionType)
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2157: 查看在线状态 (SEE_ONLINE)
+function LocalRoomServer:handleSeeOnline(clientData, cmdId, userId, seqId, body)
+    -- 响应: count(4) = 0 (没有在线好友)
+    self:sendResponse(clientData, cmdId, userId, 0, writeUInt32BE(0))
+end
+
+-- CMD 2201: 接受任务 (ACCEPT_TASK)
+function LocalRoomServer:handleAcceptTask(clientData, cmdId, userId, seqId, body)
+    -- 返回空响应
+    self:sendResponse(clientData, cmdId, userId, 0, "")
+end
+
+-- CMD 2324: 房间精灵列表 (PET_ROOM_LIST)
+function LocalRoomServer:handlePetRoomList(clientData, cmdId, userId, seqId, body)
+    -- 响应: count(4) = 0 (没有精灵在房间)
+    self:sendResponse(clientData, cmdId, userId, 0, writeUInt32BE(0))
+end
+
+-- CMD 9003: NONO信息 (NONO_INFO)
+function LocalRoomServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
+    tprint("\27[35m[RoomServer] 处理 CMD 9003: NONO信息\27[0m")
+    
+    local userData = self:getOrCreateUser(userId)
+    local nono = userData.nono or {}
+    
+    local responseBody = ""
+    responseBody = responseBody .. writeUInt32BE(userId)                    -- userId
+    responseBody = responseBody .. writeUInt32BE(nono.flag or 1)            -- hasNono
+    responseBody = responseBody .. writeUInt32BE(nono.state or 1)           -- state
+    responseBody = responseBody .. writeFixedString(nono.nick or "NONO", 16) -- nick
+    responseBody = responseBody .. writeUInt32BE(nono.color or 0xFFFFFF)    -- color
+    responseBody = responseBody .. writeUInt32BE(nono.power or 10000)       -- power
+    responseBody = responseBody .. writeUInt32BE(nono.mate or 10000)        -- mate
+    responseBody = responseBody .. writeUInt32BE(nono.iq or 0)              -- iq
+    responseBody = responseBody .. writeUInt32BE(nono.ai or 0)              -- ai
+    responseBody = responseBody .. writeUInt32BE(nono.birth or os.time())   -- birth
+    responseBody = responseBody .. writeUInt32BE(nono.chargeTime or 500)    -- chargeTime
+    -- 20 bytes reserved
+    responseBody = responseBody .. string.rep("\xFF", 20)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- reserved
+    responseBody = responseBody .. writeUInt32BE(0)                         -- reserved
+    responseBody = responseBody .. writeUInt32BE(0)                         -- reserved
+    
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 80008: 心跳包
+function LocalRoomServer:handleHeartbeat(clientData, cmdId, userId, seqId, body)
+    -- 返回空响应
+    self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
 return {LocalRoomServer = LocalRoomServer}

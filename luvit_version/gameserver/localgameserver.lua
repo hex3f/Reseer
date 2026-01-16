@@ -3245,38 +3245,28 @@ end
 -- ==================== 家园系统 ====================
 
 -- CMD 10001: 家园登录 (ROOM_LOGIN)
--- 请求: session(24) + catchTime(4) + flag(4) + mapId(4) + x(4) + y(4)
--- 响应: 发送 ENTER_MAP 让客户端进入家园地图
+-- 请求: targetUserId(4) + session(24) + catchTime(4) + flag(4) + mapId(4) + x(4) + y(4)
+-- 注意: mapId 实际上是房主的 userId
 function LocalGameServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 10001: 家园登录\27[0m")
     
     -- 解析请求参数
+    local targetUserId = userId
     local catchTime = 0
     local flag = 0
-    local mapId = 500001  -- 默认家园地图
+    local mapId = userId  -- 默认是自己的家
     local x = 300
     local y = 200
     
-    if #body >= 24 then
-        -- 跳过 session (24 bytes)
-    end
-    if #body >= 28 then
-        catchTime = readUInt32BE(body, 25)
-    end
-    if #body >= 32 then
-        flag = readUInt32BE(body, 29)
-    end
-    if #body >= 36 then
-        mapId = readUInt32BE(body, 33)
-    end
-    if #body >= 40 then
-        x = readUInt32BE(body, 37)
-    end
-    if #body >= 44 then
-        y = readUInt32BE(body, 41)
-    end
+    if #body >= 4 then targetUserId = readUInt32BE(body, 1) end
+    -- session 在 5-28 字节，跳过
+    if #body >= 32 then catchTime = readUInt32BE(body, 29) end
+    if #body >= 36 then flag = readUInt32BE(body, 33) end
+    if #body >= 40 then mapId = readUInt32BE(body, 37) end  -- 实际是房主ID
+    if #body >= 44 then x = readUInt32BE(body, 41) end
+    if #body >= 48 then y = readUInt32BE(body, 45) end
     
-    tprint(string.format("\27[36m[LocalGame] 用户 %d 进入家园 mapId=%d pos=(%d,%d)\27[0m", userId, mapId, x, y))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 进入家园 (房主=%d) pos=(%d,%d)\27[0m", userId, mapId, x, y))
     
     -- 返回空响应表示成功
     self:sendResponse(clientData, cmdId, userId, 0, "")
