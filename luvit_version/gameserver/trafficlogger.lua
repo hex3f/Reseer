@@ -221,7 +221,8 @@ local policy_file = "\
 <allow-access-from domain=\"*\" to-ports=\"*\" /></cross-domain-policy>\000\
 "
 
--- 初始密钥（客户端默认密钥）
+-- 初始密钥（保留用于可能的加密数据解析）
+-- 注意：Flash客户端发送的是明文，服务器返回的数据也可能是明文
 local INITIAL_KEY = "!crAckmE4nOthIng:-)"
 
 -- 解析数据包头
@@ -456,27 +457,49 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             local decryptedData = nil
             local header = nil
             
-            -- 尝试解密
-            decryptedData = tryDecryptPacket(crypto, data)
-            if decryptedData then
-                header = parsePacketHeader(decryptedData)
+            -- 首先尝试直接解析为明文（Flash客户端发送的是明文）
+            header = parsePacketHeader(data)
+            
+            -- 检查是否是有效的明文包
+            local isValidPlaintext = header and 
+                                     header.cmdId > 0 and 
+                                     header.cmdId < 100000 and 
+                                     header.length == #data and
+                                     header.length >= 17 and
+                                     header.length < 1000000
+            
+            if isValidPlaintext then
+                -- 明文包，直接使用
+                decryptedData = data
+            else
+                -- 尝试解密（服务器返回的数据可能是加密的）
+                decryptedData = tryDecryptPacket(crypto, data)
+                if decryptedData then
+                    header = parsePacketHeader(decryptedData)
+                else
+                    -- 解密失败，尝试直接使用原始数据
+                    header = parsePacketHeader(data)
+                    decryptedData = data
+                end
             end
             
             -- 打印信息
             local arrow = direction == "CLI" and "->" or "<-"
-            if header and header.cmdId < 100000 and header.length < 1000000 then
+            if header and header.cmdId > 0 and header.cmdId < 100000 and header.length < 1000000 then
                 local cmdName = getCmdName(header.cmdId)
+                local isEncrypted = not isValidPlaintext and decryptedData ~= data
+                local encryptTag = isEncrypted and " [加密]" or " [明文]"
                 
                 -- 使用醒目的框架显示
                 if direction == "CLI" then
                     print("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m")
-                    print(string.format("\27[32m║ [Flash→官服游戏] CMD=%d (%s)\27[0m", header.cmdId, cmdName))
+                    print(string.format("\27[32m║ [Flash→官服游戏] CMD=%d (%s)%s\27[0m", header.cmdId, cmdName, encryptTag))
                     print("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m")
                     print(string.format("\27[32m[Flash→官服] 端口=%d, UID=%d, 长度=%d bytes\27[0m",
                         localPort, header.userId, header.length))
                 else
                     print("\27[33m╔══════════════════════════════════════════════════════════════╗\27[0m")
-                    print(string.format("\27[33m║ [官服游戏→Flash] CMD=%d (%s)\27[0m", header.cmdId, cmdName))
+                    print(string.format("\27[33m║ [官服游戏→Flash] CMD=%d (%s)%s\27[0m", header.cmdId, cmdName, encryptTag))
                     print("\27[33m╚══════════════════════════════════════════════════════════════╝\27[0m")
                     print(string.format("\27[33m[官服→Flash] 端口=%d, UID=%d, 长度=%d bytes\27[0m",
                         localPort, header.userId, header.length))
@@ -507,8 +530,13 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                     end
                 end
             else
-                print(string.format("\27[31m[GAME:%d] %s (解密失败) %d bytes\27[0m", localPort, arrow, #data))
-                decryptedData = data  -- 解密失败，记录原始数据
+                -- 无法解析的数据
+                local hexStr = ""
+                for i = 1, math.min(32, #data) do
+                    hexStr = hexStr .. string.format("%02X ", data:byte(i))
+                end
+                print(string.format("\27[31m[GAME:%d] %s (无法解析) %d bytes: %s\27[0m", localPort, arrow, #data, hexStr))
+                decryptedData = data  -- 记录原始数据
             end
             
             -- 记录

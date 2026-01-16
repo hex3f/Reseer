@@ -2,27 +2,28 @@
 local srv = {}
 
 function srv.getGoodSrvList()
+    local gamePort = conf and conf.gameserver_port or 5000
     return 
     {
         {
             id = 1,
             userCount = 0,
             ip = "127.0.0.1",
-            port = 32410,
+            port = gamePort,
             friends = 0,
         },
         {
             id = 2,
             userCount = 10,
             ip = "127.0.0.1",
-            port = 32410,
+            port = gamePort,
             friends = 0,
         },
         {
             id = 3,
             userCount = 20,
             ip = "127.0.0.1",
-            port = 32410,
+            port = gamePort,
             friends = 0,
         },
     }

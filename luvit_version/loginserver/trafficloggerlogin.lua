@@ -145,30 +145,39 @@ local function processServerList(data)
             local portStart = offset + 24
             local currentPort = (bytes[portStart] or 0) * 256 + (bytes[portStart + 1] or 0)
             
+            -- 检查是否是本地地址（跳过本地服务器，只代理官服）
+            local isLocalServer = currentIP:match("^127%.") or currentIP:match("^localhost")
+            
             if onlineID > 0 and currentIP ~= "" and currentPort > 0 then
                 local localPort = 5000 + (onlineID % 1000)
-                print(string.format("\27[36m[服务器列表] #%d: ID=%d, 人数=%d, %s:%d -> 127.0.0.1:%d\27[0m", 
-                    i+1, onlineID, userCnt, currentIP, currentPort, localPort))
                 
-                _G.serverMapping[onlineID] = { ip = currentIP, port = currentPort, localPort = localPort }
-                _G.portToServer = _G.portToServer or {}
-                _G.portToServer[localPort] = { id = onlineID, ip = currentIP, port = currentPort }
-                table.insert(_G.lastServerList, { id = onlineID, ip = currentIP, port = currentPort, localPort = localPort })
-                
-                -- 创建游戏服务器代理
-                if _G.createGameServerForPort then 
-                    _G.createGameServerForPort(localPort, currentIP, currentPort, onlineID) 
+                if isLocalServer then
+                    print(string.format("\27[33m[服务器列表] #%d: ID=%d, 人数=%d, %s:%d (本地服务器，跳过代理)\27[0m", 
+                        i+1, onlineID, userCnt, currentIP, currentPort))
+                else
+                    print(string.format("\27[36m[服务器列表] #%d: ID=%d, 人数=%d, %s:%d -> 127.0.0.1:%d\27[0m", 
+                        i+1, onlineID, userCnt, currentIP, currentPort, localPort))
+                    
+                    _G.serverMapping[onlineID] = { ip = currentIP, port = currentPort, localPort = localPort }
+                    _G.portToServer = _G.portToServer or {}
+                    _G.portToServer[localPort] = { id = onlineID, ip = currentIP, port = currentPort }
+                    table.insert(_G.lastServerList, { id = onlineID, ip = currentIP, port = currentPort, localPort = localPort })
+                    
+                    -- 创建游戏服务器代理
+                    if _G.createGameServerForPort then 
+                        _G.createGameServerForPort(localPort, currentIP, currentPort, onlineID) 
+                    end
+                    
+                    -- 替换 IP 为本地代理地址
+                    local newIP = "127.0.0.1"
+                    for j = 1, 16 do 
+                        bytes[ipStart + j - 1] = j <= #newIP and newIP:byte(j) or 0 
+                    end
+                    
+                    -- 替换端口为本地代理端口
+                    bytes[portStart] = math.floor(localPort / 256)
+                    bytes[portStart + 1] = localPort % 256
                 end
-                
-                -- 替换 IP 为本地代理地址
-                local newIP = "127.0.0.1"
-                for j = 1, 16 do 
-                    bytes[ipStart + j - 1] = j <= #newIP and newIP:byte(j) or 0 
-                end
-                
-                -- 替换端口为本地代理端口
-                bytes[portStart] = math.floor(localPort / 256)
-                bytes[portStart + 1] = localPort % 256
             end
         end
     end

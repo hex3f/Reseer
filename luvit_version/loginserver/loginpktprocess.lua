@@ -109,19 +109,33 @@ function lpp.parse(data,socket)
     local buf = buffer.Buffer:new(data)
     local length = math.min(buf:readUInt32BE(1),buf.length)
     if length < 17 then return end
-    -- 赛尔号：登录前版本号是31(0x1F)或0，不是摩尔庄园的1
+    -- 赛尔号：版本号可能是 0x31 ('1'), 0x1F, 或 0
     local version = buf:readUInt8(5)
-    if version ~= 0x1F and version ~= 0 then return end
+    -- 打印调试信息
     local cmdId = buf:readUInt32BE(6)
     local userId = buf:readUInt32BE(10)
-    if buf:readUInt32BE(14) ~= 0 then return end
-    local handler = lpp.handler[cmdId]
-    if handler then handler(socket,userId,buf,length)
-    else
-        print("\27[31mUnhandled login packet:",cmdId,"\27[0m")
-        --p(data)
+    local result = buf:readUInt32BE(14)
+    
+    print(string.format("\27[36m[LOGIN-PARSE] 解析数据包: len=%d, ver=0x%02X, cmd=%d, uid=%d, result=%d\27[0m", 
+        length, version, cmdId, userId, result))
+    
+    -- 放宽版本号检查
+    if version ~= 0x31 and version ~= 0x1F and version ~= 0 and version ~= 0x37 then 
+        print(string.format("\27[31m[LOGIN-PARSE] 未知版本号: 0x%02X\27[0m", version))
+        return 
     end
     
+    if result ~= 0 then 
+        print(string.format("\27[31m[LOGIN-PARSE] result 不为 0: %d\27[0m", result))
+        return 
+    end
+    
+    local handler = lpp.handler[cmdId]
+    if handler then 
+        handler(socket,userId,buf,length)
+    else
+        print("\27[31m[LOGIN-PARSE] Unhandled login packet: CMD=" .. cmdId .. "\27[0m")
+    end
 end
 
 local fs = require("fs")
