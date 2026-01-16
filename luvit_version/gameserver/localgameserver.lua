@@ -499,30 +499,93 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
 end
 
 -- CMD 1002: 获取系统时间
--- SystemTimeInfo 结构: timestamp(4) + num(4)
+-- SystemTimeInfo 结构: timestamp(4) 只有一个字段
 function LocalGameServer:handleSystemTime(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 1002: 获取系统时间\27[0m")
-    
     local timestamp = os.time()
-    local responseBody = writeUInt32BE(timestamp) .. writeUInt32BE(0)  -- num = 0
-    
+    local responseBody = writeUInt32BE(timestamp)
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
 -- CMD 2001: 进入地图
+-- 响应结构 (基于 UserInfo.setForPeoleInfo):
+-- sysTime(4) + userID(4) + nick(16) + color(4) + texture(4) + vipFlags(4) + vipStage(4)
+-- + actionType(4) + posX(4) + posY(4) + action(4) + direction(4) + changeShape(4)
+-- + spiritTime(4) + spiritID(4) + petDV(4) + petSkin(4) + fightFlag(4)
+-- + teacherID(4) + studentID(4) + nonoState(4) + nonoColor(4) + superNono(4)
+-- + playerForm(4) + transTime(4)
+-- + TeamInfo: id(4) + coreCount(4) + isShow(4) + logoBg(2) + logoIcon(2) + logoColor(2) + txtColor(2) + logoWord(4)
+-- + clothCount(4) + clothes[clothCount]*(id+level) + curTitle(4)
 function LocalGameServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     print("\27[36m[LocalGame] 处理 CMD 2001: 进入地图\27[0m")
     
+    local mapType = 0
     local mapId = 0
+    local posX = 300
+    local posY = 200
+    
     if #body >= 4 then
-        mapId = readUInt32BE(body, 1)
+        mapType = readUInt32BE(body, 1)
+    end
+    if #body >= 8 then
+        mapId = readUInt32BE(body, 5)
+    end
+    if #body >= 12 then
+        posX = readUInt32BE(body, 9)
+    end
+    if #body >= 16 then
+        posY = readUInt32BE(body, 13)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 进入地图 %d\27[0m", userId, mapId))
+    local userData = self:getOrCreateUser(userId)
+    local nickname = userData.nick or userData.nickname or userData.username or ("赛尔" .. userId)
     
-    -- 返回地图信息
-    local responseBody = writeUInt32BE(mapId) ..
-        writeUInt32BE(0)  -- 地图上的玩家数量
+    print(string.format("\27[36m[LocalGame] 用户 %d 进入地图 %d (type=%d) pos=(%d,%d)\27[0m", 
+        userId, mapId, mapType, posX, posY))
+    
+    -- 构建 PeopleInfo 响应
+    local responseBody = ""
+    
+    responseBody = responseBody .. writeUInt32BE(os.time())                 -- sysTime
+    responseBody = responseBody .. writeUInt32BE(userId)                    -- userID
+    responseBody = responseBody .. writeFixedString(nickname, 16)           -- nick (16字节)
+    responseBody = responseBody .. writeUInt32BE(1)                         -- color
+    responseBody = responseBody .. writeUInt32BE(1)                         -- texture
+    responseBody = responseBody .. writeUInt32BE(0)                         -- vipFlags
+    responseBody = responseBody .. writeUInt32BE(1)                         -- vipStage
+    responseBody = responseBody .. writeUInt32BE(0)                         -- actionType (0=走路)
+    responseBody = responseBody .. writeUInt32BE(posX)                      -- posX
+    responseBody = responseBody .. writeUInt32BE(posY)                      -- posY
+    responseBody = responseBody .. writeUInt32BE(0)                         -- action
+    responseBody = responseBody .. writeUInt32BE(1)                         -- direction
+    responseBody = responseBody .. writeUInt32BE(0)                         -- changeShape
+    responseBody = responseBody .. writeUInt32BE(0)                         -- spiritTime
+    responseBody = responseBody .. writeUInt32BE(0)                         -- spiritID
+    responseBody = responseBody .. writeUInt32BE(0)                         -- petDV
+    responseBody = responseBody .. writeUInt32BE(0)                         -- petSkin
+    responseBody = responseBody .. writeUInt32BE(0)                         -- fightFlag
+    responseBody = responseBody .. writeUInt32BE(0)                         -- teacherID
+    responseBody = responseBody .. writeUInt32BE(0)                         -- studentID
+    responseBody = responseBody .. writeUInt32BE(0)                         -- nonoState
+    responseBody = responseBody .. writeUInt32BE(0)                         -- nonoColor
+    responseBody = responseBody .. writeUInt32BE(0)                         -- superNono
+    responseBody = responseBody .. writeUInt32BE(0)                         -- playerForm
+    responseBody = responseBody .. writeUInt32BE(0)                         -- transTime
+    
+    -- TeamInfo
+    responseBody = responseBody .. writeUInt32BE(0)                         -- team.id
+    responseBody = responseBody .. writeUInt32BE(0)                         -- team.coreCount
+    responseBody = responseBody .. writeUInt32BE(0)                         -- team.isShow
+    responseBody = responseBody .. writeUInt16BE(0)                         -- team.logoBg
+    responseBody = responseBody .. writeUInt16BE(0)                         -- team.logoIcon
+    responseBody = responseBody .. writeUInt16BE(0)                         -- team.logoColor
+    responseBody = responseBody .. writeUInt16BE(0)                         -- team.txtColor
+    responseBody = responseBody .. writeFixedString("", 4)                  -- team.logoWord (4字节)
+    
+    -- clothes
+    responseBody = responseBody .. writeUInt32BE(0)                         -- clothCount = 0
+    
+    -- curTitle
+    responseBody = responseBody .. writeUInt32BE(0)                         -- curTitle
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -860,17 +923,21 @@ function LocalGameServer:handleMailGetUnread(clientData, cmdId, userId, seqId, b
 end
 
 -- CMD 9003: 获取NONO信息
+-- NonoInfo 结构 (基于 NonoInfo.as):
+-- userID(4) + flag(4) + [如果flag!=0: state(4) + nick(16) + superNono(4) + color(4)
+--   + power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + func(20)
+--   + superEnergy(4) + superLevel(4) + superStage(4)]
 function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     print("\27[36m[LocalGame] 处理 CMD 9003: 获取NONO信息\27[0m")
     
-    -- NONO 信息结构 (基于官服响应)
-    local responseBody = writeUInt32BE(userId) ..
-        writeUInt32BE(1) ..  -- NONO 数量
-        writeUInt32BE(1) ..  -- NONO ID
-        writeFixedString("NONO", 20) ..  -- NONO 名称
-        writeUInt32BE(1) ..  -- 等级
-        writeUInt32BE(0) ..  -- 经验
-        string.rep("\0", 40)  -- 其他数据
+    local targetUserId = userId
+    if #body >= 4 then
+        targetUserId = readUInt32BE(body, 1)
+    end
+    
+    -- 新用户没有NONO，flag=0
+    local responseBody = writeUInt32BE(targetUserId) ..
+        writeUInt32BE(0)  -- flag=0 表示没有NONO
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
