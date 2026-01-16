@@ -1,183 +1,190 @@
--- 精灵数据库加载器
--- 从 data/monsters.json 加载精灵基础数据
+-- 精灵数据模块 - 从 XML 读取精灵信息
+-- 数据来源: data/spt.xml (客户端解包)
 
-local fs = require "fs"
-local json = require "json"
+local fs = require('fs')
 
 local SeerMonsters = {}
+SeerMonsters.monsters = {}  -- id -> monster data
+SeerMonsters.loaded = false
 
--- 精灵数据缓存
-local monstersCache = nil
-local monsterById = {}
+-- 简单的 XML 属性解析
+local function parseAttributes(tag)
+    local attrs = {}
+    for key, value in tag:gmatch('(%w+)="([^"]*)"') do
+        attrs[key] = value
+    end
+    return attrs
+end
+
+-- 解析 LearnableMoves
+local function parseMoves(content)
+    local moves = {}
+    for moveTag in content:gmatch('<Move[^/]*/[^>]*>') do
+        local attrs = parseAttributes(moveTag)
+        if attrs.ID and attrs.LearningLv then
+            table.insert(moves, {
+                id = tonumber(attrs.ID),
+                level = tonumber(attrs.LearningLv)
+            })
+        end
+    end
+    -- 按等级排序
+    table.sort(moves, function(a, b) return a.level < b.level end)
+    return moves
+end
 
 -- 加载精灵数据
 function SeerMonsters.load()
-    if monstersCache then
-        return monstersCache
+    if SeerMonsters.loaded then
+        return true
     end
     
-    local dataPath = "../data/monsters.json"
+    local xmlPath = "../data/spt.xml"
+    local content, err = fs.readFileSync(xmlPath)
     
-    if not fs.existsSync(dataPath) then
-        print("\27[31m[SeerMonsters] 精灵数据文件不存在: " .. dataPath .. "\27[0m")
-        return {}
+    if not content then
+        print("[SeerMonsters] 无法读取精灵数据: " .. tostring(err))
+        return false
     end
     
-    local data = fs.readFileSync(dataPath)
-    local success, result = pcall(function()
-        return json.parse(data)
-    end)
-    
-    if not success or not result then
-        print("\27[31m[SeerMonsters] 精灵数据解析失败\27[0m")
-        return {}
-    end
-    
-    -- 解析数据结构
-    local monsters = {}
-    if result.Monsters and result.Monsters.Monster then
-        for _, monster in ipairs(result.Monsters.Monster) do
-            local id = monster.ID
-            monsters[id] = {
+    -- 解析每个 Monster 标签
+    local count = 0
+    for monsterBlock in content:gmatch('<Monster[^>]*>.-</Monster>') do
+        -- 提取属性部分
+        local tagStart = monsterBlock:match('<Monster[^>]*>')
+        local attrs = parseAttributes(tagStart)
+        
+        if attrs.ID then
+            local id = tonumber(attrs.ID)
+            local monster = {
                 id = id,
-                name = monster.DefName or ("精灵" .. id),
-                type = monster.Type or 8,  -- 默认普通属性
-                -- 种族值
-                baseStats = {
-                    hp = monster.HP or 50,
-                    atk = monster.Atk or 50,
-                    def = monster.Def or 50,
-                    spa = monster.SpAtk or 50,
-                    spd = monster.SpDef or 50,
-                    spe = monster.Spd or 50
-                },
-                -- 进化信息
-                evolvesFrom = monster.EvolvesFrom or 0,
-                evolvesTo = monster.EvolvesTo or 0,
-                evolvingLv = monster.EvolvingLv or 0,
-                -- 捕获信息
-                catchRate = monster.CatchRate or 45,
-                yieldingExp = monster.YieldingExp or 50,
-                yieldingEV = monster.YieldingEV or "0 0 0 0 0 0",
-                -- 其他
-                gender = monster.Gender or 0,
-                petClass = monster.PetClass or 0,
-                isRare = monster.IsRareMon == 1,
-                -- 可学技能
-                learnableMoves = {}
+                name = attrs.DefName or "",
+                type = tonumber(attrs.Type) or 0,
+                growthType = tonumber(attrs.GrowthType) or 0,
+                hp = tonumber(attrs.HP) or 0,
+                atk = tonumber(attrs.Atk) or 0,
+                def = tonumber(attrs.Def) or 0,
+                spAtk = tonumber(attrs.SpAtk) or 0,
+                spDef = tonumber(attrs.SpDef) or 0,
+                spd = tonumber(attrs.Spd) or 0,
+                yieldingExp = tonumber(attrs.YieldingExp) or 0,
+                catchRate = tonumber(attrs.CatchRate) or 0,
+                evolvesFrom = tonumber(attrs.EvolvesFrom) or 0,
+                evolvesTo = tonumber(attrs.EvolvesTo) or 0,
+                evolvingLv = tonumber(attrs.EvolvingLv) or 0,
+                freeForbidden = tonumber(attrs.FreeForbidden) or 0,
+                gender = tonumber(attrs.Gender) or 0,
+                petClass = tonumber(attrs.PetClass) or 0,
+                moves = parseMoves(monsterBlock)
             }
-            
-            -- 解析可学技能
-            if monster.LearnableMoves and monster.LearnableMoves.Move then
-                for _, move in ipairs(monster.LearnableMoves.Move) do
-                    table.insert(monsters[id].learnableMoves, {
-                        id = move.ID,
-                        level = move.LearningLv
-                    })
-                end
-            end
-            
-            monsterById[id] = monsters[id]
+            SeerMonsters.monsters[id] = monster
+            count = count + 1
         end
     end
     
-    monstersCache = monsters
-    
-    local count = 0
-    for _ in pairs(monsters) do count = count + 1 end
-    print(string.format("\27[32m[SeerMonsters] 加载了 %d 只精灵数据\27[0m", count))
-    
-    return monsters
+    SeerMonsters.loaded = true
+    print(string.format("[SeerMonsters] 加载了 %d 个精灵数据", count))
+    return true
 end
 
 -- 获取精灵数据
-function SeerMonsters.get(petId)
-    if not monstersCache then
+function SeerMonsters.get(id)
+    if not SeerMonsters.loaded then
         SeerMonsters.load()
     end
-    return monsterById[petId]
+    return SeerMonsters.monsters[id]
+end
+
+-- 获取精灵名称
+function SeerMonsters.getName(id)
+    local monster = SeerMonsters.get(id)
+    return monster and monster.name or ""
+end
+
+-- 获取精灵在指定等级可学习的技能
+function SeerMonsters.getSkillsForLevel(id, level)
+    local monster = SeerMonsters.get(id)
+    if not monster then return {} end
+    
+    local skills = {}
+    for _, move in ipairs(monster.moves) do
+        if move.level <= level then
+            table.insert(skills, move.id)
+        end
+    end
+    return skills
+end
+
+-- 获取精灵在指定等级的前4个技能 (战斗用)
+function SeerMonsters.getBattleSkills(id, level)
+    local allSkills = SeerMonsters.getSkillsForLevel(id, level)
+    local skills = {0, 0, 0, 0}
+    
+    -- 取最后学会的4个技能
+    local start = math.max(1, #allSkills - 3)
+    for i = start, #allSkills do
+        skills[i - start + 1] = allSkills[i]
+    end
+    
+    return skills
+end
+
+-- 计算精灵在指定等级的属性
+-- 使用简化公式: stat = base * level / 50 + 5
+function SeerMonsters.calculateStats(id, level, dv)
+    local monster = SeerMonsters.get(id)
+    if not monster then return nil end
+    
+    dv = dv or 15  -- 默认个体值
+    level = level or 5
+    
+    -- 简化的属性计算公式
+    local function calcStat(base)
+        return math.floor((base * 2 + dv) * level / 100 + 5)
+    end
+    
+    local function calcHP(base)
+        return math.floor((base * 2 + dv) * level / 100 + level + 10)
+    end
+    
+    return {
+        hp = calcHP(monster.hp),
+        maxHp = calcHP(monster.hp),
+        attack = calcStat(monster.atk),
+        defence = calcStat(monster.def),
+        spAtk = calcStat(monster.spAtk),
+        spDef = calcStat(monster.spDef),
+        speed = calcStat(monster.spd)
+    }
 end
 
 -- 获取所有精灵ID列表
 function SeerMonsters.getAllIds()
-    if not monstersCache then
+    if not SeerMonsters.loaded then
         SeerMonsters.load()
     end
     
     local ids = {}
-    for id, _ in pairs(monsterById) do
+    for id, _ in pairs(SeerMonsters.monsters) do
         table.insert(ids, id)
     end
     table.sort(ids)
     return ids
 end
 
--- 获取精灵总数
-function SeerMonsters.getCount()
-    if not monstersCache then
+-- 按类型获取精灵
+function SeerMonsters.getByType(typeId)
+    if not SeerMonsters.loaded then
         SeerMonsters.load()
     end
     
-    local count = 0
-    for _ in pairs(monsterById) do count = count + 1 end
-    return count
-end
-
--- 检查精灵是否存在
-function SeerMonsters.exists(petId)
-    if not monstersCache then
-        SeerMonsters.load()
-    end
-    return monsterById[petId] ~= nil
-end
-
--- 获取精灵名称
-function SeerMonsters.getName(petId)
-    local monster = SeerMonsters.get(petId)
-    if monster then
-        return monster.name
-    end
-    return "未知精灵"
-end
-
--- 获取精灵种族值
-function SeerMonsters.getBaseStats(petId)
-    local monster = SeerMonsters.get(petId)
-    if monster then
-        return monster.baseStats
-    end
-    return { hp = 50, atk = 50, def = 50, spa = 50, spd = 50, spe = 50 }
-end
-
--- 获取精灵属性类型
-function SeerMonsters.getType(petId)
-    local monster = SeerMonsters.get(petId)
-    if monster then
-        return monster.type
-    end
-    return 8  -- 默认普通属性
-end
-
--- 获取精灵可学技能（按等级）
-function SeerMonsters.getMovesAtLevel(petId, level)
-    local monster = SeerMonsters.get(petId)
-    if not monster then
-        return {}
-    end
-    
-    local moves = {}
-    for _, move in ipairs(monster.learnableMoves) do
-        if move.level <= level then
-            table.insert(moves, move.id)
+    local result = {}
+    for id, monster in pairs(SeerMonsters.monsters) do
+        if monster.type == typeId then
+            table.insert(result, monster)
         end
     end
-    
-    -- 只返回最后4个技能
-    while #moves > 4 do
-        table.remove(moves, 1)
-    end
-    
-    return moves
+    return result
 end
 
 return SeerMonsters
