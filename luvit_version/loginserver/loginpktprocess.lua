@@ -14,7 +14,7 @@ local userDB = UserDB:new()
 function lpp.makeHead(cmdId,userId,errorId,bodylen)
     local head = buffer.Buffer:new(offset)
     head:writeUInt32BE(1,offset+bodylen) --PkgLen
-    head:writeUInt8(5,0) --Version (赛尔号登录前是0)
+    head:writeUInt8(5,0x31) --Version: '1' (0x31) - 登录服务器使用版本1
     head:writeUInt32BE(6,cmdId) --Command
     head:writeUInt32BE(10,userId) --UserID
     head:writeUInt32BE(14,errorId) --Result
@@ -87,17 +87,52 @@ end
 --local aut = require("fs").readFileSync("upper.gif")
 
 function lpp.makeSrvList(servers)
+    -- 服务器列表格式: count(4) + [ServerInfo](30 * count)
     local list = buffer.Buffer:new(#servers * 30 + 4)
     createSrvList(list,servers)
     return tostring(list)
 end
 
 function lpp.makeGoodSrvList(servers)
-    local meta = buffer.Buffer:new(12)
-    meta:writeUInt32BE(1,srv.getMaxServerID())
-    meta:writeUInt32BE(5,0)-- isVip，TODO: 实现用户系统
-    meta:writeUInt32BE(9,0)-- 好友列表userCount，暂未实现，填0
-    return lpp.makeSrvList(servers) .. tostring(meta)
+    -- CMD 105 响应格式:
+    -- maxOnlineID(4) + isVIP(4) + onlineCnt(4) + [ServerInfo](30 * onlineCnt)
+    -- ServerInfo: onlineID(4) + userCnt(4) + ip(16) + port(2) + friends(4) = 30 bytes
+    
+    local totalSize = 8 + 4 + (#servers * 30)  -- meta(8) + count(4) + servers
+    local body = buffer.Buffer:new(totalSize)
+    
+    -- 写入 meta
+    body:writeUInt32BE(1, srv.getMaxServerID())  -- maxOnlineID
+    body:writeUInt32BE(5, 0)  -- isVIP
+    body:writeUInt32BE(9, #servers)  -- onlineCnt
+    
+    -- 写入服务器列表
+    local offset = 12  -- 从第13字节开始
+    for i = 1, #servers do
+        local s = servers[i]
+        body:writeUInt32BE(offset + 1, s.id)           -- onlineID (4)
+        body:writeUInt32BE(offset + 5, s.userCount)    -- userCnt (4)
+        
+        -- IP (16字节)
+        local ip = s.ip or "127.0.0.1"
+        for j = 1, 16 do
+            if j <= #ip then
+                body:writeUInt8(offset + 8 + j, ip:byte(j))
+            else
+                body:writeUInt8(offset + 8 + j, 0)
+            end
+        end
+        
+        body:writeUInt16BE(offset + 25, s.port or 5000)  -- port (2)
+        body:writeUInt32BE(offset + 27, s.friends or 0)  -- friends (4)
+        
+        offset = offset + 30
+    end
+    
+    print(string.format("\27[36m[CMD-105] 生成响应: maxOnlineID=%d, serverCount=%d, totalSize=%d\27[0m", 
+        srv.getMaxServerID(), #servers, totalSize))
+    
+    return tostring(body)
 end
 
 function lpp.preparse(data)
@@ -362,16 +397,30 @@ end
 
 -- CMD_GET_GOOD_SERVER_LIST
 lpp.handler[105] = function(socket,userId,buf,length)
-    local session = buf:toString(offset+1,offset+16)
-    local body = lpp.makeGoodSrvList(srv.getGoodSrvList())
+    print(string.format("\27[36m[CMD-105] 获取推荐服务器列表: userId=%d\27[0m", userId))
+    local servers = srv.getGoodSrvList()
+    print(string.format("\27[36m[CMD-105] 服务器数量: %d\27[0m", #servers))
+    local body = lpp.makeGoodSrvList(servers)
     socket:write(lpp.makeHead(105,userId,0,#body))
     socket:write(body)
 end
 
--- CMD_GET_SERVER_LIST
+-- CMD_GET_SERVER_LIST (范围查询)
 lpp.handler[106] = function(socket,userId,buf,length)
-    local session = buf:toString(offset+1,offset+16)
-    local body = lpp.makeSrvList(srv.getServerList())
+    -- CMD 106 请求格式: session(16) + startId(4) + endId(4) + flag(4)
+    -- 但数据包可能很短，需要安全读取
+    local startId = 1
+    local endId = 100
+    
+    if length >= offset + 20 then
+        startId = buf:readUInt32BE(offset + 17)
+        endId = buf:readUInt32BE(offset + 21)
+    end
+    
+    print(string.format("\27[36m[CMD-106] 获取服务器列表: userId=%d, range=%d-%d\27[0m", userId, startId, endId))
+    
+    local servers = srv.getServerList()
+    local body = lpp.makeSrvList(servers)
     socket:write(lpp.makeHead(106,userId,0,#body))
     socket:write(body)
 end

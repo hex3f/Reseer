@@ -359,36 +359,182 @@ function LocalGameServer:handleRangeOnline(clientData, cmdId, userId, seqId, bod
 end
 
 -- CMD 1001: 登录游戏服务器
+-- 响应结构 (基于 UserInfo.setForLoginInfo):
+-- userID(4) + regTime(4) + nick(16) + vipFlags(4) + dsFlag(4) + color(4) + texture(4)
+-- + energy(4) + coins(4) + fightBadge(4) + mapID(4) + posX(4) + posY(4)
+-- + timeToday(4) + timeLimit(4) + halfDayFlags(4) + loginCnt(4) + inviter(4)
+-- + newInviteeCnt(4) + vipLevel(4) + vipValue(4) + vipStage(4) + autoCharge(4)
+-- + vipEndTime(4) + freshManBonus(4) + nonoChipList(80) + dailyResArr(50)
+-- + teacherID(4) + studentID(4) + graduationCount(4) + maxPuniLv(4)
+-- + petMaxLev(4) + petAllNum(4) + monKingWin(4) + curStage(4) + maxStage(4)
+-- + curFreshStage(4) + maxFreshStage(4) + maxArenaWins(4) + twoTimes(4) + threeTimes(4)
+-- + autoFight(4) + autoFightTimes(4) + energyTimes(4) + learnTimes(4) + monBtlMedal(4)
+-- + recordCnt(4) + obtainTm(4) + soulBeadItemID(4) + expireTm(4) + fuseTimes(4)
+-- + hasNono(4) + superNono(4) + nonoState(4) + nonoColor(4) + nonoNick(16)
+-- + TeamInfo + TeamPKInfo + reserved(1) + badge(4) + reserved(27)
+-- + taskList(500) + petNum(4) + PetData... + clothCount(4) + clothes... + curTitle(4)
+-- + bossAchievement(200)
 function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     print("\27[36m[LocalGame] 处理 CMD 1001: 登录游戏服务器\27[0m")
     
     -- 从 body 中提取 session (如果有)
     local session = ""
-    if #body >= 8 then
-        session = body:sub(1, 8)
+    if #body >= 16 then
+        session = body:sub(1, 16)
     end
     
     -- 查找或创建用户数据
     local userData = self:getOrCreateUser(userId)
     clientData.session = session
     
-    -- 响应结构 (基于官服响应分析):
-    -- userId: 4 字节
-    -- session: 8 字节
-    -- nickname: 20 字节
-    -- ... 其他用户数据
+    local nickname = userData.nick or userData.nickname or userData.username or ("赛尔" .. userId)
     
-    local responseBody = writeUInt32BE(userId) ..
-        writeFixedString(session, 8) ..
-        writeFixedString(userData.nick or userData.nickname or userData.username or ("赛尔" .. userId), 20) ..
-        string.rep("\0", 20) ..  -- 填充数据
-        writeUInt32BE(userData.level or 1) ..
-        writeUInt32BE(userData.exp or 0) ..
-        writeUInt32BE(userData.money or 10000) ..
-        writeUInt32BE(userData.vipLevel or 0) ..
-        string.rep("\0", 100)  -- 更多填充数据
+    -- 构建响应
+    local responseBody = ""
+    
+    -- 基本信息
+    responseBody = responseBody .. writeUInt32BE(userId)                    -- userID
+    responseBody = responseBody .. writeUInt32BE(os.time() - 86400 * 30)   -- regTime (30天前注册)
+    responseBody = responseBody .. writeFixedString(nickname, 16)          -- nick (16字节)
+    responseBody = responseBody .. writeUInt32BE(0)                        -- vipFlags (bit0=vip, bit1=viped)
+    responseBody = responseBody .. writeUInt32BE(0)                        -- dsFlag
+    responseBody = responseBody .. writeUInt32BE(1)                        -- color
+    responseBody = responseBody .. writeUInt32BE(1)                        -- texture
+    responseBody = responseBody .. writeUInt32BE(100)                      -- energy
+    responseBody = responseBody .. writeUInt32BE(10000)                    -- coins
+    responseBody = responseBody .. writeUInt32BE(0)                        -- fightBadge
+    responseBody = responseBody .. writeUInt32BE(301)                      -- mapID (克洛斯星)
+    responseBody = responseBody .. writeUInt32BE(400)                      -- posX
+    responseBody = responseBody .. writeUInt32BE(300)                      -- posY
+    responseBody = responseBody .. writeUInt32BE(0)                        -- timeToday
+    responseBody = responseBody .. writeUInt32BE(0)                        -- timeLimit
+    
+    -- halfDayFlags (4个byte: isClothHalfDay, isRoomHalfDay, iFortressHalfDay, isHQHalfDay)
+    responseBody = responseBody .. string.char(0, 0, 0, 0)
+    
+    responseBody = responseBody .. writeUInt32BE(1)                        -- loginCnt
+    responseBody = responseBody .. writeUInt32BE(0)                        -- inviter
+    responseBody = responseBody .. writeUInt32BE(0)                        -- newInviteeCnt
+    responseBody = responseBody .. writeUInt32BE(0)                        -- vipLevel
+    responseBody = responseBody .. writeUInt32BE(0)                        -- vipValue
+    responseBody = responseBody .. writeUInt32BE(1)                        -- vipStage
+    responseBody = responseBody .. writeUInt32BE(0)                        -- autoCharge
+    responseBody = responseBody .. writeUInt32BE(0)                        -- vipEndTime
+    responseBody = responseBody .. writeUInt32BE(0)                        -- freshManBonus
+    
+    -- nonoChipList (80 bytes)
+    responseBody = responseBody .. string.rep("\0", 80)
+    
+    -- dailyResArr (50 bytes)
+    responseBody = responseBody .. string.rep("\0", 50)
+    
+    responseBody = responseBody .. writeUInt32BE(0)                        -- teacherID
+    responseBody = responseBody .. writeUInt32BE(0)                        -- studentID
+    responseBody = responseBody .. writeUInt32BE(0)                        -- graduationCount
+    responseBody = responseBody .. writeUInt32BE(100)                      -- maxPuniLv
+    responseBody = responseBody .. writeUInt32BE(100)                      -- petMaxLev
+    responseBody = responseBody .. writeUInt32BE(1)                        -- petAllNum
+    responseBody = responseBody .. writeUInt32BE(0)                        -- monKingWin
+    responseBody = responseBody .. writeUInt32BE(0)                        -- curStage
+    responseBody = responseBody .. writeUInt32BE(0)                        -- maxStage
+    responseBody = responseBody .. writeUInt32BE(0)                        -- curFreshStage
+    responseBody = responseBody .. writeUInt32BE(0)                        -- maxFreshStage
+    responseBody = responseBody .. writeUInt32BE(0)                        -- maxArenaWins
+    responseBody = responseBody .. writeUInt32BE(0)                        -- twoTimes
+    responseBody = responseBody .. writeUInt32BE(0)                        -- threeTimes
+    responseBody = responseBody .. writeUInt32BE(0)                        -- autoFight
+    responseBody = responseBody .. writeUInt32BE(0)                        -- autoFightTimes
+    responseBody = responseBody .. writeUInt32BE(0)                        -- energyTimes
+    responseBody = responseBody .. writeUInt32BE(0)                        -- learnTimes
+    responseBody = responseBody .. writeUInt32BE(0)                        -- monBtlMedal
+    responseBody = responseBody .. writeUInt32BE(0)                        -- recordCnt
+    responseBody = responseBody .. writeUInt32BE(0)                        -- obtainTm
+    responseBody = responseBody .. writeUInt32BE(0)                        -- soulBeadItemID
+    responseBody = responseBody .. writeUInt32BE(0)                        -- expireTm
+    responseBody = responseBody .. writeUInt32BE(0)                        -- fuseTimes
+    responseBody = responseBody .. writeUInt32BE(0)                        -- hasNono
+    responseBody = responseBody .. writeUInt32BE(0)                        -- superNono
+    responseBody = responseBody .. writeUInt32BE(0)                        -- nonoState
+    responseBody = responseBody .. writeUInt32BE(0)                        -- nonoColor
+    responseBody = responseBody .. writeFixedString("", 16)                -- nonoNick (16字节)
+    
+    -- TeamInfo: id(4) + priv(4) + superCore(4) + isShow(4) + allContribution(4) + canExContribution(4)
+    responseBody = responseBody .. writeUInt32BE(0)                        -- team.id
+    responseBody = responseBody .. writeUInt32BE(0)                        -- team.priv
+    responseBody = responseBody .. writeUInt32BE(0)                        -- team.superCore
+    responseBody = responseBody .. writeUInt32BE(0)                        -- team.isShow
+    responseBody = responseBody .. writeUInt32BE(0)                        -- team.allContribution
+    responseBody = responseBody .. writeUInt32BE(0)                        -- team.canExContribution
+    
+    -- TeamPKInfo: groupID(4) + homeTeamID(4)
+    responseBody = responseBody .. writeUInt32BE(0)                        -- teamPK.groupID
+    responseBody = responseBody .. writeUInt32BE(0)                        -- teamPK.homeTeamID
+    
+    responseBody = responseBody .. string.char(0)                          -- reserved (1 byte)
+    responseBody = responseBody .. writeUInt32BE(0)                        -- badge
+    responseBody = responseBody .. string.rep("\0", 27)                    -- reserved (27 bytes)
+    
+    -- taskList (500 bytes) - 任务状态
+    responseBody = responseBody .. string.rep("\0", 500)
+    
+    -- petNum (4 bytes) + PetData
+    responseBody = responseBody .. writeUInt32BE(1)                        -- petNum = 1
+    
+    -- PetInfo 结构 (param2=true 完整版):
+    -- id(4) + name(16) + dv(4) + nature(4) + level(4) + exp(4) + lvExp(4) + nextLvExp(4)
+    -- + hp(4) + maxHp(4) + attack(4) + defence(4) + s_a(4) + s_d(4) + speed(4)
+    -- + ev_hp(4) + ev_attack(4) + ev_defence(4) + ev_sa(4) + ev_sd(4) + ev_sp(4)
+    -- + skillNum(4) + skills[4]*(id(4)+pp(4)) + catchTime(4) + catchMap(4) + catchRect(4) + catchLevel(4)
+    -- + effectCount(2) + [PetEffectInfo]... + skinID(4)
+    local petId = userData.currentPetId or 7  -- 默认小火猴
+    local catchId = os.time()
+    
+    responseBody = responseBody .. writeUInt32BE(petId)                    -- id
+    responseBody = responseBody .. writeFixedString("", 16)                -- name (16字节)
+    responseBody = responseBody .. writeUInt32BE(31)                       -- dv (个体值)
+    responseBody = responseBody .. writeUInt32BE(0)                        -- nature (性格)
+    responseBody = responseBody .. writeUInt32BE(16)                       -- level
+    responseBody = responseBody .. writeUInt32BE(0)                        -- exp
+    responseBody = responseBody .. writeUInt32BE(0)                        -- lvExp
+    responseBody = responseBody .. writeUInt32BE(1000)                     -- nextLvExp
+    responseBody = responseBody .. writeUInt32BE(100)                      -- hp
+    responseBody = responseBody .. writeUInt32BE(100)                      -- maxHp
+    responseBody = responseBody .. writeUInt32BE(39)                       -- attack
+    responseBody = responseBody .. writeUInt32BE(35)                       -- defence
+    responseBody = responseBody .. writeUInt32BE(78)                       -- s_a (特攻)
+    responseBody = responseBody .. writeUInt32BE(36)                       -- s_d (特防)
+    responseBody = responseBody .. writeUInt32BE(39)                       -- speed
+    responseBody = responseBody .. writeUInt32BE(0)                        -- ev_hp
+    responseBody = responseBody .. writeUInt32BE(0)                        -- ev_attack
+    responseBody = responseBody .. writeUInt32BE(0)                        -- ev_defence
+    responseBody = responseBody .. writeUInt32BE(0)                        -- ev_sa
+    responseBody = responseBody .. writeUInt32BE(0)                        -- ev_sd
+    responseBody = responseBody .. writeUInt32BE(0)                        -- ev_sp
+    responseBody = responseBody .. writeUInt32BE(4)                        -- skillNum
+    -- 4个技能槽 (id + pp)
+    responseBody = responseBody .. writeUInt32BE(10022) .. writeUInt32BE(30)  -- 技能1
+    responseBody = responseBody .. writeUInt32BE(10035) .. writeUInt32BE(25)  -- 技能2
+    responseBody = responseBody .. writeUInt32BE(20036) .. writeUInt32BE(20)  -- 技能3
+    responseBody = responseBody .. writeUInt32BE(0) .. writeUInt32BE(0)       -- 技能4 (空)
+    responseBody = responseBody .. writeUInt32BE(catchId)                  -- catchTime
+    responseBody = responseBody .. writeUInt32BE(301)                      -- catchMap
+    responseBody = responseBody .. writeUInt32BE(0)                        -- catchRect
+    responseBody = responseBody .. writeUInt32BE(5)                        -- catchLevel
+    responseBody = responseBody .. writeUInt16BE(0)                        -- effectCount
+    responseBody = responseBody .. writeUInt32BE(0)                        -- skinID
+    
+    -- clothCount (4 bytes) + clothes
+    responseBody = responseBody .. writeUInt32BE(0)                        -- clothCount = 0
+    
+    -- curTitle (4 bytes)
+    responseBody = responseBody .. writeUInt32BE(0)                        -- curTitle
+    
+    -- bossAchievement (200 bytes)
+    responseBody = responseBody .. string.rep("\0", 200)
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+    
+    print(string.format("\27[32m[LocalGame] ✓ 用户 %d 登录成功，昵称: %s\27[0m", userId, nickname))
 end
 
 -- CMD 1002: 获取系统时间
@@ -1314,13 +1460,33 @@ end
 -- ==================== 用户数据管理 ====================
 
 function LocalGameServer:getOrCreateUser(userId)
+    -- 首先尝试从 userdb 获取游戏数据
+    if self.userdb then
+        local db = self.userdb:new()
+        local gameData = db:getOrCreateGameData(userId)
+        if gameData then
+            -- 合并到本地缓存
+            if not self.users[userId] then
+                self.users[userId] = {}
+            end
+            for k, v in pairs(gameData) do
+                self.users[userId][k] = v
+            end
+            self.users[userId].id = userId
+            return self.users[userId]
+        end
+    end
+    
+    -- 如果没有 userdb，使用本地缓存
     if not self.users[userId] then
         self.users[userId] = {
             id = userId,
-            nickname = "Player" .. userId,
+            nick = "玩家" .. userId,
+            nickname = "玩家" .. userId,
             level = 1,
             exp = 0,
             money = 10000,
+            coins = 999999,
             vipLevel = 0,
             petCount = 0,
             pets = {},
