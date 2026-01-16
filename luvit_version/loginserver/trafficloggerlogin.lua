@@ -257,6 +257,26 @@ local server = net.createServer(function(client)
                         print(string.format("\27[32m║ 📧 邮箱验证码: %s\27[0m", verifyCode))
                         print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
                     end
+                    
+                    -- 解析 CMD 2 响应（注册结果）
+                    if header.cmdId == 2 then
+                        if header.result == 0 then
+                            print(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
+                            print(string.format("\27[32m║ ✅ 注册成功！米米号: %d\27[0m", header.userId))
+                            print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+                        else
+                            local errorMsg = "未知错误"
+                            if header.result == 5002 then errorMsg = "邮箱已被注册"
+                            elseif header.result == 5003 then errorMsg = "账号或密码错误"
+                            elseif header.result == 6002 then errorMsg = "验证码错误"
+                            elseif header.result == 1301 then errorMsg = "邮箱已注册过"
+                            elseif header.result == 20002 then errorMsg = "邀请码有误"
+                            end
+                            print(string.format("\27[31m╔══════════════════════════════════════════════════════════════╗\27[0m"))
+                            print(string.format("\27[31m║ ❌ 注册失败！错误码: %d (%s)\27[0m", header.result, errorMsg))
+                            print(string.format("\27[31m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+                        end
+                    end
                 end
                 
                 -- 发送给客户端
@@ -300,8 +320,9 @@ local server = net.createServer(function(client)
         end
         
         -- 如果官服还没连接好，先缓存
-        if not officialConn or officialClosed then
+        if not officialConnected then
             clientBuffer = clientBuffer .. data
+            print(string.format("\27[33m[LOGIN-PROXY] 缓存数据等待连接: %d bytes (总计 %d bytes)\27[0m", #data, #clientBuffer))
             return
         end
         
