@@ -50,30 +50,53 @@ end
 
 -- ==================== 工具函数 ====================
 
--- 获取或创建NONO数据
+-- NONO 默认数据 (基于官服)
+local NONO_DEFAULTS = {
+    flag = 1,               -- 标志位 (1=已开启)
+    state = 1,              -- 状态位 (1=已激活)
+    nick = "NONO",          -- 名字
+    superNono = 0,          -- 超级诺诺 (0=普通, 1=超级)
+    color = 0x00FFFFFF,     -- 颜色 (官服默认白色)
+    power = 10000,          -- 体力 (客户端会除以1000, 显示10)
+    mate = 10000,           -- 心情 (客户端会除以1000, 显示10)
+    iq = 0,                 -- 智力
+    ai = 0,                 -- AI
+    birth = 0,              -- 出生时间 (会设为当前时间)
+    chargeTime = 500,       -- 充电时间 (官服默认500)
+    superEnergy = 0,        -- 超能能量
+    superLevel = 0,         -- 超能等级
+    superStage = 1,         -- 超能阶段 (1-5, 官服默认1)
+    hp = 10000,             -- HP
+    maxHp = 10000,          -- 最大HP
+    isFollowing = false     -- 是否跟随
+}
+
+-- 获取或创建用户的NONO数据 (确保所有字段都存在)
 local function getNonoData(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
+    local needSave = false
+    
     if not user.nono then
-        user.nono = {
-            flag = 0x00000001,
-            state = 0x00000001,
-            nick = "NONO",
-            superNono = 1,
-            color = 0x00FFFFFF,
-            power = 80000,
-            mate = 80000,
-            iq = 100,
-            ai = 100,
-            birth = os.time(),
-            chargeTime = 0,
-            superEnergy = 10000,
-            superLevel = 10,
-            superStage = 3,
-            hp = 10000,
-            isFollowing = false
-        }
+        user.nono = {}
+        needSave = true
+    end
+    
+    -- 确保所有字段都有值
+    for key, defaultValue in pairs(NONO_DEFAULTS) do
+        if user.nono[key] == nil then
+            if key == "birth" then
+                user.nono[key] = os.time()
+            else
+                user.nono[key] = defaultValue
+            end
+            needSave = true
+        end
+    end
+    
+    if needSave then
         ctx.saveUser(ctx.userId, user)
     end
+    
     return user.nono
 end
 
@@ -87,26 +110,30 @@ end
 -- ==================== NONO 命令处理器 ====================
 
 -- CMD 9003: NONO_INFO (获取NONO信息)
+-- NonoInfo 结构 (86 bytes body):
+-- userID(4) + flag(4) + state(4) + nick(16) + superNono(4) + color(4) + 
+-- power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + 
+-- func(20) + superEnergy(4) + superLevel(4) + superStage(4)
 local function handleNonoInfo(ctx)
     local nonoData = getNonoData(ctx)
     
     local body = ""
-    body = body .. writeUInt32BE(ctx.userId)
-    body = body .. writeUInt32BE(nonoData.flag or 1)
-    body = body .. writeUInt32BE(nonoData.state or 1)
-    body = body .. writeFixedString(nonoData.nick or "NONO", 16)
-    body = body .. writeUInt32BE(nonoData.superNono or 1)
-    body = body .. writeUInt32BE(nonoData.color or 0x00FFFFFF)
-    body = body .. writeUInt32BE(nonoData.power or 80000)
-    body = body .. writeUInt32BE(nonoData.mate or 80000)
-    body = body .. writeUInt32BE(nonoData.iq or 100)
-    body = body .. writeUInt16BE(nonoData.ai or 100)
-    body = body .. writeUInt32BE(nonoData.birth or os.time())
-    body = body .. writeUInt32BE(nonoData.chargeTime or 0)
-    body = body .. string.rep("\xFF", 20)  -- func (所有功能开启)
-    body = body .. writeUInt32BE(nonoData.superEnergy or 10000)
-    body = body .. writeUInt32BE(nonoData.superLevel or 10)
-    body = body .. writeUInt32BE(nonoData.superStage or 3)
+    body = body .. writeUInt32BE(ctx.userId)                        -- userID
+    body = body .. writeUInt32BE(nonoData.flag or 1)                -- flag
+    body = body .. writeUInt32BE(nonoData.state or 1)               -- state
+    body = body .. writeFixedString(nonoData.nick or "NONO", 16)    -- nick
+    body = body .. writeUInt32BE(nonoData.superNono or 0)           -- superNono
+    body = body .. writeUInt32BE(nonoData.color or 0x00FFFFFF)      -- color
+    body = body .. writeUInt32BE(nonoData.power or 10000)           -- power (客户端/1000)
+    body = body .. writeUInt32BE(nonoData.mate or 10000)            -- mate (客户端/1000)
+    body = body .. writeUInt32BE(nonoData.iq or 0)                  -- iq
+    body = body .. writeUInt16BE(nonoData.ai or 0)                  -- ai
+    body = body .. writeUInt32BE(nonoData.birth or os.time())       -- birth
+    body = body .. writeUInt32BE(nonoData.chargeTime or 500)        -- chargeTime
+    body = body .. string.rep("\xFF", 20)                           -- func (所有功能开启)
+    body = body .. writeUInt32BE(nonoData.superEnergy or 0)         -- superEnergy
+    body = body .. writeUInt32BE(nonoData.superLevel or 0)          -- superLevel
+    body = body .. writeUInt32BE(nonoData.superStage or 1)          -- superStage
     
     ctx.sendResponse(buildResponse(9003, ctx.userId, 0, body))
     return true
