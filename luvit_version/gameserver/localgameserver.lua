@@ -1304,6 +1304,21 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     local petId = userData.currentPetId or 1
     local catchTime = userData.catchId or 0x6969C45E
     
+    -- 根据精灵ID获取对应的技能
+    -- 布布种子(1): 10001(Lv1), 20001(Lv4)
+    -- 伊优(4): 10004(Lv1), 20002(Lv4)
+    -- 小火猴(7): 10001(Lv1), 20004(Lv5)
+    local petSkills = {
+        [1] = {10001, 20001, 0, 0},  -- 布布种子
+        [4] = {10004, 20002, 0, 0},  -- 伊优
+        [7] = {10001, 20004, 0, 0},  -- 小火猴
+    }
+    local skills = petSkills[petId] or {10001, 20002, 0, 0}
+    local skillCount = 0
+    for _, s in ipairs(skills) do
+        if s > 0 then skillCount = skillCount + 1 end
+    end
+    
     -- 构建 NoteReadyToFightInfo
     local responseBody = ""
     
@@ -1320,17 +1335,16 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     
     -- PetInfo (简化版 param2=false):
     -- id(4) + level(4) + hp(4) + maxHp(4) + skillNum(4) + skills[4]*(8) + catchTime(4) + catchMap(4) + catchRect(4) + catchLevel(4) + skinID(4)
-    -- = 4+4+4+4+4+32+4+4+4+4+4 = 72 bytes
     responseBody = responseBody .. writeUInt32BE(petId)      -- id
     responseBody = responseBody .. writeUInt32BE(5)          -- level
     responseBody = responseBody .. writeUInt32BE(21)         -- hp
     responseBody = responseBody .. writeUInt32BE(21)         -- maxHp
-    responseBody = responseBody .. writeUInt32BE(4)          -- skillNum
+    responseBody = responseBody .. writeUInt32BE(skillCount) -- skillNum
     -- 4个技能槽 (id + pp)
-    responseBody = responseBody .. writeUInt32BE(20002) .. writeUInt32BE(30)  -- 技能1
-    responseBody = responseBody .. writeUInt32BE(10004) .. writeUInt32BE(25)  -- 技能2
-    responseBody = responseBody .. writeUInt32BE(10001) .. writeUInt32BE(35)  -- 技能3
-    responseBody = responseBody .. writeUInt32BE(0) .. writeUInt32BE(0)       -- 技能4 (空)
+    responseBody = responseBody .. writeUInt32BE(skills[1]) .. writeUInt32BE(35)
+    responseBody = responseBody .. writeUInt32BE(skills[2]) .. writeUInt32BE(25)
+    responseBody = responseBody .. writeUInt32BE(skills[3]) .. writeUInt32BE(0)
+    responseBody = responseBody .. writeUInt32BE(skills[4]) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(catchTime)  -- catchTime
     responseBody = responseBody .. writeUInt32BE(515)        -- catchMap
     responseBody = responseBody .. writeUInt32BE(0)          -- catchRect
@@ -1352,11 +1366,11 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     responseBody = responseBody .. writeUInt32BE(21)         -- hp
     responseBody = responseBody .. writeUInt32BE(21)         -- maxHp
     responseBody = responseBody .. writeUInt32BE(2)          -- skillNum
-    -- 4个技能槽 (id + pp)
-    responseBody = responseBody .. writeUInt32BE(20002) .. writeUInt32BE(30)  -- 技能1
-    responseBody = responseBody .. writeUInt32BE(10001) .. writeUInt32BE(35)  -- 技能2
-    responseBody = responseBody .. writeUInt32BE(0) .. writeUInt32BE(0)       -- 技能3 (空)
-    responseBody = responseBody .. writeUInt32BE(0) .. writeUInt32BE(0)       -- 技能4 (空)
+    -- 4个技能槽 (id + pp) - 比波的技能
+    responseBody = responseBody .. writeUInt32BE(20002) .. writeUInt32BE(30)
+    responseBody = responseBody .. writeUInt32BE(10001) .. writeUInt32BE(35)
+    responseBody = responseBody .. writeUInt32BE(0) .. writeUInt32BE(0)
+    responseBody = responseBody .. writeUInt32BE(0) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(0)          -- catchTime (野生精灵无)
     responseBody = responseBody .. writeUInt32BE(515)        -- catchMap
     responseBody = responseBody .. writeUInt32BE(0)          -- catchRect
