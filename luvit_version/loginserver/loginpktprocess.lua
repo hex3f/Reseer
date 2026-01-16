@@ -4,7 +4,12 @@ local lpp = {}
 lpp.handler = {}
 local buffer = require "buffer"
 local srv = require "./server"
+local UserDB = require "../userdb"
+local md5 = require "../md5"
 local offset = 17
+
+-- 用户数据库实例
+local userDB = UserDB:new()
 
 function lpp.makeHead(cmdId,userId,errorId,bodylen)
     local head = buffer.Buffer:new(offset)
@@ -16,8 +21,32 @@ function lpp.makeHead(cmdId,userId,errorId,bodylen)
     return tostring(head)
 end
 
-function lpp.makeLoginBody(session)
-    return "\0\0\0\0"..session.."\000\000\000\001"
+function lpp.makeLoginBody(session, roleCreate)
+    -- session: 16字节
+    -- roleCreate: 4字节 (1=已创建角色, 0=未创建)
+    local body = buffer.Buffer:new(20)
+    -- 写入session (16字节)
+    for i = 1, 16 do
+        if i <= #session then
+            body:writeUInt8(i, session:byte(i))
+        else
+            body:writeUInt8(i, 0)
+        end
+    end
+    -- 写入roleCreate (4字节)
+    body:writeUInt32BE(17, roleCreate or 1)
+    return tostring(body)
+end
+
+-- 辅助函数：从buffer读取字符串（去除尾部的\0）
+local function readString(buf, start, length)
+    local str = buf:toString(start, start + length - 1)
+    -- 去除尾部的\0
+    local nullPos = str:find("\0")
+    if nullPos then
+        str = str:sub(1, nullPos - 1)
+    end
+    return str
 end
 
 local function createSrvList(buf,srvs)
@@ -95,23 +124,129 @@ function lpp.parse(data,socket)
     
 end
 
-local aut = require("fs").readFileSync("upper.gif")
+local fs = require("fs")
+local aut = fs.existsSync("upper.gif") and fs.readFileSync("upper.gif") or ""
 
 -- CMD_GET_AUTHCODE
 lpp.handler[101] = function()
     p"getauth"
 end
 
--- CMD_LOGIN
+-- CMD_REGISTER (注册)
+lpp.handler[2] = function(socket, userId, buf, length)
+    -- 解析注册数据
+    -- password: 32字节
+    -- email: 64字节
+    -- emailCode: 32字节 (验证码)
+    -- emailCodeRes: 32字节 (验证码响应)
+    
+    local password = readString(buf, offset + 1, 32)
+    local email = readString(buf, offset + 33, 64)
+    
+    print(string.format("\27[33m[REGISTER] 注册请求: email=%s\27[0m", email))
+    
+    -- 创建用户
+    local user, err = userDB:createUser(email, password)
+    
+    if user then
+        -- 注册成功
+        print(string.format("\27[32m[REGISTER] 注册成功: userId=%d, email=%s\27[0m", user.userId, email))
+        socket:write(lpp.makeHead(2, user.userId, 0, 0))
+    else
+        -- 注册失败
+        print(string.format("\27[31m[REGISTER] 注册失败: %s\27[0m", err or "未知错误"))
+        socket:write(lpp.makeHead(2, 0, 1, 0))  -- errorId=1 表示失败
+    end
+end
+
+-- CMD_SEND_EMAIL_CODE (发送邮箱验证码)
+lpp.handler[3] = function(socket, userId, buf, length)
+    local email = readString(buf, offset + 1, 64)
+    print(string.format("\27[33m[EMAIL_CODE] 发送验证码请求: email=%s\27[0m", email))
+    
+    -- 生成一个32字节的假验证码（本地服务器不需要真正发邮件）
+    -- 官服返回格式: 32字节的hex字符串
+    local codeRes = string.format("%032x", math.random(0, 0xFFFFFFFF)) .. string.format("%032x", math.random(0, 0xFFFFFFFF))
+    codeRes = codeRes:sub(1, 32)  -- 取前32字节
+    
+    local body = buffer.Buffer:new(32)
+    for i = 1, 32 do
+        if i <= #codeRes then
+            body:writeUInt8(i, codeRes:byte(i))
+        else
+            body:writeUInt8(i, 0)
+        end
+    end
+    
+    socket:write(lpp.makeHead(3, userId, 0, 32))
+    socket:write(tostring(body))
+    
+    -- 在控制台显示验证码
+    print(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
+    print(string.format("\27[32m║ 📧 邮箱验证码: %s\27[0m", codeRes))
+    print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+end
+
+-- CMD_LOGIN (旧的米米号登录，保留兼容)
 lpp.handler[103] = function(socket,userId,buf,length)
     if length < 147 then return end
     local password = buf:toString(offset+1,offset+32)
     local session = "0000000000000000"
-    local body = lpp.makeLoginBody(session)
-    --lpp.sendAuthCode(socket,userId,1,"0123456789abcdef",aut)
+    local body = lpp.makeLoginBody(session, 1)
     socket:write(lpp.makeHead(103,userId,0,#body))
     socket:write(body)
-    print("\27[1mLogin:",userId..",pass "..password..",session "..session.."\27[0m")
+    print("\27[1m[LOGIN-103] 米米号登录: userId="..userId.."\27[0m")
+end
+
+-- CMD_MAIN_LOGIN_IN (邮箱登录 - 主要登录方式)
+lpp.handler[104] = function(socket, userId, buf, length)
+    -- 邮箱登录数据格式:
+    -- email: 64字节
+    -- password: 32字节 (MD5)
+    -- 后面还有一些其他数据
+    
+    local email = readString(buf, offset + 1, 64)
+    local passwordMD5 = readString(buf, offset + 65, 32)
+    
+    print(string.format("\27[33m[LOGIN-104] 邮箱登录请求: email=%s\27[0m", email))
+    
+    -- 查找用户
+    local user = userDB:findByEmail(email)
+    local loginUserId = 0
+    local errorCode = 0
+    
+    if user then
+        -- 验证密码 (客户端发送的是MD5后的密码)
+        local storedPasswordMD5 = md5.sumhexa(user.password)
+        if passwordMD5 == storedPasswordMD5 or passwordMD5 == user.password then
+            -- 登录成功
+            loginUserId = user.userId
+            print(string.format("\27[32m[LOGIN-104] 登录成功: userId=%d, email=%s\27[0m", loginUserId, email))
+        else
+            -- 密码错误
+            errorCode = 2
+            print(string.format("\27[31m[LOGIN-104] 密码错误: email=%s\27[0m", email))
+        end
+    else
+        -- 用户不存在 - 自动注册
+        print(string.format("\27[33m[LOGIN-104] 用户不存在，自动注册: email=%s\27[0m", email))
+        user = userDB:createUser(email, passwordMD5)
+        if user then
+            loginUserId = user.userId
+            print(string.format("\27[32m[LOGIN-104] 自动注册成功: userId=%d\27[0m", loginUserId))
+        else
+            errorCode = 1
+            print("\27[31m[LOGIN-104] 自动注册失败\27[0m")
+        end
+    end
+    
+    -- 生成session
+    local session = string.format("%016d", loginUserId)
+    local roleCreate = 1  -- 1=已创建角色
+    
+    local body = lpp.makeLoginBody(session, roleCreate)
+    socket:write(lpp.makeHead(104, loginUserId, errorCode, #body))
+    socket:write(body)
 end
 
 -- CMD_GET_GOOD_SERVER_LIST

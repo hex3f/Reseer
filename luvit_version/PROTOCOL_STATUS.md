@@ -39,7 +39,7 @@
 - ✅ 任务状态持久化 (taskList)
 - ✅ 便捷方法: addItem, removeItem, getItemCount
 
-### 广播系统 (websocket_login.lua)
+### 广播系统 (login.lua)
 - ✅ 客户端连接跟踪 (connectedClients)
 - ✅ broadcastToMap - 广播给同地图其他玩家
 - ✅ saveUser - 保存用户数据便捷方法

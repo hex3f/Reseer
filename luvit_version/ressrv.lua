@@ -26,23 +26,18 @@ local DEFAULT = PASSTHROUGH
 
 local proxy_rules = 
 {
-    ["/"] = "/index_ruffle.html",  -- 使用官服 Vue 应用
-    ["/index_ruffle.html"] = PROXY,  -- 官服 Vue 应用（注入微端模拟器）
-    ["/test.html"] = PROXY,   -- 统一测试页面
-    ["/test_socket_bridge.html"] = PROXY,  -- Socket 桥接测试页面
+    ["/"] = "/index.html",  -- 本地前端页面
+    ["/index.html"] = PROXY,  -- 本地前端
     ["/config/ServerR.xml"] = "DYNAMIC_SERVER_CONFIG",  -- 动态选择配置文件
     ["/config/ServerOfficial.xml"] = PROXY,  -- 官服代理模式配置
     ["/config/ServerLocal.xml"] = PROXY,  -- 本地模式配置（备用）
+    ["/config/doorConfig.xml"] = PROXY,  -- 开门配置（防沉迷时间）
     ["/crossdomain.xml"] = PROXY,  -- 跨域策略文件
     
-    -- CSS/JS 文件
-    ["/css/main.css"] = PROXY,
+    -- JS 文件
     ["/js/swfobject.js"] = PROXY,
-    ["/js/request-interceptor.js"] = PROXY,   -- 请求拦截器
     ["/js/server-config.js"] = PROXY,         -- 服务器配置（自动生成）
-    ["/js/client-emulator.js"] = PROXY,       -- 微端模拟器
-    ["/js/ruffle-socket-bridge.js"] = PROXY,  -- WebSocket Socket 桥接
-    ["/assets/js/application-config.js"] = PROXY,  -- 官服 Vue 应用配置（修改版）
+    ["/js/client-emulator.js"] = PROXY,       -- Flash 辅助脚本
     
     -- 隐藏广告
     ["/resource/login/Advertisement.swf"] = INVISIBLE,
@@ -75,6 +70,8 @@ function Response:notFound(path,reason)
     local baseUrl = conf.res_official_address:gsub("/$", "")
     local officialUrl = baseUrl .. path
     
+    print(string.format("\27[36m[官服下载] 开始下载: %s\27[0m", officialUrl))
+    
     local function fetchUrl(urlStr, callback)
         -- 判断使用 http 还是 https
         local protocol = https
@@ -82,7 +79,25 @@ function Response:notFound(path,reason)
             protocol = http
         end
         
-        local fetchReq = protocol.request(urlStr, function(res)
+        -- 解析 URL
+        local parsedUrl = require('url').parse(urlStr)
+        local options = {
+            host = parsedUrl.hostname,
+            port = parsedUrl.port or (parsedUrl.protocol == "https:" and 443 or 80),
+            path = parsedUrl.pathname .. (parsedUrl.search or ""),
+            method = "GET",
+            headers = {
+                ["Host"] = parsedUrl.hostname,
+                ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                ["Accept"] = "*/*",
+                ["Connection"] = "keep-alive"
+            }
+        }
+        
+        print(string.format("\27[36m[官服下载] 请求: %s://%s%s\27[0m", 
+            parsedUrl.protocol:gsub(":", ""), options.host, options.path))
+        
+        local fetchReq = protocol.request(options, function(res)
             local fetchData = ""
             
             -- 处理重定向
@@ -119,7 +134,8 @@ function Response:notFound(path,reason)
         end)
         
         fetchReq:on('error', function(err)
-            print("\27[31mRequest error: "..tostring(err).."\27[0m")
+            print("\27[31m[官服下载] 请求错误: "..tostring(err).."\27[0m")
+            print("\27[31m[官服下载] URL: "..urlStr.."\27[0m")
             callback(0, "")
         end)
         
@@ -127,6 +143,8 @@ function Response:notFound(path,reason)
     end
     
     fetchUrl(officialUrl, function(statusCode, fetchedData)
+        print(string.format("\27[36m[官服下载] 响应: status=%d, size=%d bytes\27[0m", statusCode, #fetchedData))
+        
         if statusCode == 200 and #fetchedData > 0 then
             print(string.format("\27[90m[下载] %s (%d bytes)\27[0m", path, #fetchedData))
             
@@ -231,12 +249,9 @@ local function resolvePathByProxyRules(dest)
     return (rootpath .. dest),code
 end
 
--- SPA 路由列表 - 这些路由应该返回对应的 HTML 文件
+-- 路由别名 - 这些路由都返回主页面
 local spa_routes = {
-    ["/game"] = "/index_ruffle.html",      -- Vue 应用处理游戏路由
-    ["/login"] = "/index_ruffle.html",     -- Vue 应用处理登录路由
-    ["/download"] = "/index_ruffle.html",  -- Vue 应用处理下载路由
-    ["/dowload"] = "/index_ruffle.html",   -- 官服拼写错误
+    ["/game"] = "/index.html",
 }
 
 local resServer = http.createServer(function(req, res)
@@ -472,6 +487,7 @@ local resServer = http.createServer(function(req, res)
     
     local path,code = resolvePathByProxyRules(dest)
     
+    print(string.format("\27[90m[DEBUG] dest=%s, path=%s, code=%d\27[0m", dest, path, code))
     if code == 301 then
         -- TODO: REDIRECT
     elseif code == 404 then

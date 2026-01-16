@@ -20,10 +20,13 @@ local conf = {
     -- ============================================================
     -- 官服地址配置
     -- ============================================================
-    res_official_address = "http://192.158.229.131:18888",  -- 官服资源服务器
+    -- 资源服务器地址（官服代理模式下使用）
+    -- luvit 的 HTTPS 有 SSL 问题，需要通过 nieo 微端代理
+    -- 先启动 nieo 微端，它会在 9990 端口提供资源代理
+    res_official_address = "http://127.0.0.1:9990",  -- 通过 nieo 微端代理（需要先启动微端）
     official_api_server = "http://115.238.192.7:9999",     -- 官服 API 服务器
-    official_login_server = "45.125.46.70",               -- 官服登录/游戏服务器 IP
-    official_login_port = 12345,                          -- 官服 WebSocket 端口
+    official_login_server = "115.238.192.7",               -- 官服登录服务器 IP（从ip.txt获取）
+    official_login_port = 9999,                            -- 官服登录服务器端口（TCP Socket）
     
     -- ============================================================
     -- 本地服务器端口配置
@@ -44,7 +47,7 @@ local conf = {
     -- [核心开关] 本地模式 vs 官服代理模式
     -- true  = 本地模式：使用本地数据库，不连接官服（开发/测试用）
     -- false = 官服代理模式：所有请求转发到官服，记录流量（抓包分析用）
-    local_server_mode = true,
+    local_server_mode = false,
     
     -- [资源模式] 是否从官服下载资源
     -- true  = 从官服下载资源并缓存到 res_dir
@@ -102,62 +105,25 @@ local function generateFrontendConfig()
     local fs = require('fs')
     local json = require('json')
     
-    -- 生成 server-config.js（用于简化版前端）
+    -- 生成 server-config.js
     local config = {
         local_server_mode = conf.local_server_mode,
         use_official_resources = conf.use_official_resources,
         server_info = {
-            login_server = conf.local_server_mode and ("127.0.0.1:" .. conf.login_port) or conf.login_server_address,
-            game_server = conf.local_server_mode and ("127.0.0.1:" .. conf.gameserver_port) or conf.login_server_address,
-            api_server = "http://127.0.0.1:8211",
-            resource_server = conf.local_server_mode and "http://127.0.0.1:" .. conf.ressrv_port or conf.res_official_address
+            login_server = "127.0.0.1:" .. conf.login_port,
+            game_server = "127.0.0.1:" .. conf.gameserver_port,
+            resource_server = "http://127.0.0.1:" .. conf.ressrv_port
         }
     }
     
     local configJs = string.format([[
-// 自动生成的配置文件 - 请勿手动编辑
-// 生成时间: %s
+// 自动生成 - %s
 window.SEER_SERVER_CONFIG = %s;
 ]], os.date("%Y-%m-%d %H:%M:%S"), json.stringify(config))
     
     local configPath = conf.res_proxy_dir .. "/js/server-config.js"
     fs.writeFileSync(configPath, configJs)
-    print("\27[36m[CONFIG] 已生成前端配置: " .. configPath .. "\27[0m")
-    
-    -- 生成 application-config.js（用于官服 Vue 应用）
-    local apiServer = "http://127.0.0.1:8211"  -- 始终使用本地 API 服务器（会代理到官服）
-    local website = "http://127.0.0.1:" .. conf.ressrv_port .. "/"
-    
-    local appConfigJs = string.format([[
-// 自动生成的配置文件 - 请勿手动编辑
-// 生成时间: %s
-var applicationConfig = {
-  version: {
-    win: '1.0.6.8',
-    mac: '1.0.6.8',
-    mobile: '1.0.1.1',
-  },
-  ruffleSrc: './assets/js/ruffle.js',
-  maintenance: false,
-  VITE_APP_BASE_API: '%s',  // 本地 API 服务器（代理到官服）
-  website: '%s',
-}
-window.getS = () => {
-  const str = '88b69df269060c5b0b0fb276267f20b3,17eb96fd6e1b5ceab90f90f67b6c4e1c,9d50c6981b408bc91f478072dc59e41a,88e49e61160379f7c13521cd90f93c64'
-  return str
-}
-]], os.date("%Y-%m-%d %H:%M:%S"), apiServer, website)
-    
-    local appConfigPath = conf.res_proxy_dir .. "/assets/js/application-config.js"
-    
-    -- 确保目录存在
-    local dirPath = conf.res_proxy_dir .. "/assets/js"
-    if not fs.existsSync(dirPath) then
-        fs.mkdirSync(dirPath, {recursive = true})
-    end
-    
-    fs.writeFileSync(appConfigPath, appConfigJs)
-    print("\27[36m[CONFIG] 已生成 Vue 应用配置: " .. appConfigPath .. "\27[0m")
+    print("\27[36m[CONFIG] 已生成: " .. configPath .. "\27[0m")
 end
 
 generateFrontendConfig()
@@ -170,12 +136,11 @@ require "./apiserver"  -- API 服务器（提供配置管理和模式切换）
 
 -- 根据模式选择登录服务器
 if conf.local_server_mode then
-    -- 本地模式：使用 WebSocket 登录服务器（与官服架构一致）
-    print("\27[33m========== LOCAL SERVER MODE (WebSocket) ==========\27[0m")
+    -- 本地模式：使用 TCP 登录服务器（Flash Socket 连接）
+    print("\27[33m========== LOCAL SERVER MODE (TCP Socket) ==========\27[0m")
     local lgs = require "./gameserver/localgameserver"
     lgs.LocalGameServer:new()
-    local wsLogin = require "./loginserver/websocket_login"
-    wsLogin.start(conf.login_port)  -- 启动 WebSocket 登录服务器在端口 1863
+    require "./loginserver/login"  -- 启动 TCP 登录服务器在端口 1863
 else
     -- 官服模式：使用流量记录代理
     print("\27[35m╔════════════════════════════════════════════════════════════╗\27[0m")

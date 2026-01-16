@@ -5,6 +5,7 @@ local SeerCommands = {
     -- 登录相关
     [1] = "SEER_VERIFY",
     [2] = "REGISTER",
+    [3] = "SEND_EMAIL_CODE",
     [104] = "MAIN_LOGIN_IN",
     [105] = "COMMEND_ONLINE",
     [106] = "RANGE_ONLINE",

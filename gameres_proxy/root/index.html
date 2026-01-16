@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=960, height=600">
+    <title>赛尔号 - 本地服务器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 50%, #0a2a4a 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            color: #fff;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+            margin-bottom: 5px;
+        }
+        
+        .header .subtitle {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .game-container {
+            background: #000;
+            border-radius: 8px;
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.2);
+            overflow: hidden;
+        }
+        
+        #flashcontent {
+            width: 960px;
+            height: 560px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a0a;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #555;
+        }
+        
+        .loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #222;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 11px;
+        }
+        
+        .footer .server-info {
+            color: #444;
+        }
+        
+        .footer .server-info span {
+            color: #0a0;
+            margin-left: 5px;
+        }
+        
+        .status-bar {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 11px;
+            color: #0f0;
+            border: 1px solid #333;
+        }
+        
+        .status-bar.error { color: #f55; }
+        .status-bar.warning { color: #fa0; }
+        
+        #flashcontent object, #flashcontent embed {
+            display: block;
+        }
+        
+        .error-box {
+            background: rgba(255, 50, 50, 0.1);
+            border: 1px solid #f55;
+            border-radius: 8px;
+            padding: 20px 30px;
+            text-align: center;
+        }
+        
+        .error-box h3 {
+            color: #f77;
+            margin-bottom: 10px;
+        }
+        
+        .error-box p {
+            color: #888;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .error-box a {
+            color: #00d4ff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 赛尔号</h1>
+        <p class="subtitle">RecSeer 本地服务器</p>
+    </div>
+    
+    <div class="game-container">
+        <div id="flashcontent">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>正在加载游戏...</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p class="server-info">服务器状态: <span id="serverStatus">检测中...</span></p>
+    </div>
+    
+    <div class="status-bar" id="statusBar">● 连接中</div>
+
+    <script src="/js/swfobject.js"></script>
+    <script src="/js/client-emulator.js"></script>
+    
+    <script>
+    (function() {
+        'use strict';
+        
+        // 配置
+        var RESOURCE_SERVER = 'http://127.0.0.1:32400';
+        var CLIENT_SWF = '/Client.swf';
+        var WIDTH = 960;
+        var HEIGHT = 560;
+        
+        // 状态更新
+        function updateStatus(msg, type) {
+            var bar = document.getElementById('statusBar');
+            bar.textContent = (type === 'error' ? '✗ ' : type === 'warning' ? '⚠ ' : '● ') + msg;
+            bar.className = 'status-bar' + (type ? ' ' + type : '');
+        }
+        
+        function updateServerStatus(msg) {
+            document.getElementById('serverStatus').textContent = msg;
+        }
+        
+        // 检查服务器
+        function checkServer(callback) {
+            var xhr = new XMLHttpRequest();
+            xhr.timeout = 3000;
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    callback(xhr.status === 200);
+                }
+            };
+            xhr.onerror = function() { callback(false); };
+            xhr.ontimeout = function() { callback(false); };
+            xhr.open('GET', RESOURCE_SERVER + '/config/ServerR.xml?t=' + Date.now(), true);
+            xhr.send();
+        }
+        
+        // 显示错误
+        function showError(title, message) {
+            document.getElementById('flashcontent').innerHTML = 
+                '<div class="error-box">' +
+                '<h3>' + title + '</h3>' +
+                '<p>' + message + '</p>' +
+                '</div>';
+        }
+        
+        // 加载游戏
+        function loadGame() {
+            var container = document.getElementById('flashcontent');
+            
+            if (container.querySelector('object, embed')) {
+                return;
+            }
+            
+            var swf = new SWFObject(
+                RESOURCE_SERVER + CLIENT_SWF,
+                'seer-game',
+                WIDTH,
+                HEIGHT,
+                '11.0.0',
+                '#000000'
+            );
+            
+            swf.addParam('base', RESOURCE_SERVER);
+            swf.addParam('wmode', 'direct');
+            swf.addParam('allowFullScreen', 'true');
+            swf.addParam('allowScriptAccess', 'always');
+            swf.addParam('quality', 'high');
+            swf.addParam('bgcolor', '#000000');
+            
+            var success = swf.write('flashcontent');
+            
+            if (success) {
+                updateStatus('游戏已加载');
+                updateServerStatus('已连接');
+            } else {
+                updateStatus('Flash 不可用', 'error');
+                showError('⚠️ Flash Player 未安装',
+                    '请使用支持 Flash 的浏览器<br>' +
+                    '或安装 <a href="https://ruffle.rs" target="_blank">Ruffle</a> 扩展');
+            }
+        }
+        
+        // 启动
+        function init() {
+            updateStatus('检查服务器...');
+            
+            checkServer(function(ok) {
+                if (ok) {
+                    updateStatus('加载游戏...');
+                    updateServerStatus('在线');
+                    setTimeout(loadGame, 100);
+                } else {
+                    updateStatus('服务器离线', 'error');
+                    updateServerStatus('离线');
+                    showError('服务器未启动',
+                        '请先启动本地服务器<br>' +
+                        '<code style="color:#0af">cd luvit_version && luvit reseer.lua</code>');
+                }
+            });
+        }
+        
+        // DOM 加载完成后启动
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
+    </script>
+</body>
+</html>

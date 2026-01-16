@@ -30,7 +30,7 @@
 
 ## 已实现的命令
 
-### 登录服务器 (trafficloggerlogin.lua / websocket_login.lua)
+### 登录服务器 (login.lua / trafficloggerlogin.lua)
 
 | CMD | 名称 | 说明 |
 |-----|------|------|
