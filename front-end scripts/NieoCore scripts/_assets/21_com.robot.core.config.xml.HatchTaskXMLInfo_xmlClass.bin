@@ -1,0 +1,69 @@
+<!--
+	元神珠孵化任务配置表,元神珠任务没有接任务和完成任务的概念了,表的配置只是由自己控制任务的步骤而已
+	由于对于每个元神珠有它自己的任务,故任务的ID是由物品ID配置的,parent是后续作为设置父级元神珠任务,	isDir表示是否直接完成任务
+	pro中的map代表当前任务步骤所在地图,mc代表当前地图需要做任务交互的movieclip,isMat表示是否需要完成上一个步骤才可以完成本步骤,des表元神珠交互时的弹出提示框
+-->
+<tasks>
+	<task ID="1000001" name="绿色元神珠" parent="" isDir="0">
+		<pro name="1" map="12" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000002" name="蓝色元神珠" parent="" isDir="0">
+		<pro name="1" map="21" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000003" name="红色元神珠" parent="" isDir="0">
+		<pro name="1" map="16" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000004" name="咖啡色元神珠" parent="" isDir="0">
+		<pro name="1" map="106" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000005" name="天青色元神珠" parent="" isDir="0">
+		<pro name="1" map="40" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000006" name="橙色元神珠" parent="" isDir="0">
+		<pro name="1" map="26" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000007" name="米色元神珠" parent="" isDir="0">
+		<pro name="1" map="105" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000008" name="紫色元神珠" parent="" isDir="0">
+		<pro name="1" map="105" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000009" name="粉色元神珠" parent="" isDir="0">
+		<pro name="1" map="54" mc="hatchTaskMC" parent="" isMat="0" des="元神珠开始发生些变化，似乎需要吸收更多的精华能量，过段时间再来吸收吧。"/>
+		<pro name="1" map="54" mc="hatchTaskMC" parent="" isMat="0" des="元神珠开始发生些变化，似乎需要吸收更多的精华能量，过段时间再来吸收吧。"/>
+		<pro name="1" map="54" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000010" name="灰色元神珠" parent="" isDir="0">
+		<pro name="1" map="30" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000011" name="暗紫色元神珠" parent="" isDir="0">
+		<pro name="1" map="314" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000012" name="黄色元神珠" parent="" isDir="0">
+		<pro name="1" map="32" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000013" name="深红色元神珠" parent="" isDir="0">
+		<pro name="1" map="58" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000014" name="橙紫色元神珠" parent="" isDir="0">
+		<pro name="1" map="26" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000015" name="暗绿色元神珠" parent="" isDir="0">
+		<pro name="1" map="12" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000016" name="暗棕色元神珠" parent="" isDir="0">
+		<pro name="1" map="314" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000017" name="红绿色元神珠" parent="" isDir="0">
+		<pro name="1" map="16" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000018" name="棕黑色元神珠" parent="" isDir="0">
+		<pro name="1" map="106" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000019" name="橙黑色元神珠" parent="" isDir="0">
+		<pro name="1" map="338" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+	<task ID="1000020" name="蓝紫色元神珠" parent="" isDir="0">
+		<pro name="1" map="21" mc="hatchTaskMC" parent="" isMat="0" des="元神珠已经吸收了足够的精华能量，现在可以放入元神转化仪中转化了。"/>
+	</task>
+</tasks>

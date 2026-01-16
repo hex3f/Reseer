@@ -1,0 +1,9 @@
+<!--超no派对配置表-->
+<SPS>
+	<title msg="◎ 使用时空穿梭门必须先加载时空穿梭芯片。"/>
+	<title msg="◎ 每次穿梭时空需要花费2000赛尔豆。"/>
+	<title msg="◎ 在过往时空中只能用时空精灵胶囊捕获精灵。"/>
+	<SP mapID="52" oreIDs="400018|400019|400020" petIDs="156|158" games=""/>
+	<SP mapID="316" oreIDs="" petIDs="136" games="精灵食补|体能训练|灵敏训练|电能训练"/>
+	<SP mapID="329" oreIDs="" petIDs="100|287" games=""/>
+</SPS>

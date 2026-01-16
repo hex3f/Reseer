@@ -1,0 +1,30 @@
+<!-- 说明 -->
+<!-- <Exchange> ID: 从 1 到 200 -->
+<!--  <Exchange> LimitCoins: 0: 不限制每日派豆上限, 1: 限制派豆每日上限; 注意: 不配置这个属性，则默认按照 1 处理 -->
+<!-- <In/Out> 最多 10 个 -->
+
+<Exchanges>
+	<Exchange ItemID="400051" ID="1" LimitCoins="0" >
+		<In>
+			<Item ItemID="400051" Count="1" />
+		</In>
+		<Out>
+			<Item ItemID="100016" Count="1" Max="1" />
+			<Item ItemID="100017" Count="1" Max="1" />
+			<Item ItemID="100018" Count="1" Max="1" />
+			<Item ItemID="100019" Count="1" Max="1" />
+		</Out>
+	</Exchange>
+	<Exchange ItemID="400052" ID="2" LimitCoins="0" >
+		<In>
+			<Item ItemID="400052" Count="1" />
+		</In>
+		<Out>
+			<Item ItemID="100087" Count="1" Max="1" />
+			<Item ItemID="100088" Count="1" Max="1" />
+			<Item ItemID="100089" Count="1" Max="1" />
+			<Item ItemID="100090" Count="1" Max="1" />
+			<Item ItemID="100091" Count="1" Max="1" />
+		</Out>
+	</Exchange>
+</Exchanges>

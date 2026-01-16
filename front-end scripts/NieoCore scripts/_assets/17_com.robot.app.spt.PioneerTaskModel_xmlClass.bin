@@ -1,0 +1,63 @@
+<!--spt boss列表-->
+<spts>
+	<spt id="1" title="蘑菇怪" online="1" lel="1" seatID="12" enterID="12" fightCondition="破除防护罩" description="生活在克洛斯星，被艾里逊的液氮冻伤而发狂，使用火焰喷射器可以使它安静下来。制服它可以获得草系精灵小蘑菇。">
+	</spt>
+	
+	<spt id="2" title="钢牙鲨" online="1" lel="1" seatID="22" enterID="21" fightCondition="" description="海洋星海底的危险怪兽，据说它躲藏的洞穴中有制作黑武士装的黑晶矿石。记住，到海底一定要穿上耐压的潜水套装。">
+	</spt>
+	
+	<spt id="3" title="里奥斯" online="1" lel="2" seatID="17" enterID="17" fightCondition="扑灭火焰屏障" description="海盗艾里逊在火山被它困住，战胜它有机会获得火系精灵“胡里亚”。在火山，你会用到喷水装的。">
+	</spt>
+	
+	<spt id="4" title="阿克希亚" online="1" lel="4"  seatID="40" enterID="40" fightCondition="" description="塞西利亚星的守护者，正义的精灵圣兽，它是不可战胜的，千年来一直等待着宿命的对手。">
+	</spt>
+	
+	<spt id="5" title="提亚斯" online="1" lel="3" seatID="27" enterID="27" fightCondition="" description="云霄星出现了一只极具攻击性的变异精灵，拥有很多蛋的它虽然想要努力呵护自己的孩子却力不从心，看来需要大家帮帮忙啊。">
+	</spt>
+	
+	<spt id="6" title="雷伊" online="1" lel="3" seatID="32" enterID="32" fightCondition="雷雨天" description="赫尔卡星天空中划过一道闪电，映出了一个酷似精灵的黑影，它全身被电流包围，从它的神态中可以看出它正等待来自各方的挑战。">
+	</spt>
+	
+	<spt id="7" title="纳多雷" online="1" lel="3" seatID="106" enterID="106" fightCondition="" description="在双子阿尔法星上，特派队遇见了一只巨大的精灵，经过多次挑战后，它仍然丝毫无损，赛尔们是否有办法战胜这只精灵呢？">
+	</spt>
+	
+	<spt id="8" title="雷纳多" online="1" lel="3" seatID="49" enterID="49" fightCondition="" description="彪悍的雷纳多盘踞在双子贝塔星上，和双子阿尔法星的纳多雷遥相对应，守护着星球上所有精灵的。">
+	</spt>
+	
+	<spt id="9" title="尤纳斯" online="1" lel="4" seatID="314" enterID="314" fightCondition="" description="黑暗之门的制造者，拥有能够抵御一切的暗影屏障和所有能量来源的黑暗之核。">
+	</spt>
+	
+	<spt id="10" title="魔狮迪露" online="1" lel="4" seatID="53" enterID="53" fightCondition="" description="魔狮迪露具有神秘的力量，能使自己的体力突破界限，但同时也会受到未知的惩罚。">
+	</spt>
+	
+	<spt id="11" title="哈莫雷特" online="1" lel="5" seatID="60" enterID="60" fightCondition="" description="拥有无比巨大的身躯，集水火草三种原能为一身，龙系的神秘力量使它所向无敌。失忆的它，似乎还有很多谜团……">
+	</spt>
+	
+	<spt id="12" title="奈尼芬多" online="1" lel="4" seatID="325"  enterID="325" fightCondition="" description="奈尼芬多是爱迪星的守护者，凄美的歌声连月亮都为之倾倒，据说只有音乐的力量才能够唤醒它。">
+	</spt>
+
+	<spt id="13" title="厄尔塞拉" online="1" lel="5" seatID="61"  enterID="61" fightCondition="" description="浑身散发着各色光芒，任何邪恶在她的光芒下消散无形">
+	</spt>
+
+	<spt id="14" title="盖亚" online="1" lel="5" seatID="0"  enterID="0" fightCondition="" description="提坦的进化形态，盖亚是精灵世界的战斗大师，它掌握着许许多多原创的战斗技巧，颇具霸者风范。">
+	</spt>
+
+	<spt id="15" title="塔克林" online="1" lel="4" seatID="348"  enterID="348" fightCondition="" description="龙族三巨头之一，代表着龙族巨大身躯与蛮力的最高水平">
+	</spt>
+
+	<spt id="16" title="塔西亚" online="1" lel="3" seatID="348"  enterID="348" fightCondition="" description="龙族三巨头之一，对古老的龙族咒语有着与生俱来的天赋">
+	</spt>
+
+	<spt id="17" title="远古鱼龙" online="1" lel="3" seatID="59"  enterID="59" fightCondition="" description="远古鱼龙曾经分布在宇宙的各个海洋，可是随着时间的流逝，如今远古鱼龙的数量却越来越少，海面挂起的龙卷风通常就是远古鱼龙造成的。">
+	</spt>
+
+	<spt id="18" title="上古炎兽" online="1" lel="5" seatID="16"  enterID="16" fightCondition="" description="夏伏兽的进化形态，这些上古时代的家伙至少在宇宙内生存了亿万年以上，它们的苏醒，对于生态平衡几乎是一次毁灭性的灾害">
+	</spt>
+
+	<spt id="19" title="谱尼真身" online="1" lel="5" seatID="0"  enterID="0" fightCondition="" description="不知它来自哪里、诞生于何时，因为它的力量可以扭曲时空；它的强大让我们无法探测、无法控制，也许它只是个传说">
+	</spt>
+
+	<spt id="20" title="拂晓兔" online="1" lel="5" seatID="10"  enterID="10" fightCondition="" description="2025中秋限时挑战BOSS">
+	</spt>
+
+</spts>

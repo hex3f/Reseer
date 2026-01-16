@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<root>
+	<!--type是1的表示精灵,2表示装备，3表示其他(包含道具以及家具)-->
+	<!-- NeedHonour是兑换所需荣誉点  ItemID为物品id或精灵id 由type决定 MaxExchange为最大可兑换数 999为无限制兑换-->
+	<!-- isFitment字段表示物品为家具类型 -->
+	<Exchange ID="1001" NeedHonour="100" ItemID="139" type="1" MaxExchange="999"/>
+	<Exchange ID="1002" NeedHonour="100" ItemID="196" type="1" MaxExchange="999"/>
+	<Exchange ID="1003" NeedHonour="100" ItemID="126" type="1" MaxExchange="999"/>
+	<Exchange ID="1004" NeedHonour="100" ItemID="56" type="1" MaxExchange="999"/>
+	<Exchange ID="1005" NeedHonour="275" ItemID="80" type="1" MaxExchange="999"/>
+	<Exchange ID="1006" NeedHonour="30" ItemID="164" type="1" MaxExchange="999"/>
+
+	<Exchange ID="2001" NeedHonour="40" ItemID="100034" type="2" MaxExchange="1"/>
+	<Exchange ID="2002" NeedHonour="40" ItemID="100033" type="2" MaxExchange="1"/>
+	<Exchange ID="2003" NeedHonour="40" ItemID="100035" type="2" MaxExchange="1"/>
+	<Exchange ID="2004" NeedHonour="50" ItemID="100137" type="2" MaxExchange="1"/>
+	<Exchange ID="2005" NeedHonour="220" ItemID="100162" type="2" MaxExchange="1"/>
+	<Exchange ID="2006" NeedHonour="220" ItemID="100223" type="2" MaxExchange="1"/>
+	<Exchange ID="2007" NeedHonour="50" ItemID="100261" type="2" MaxExchange="1"/>
+	<Exchange ID="2008" NeedHonour="50" ItemID="100262" type="2" MaxExchange="1"/>
+	<Exchange ID="2009" NeedHonour="50" ItemID="100265" type="2" MaxExchange="1"/>
+	<Exchange ID="2010" NeedHonour="50" ItemID="100263" type="2" MaxExchange="1"/>
+	<Exchange ID="2011" NeedHonour="50" ItemID="100264" type="2" MaxExchange="1"/>
+	<Exchange ID="2012" NeedHonour="30" ItemID="100338" type="2" MaxExchange="1"/>
+	<Exchange ID="2013" NeedHonour="30" ItemID="100339" type="2" MaxExchange="1"/>
+	<Exchange ID="2014" NeedHonour="30" ItemID="100340" type="2" MaxExchange="1"/>
+	<Exchange ID="2015" NeedHonour="30" ItemID="100341" type="2" MaxExchange="1"/>
+	<Exchange ID="2016" NeedHonour="40" ItemID="100892" type="2" MaxExchange="1"/>
+	<Exchange ID="2017" NeedHonour="40" ItemID="100893" type="2" MaxExchange="1"/>
+	<Exchange ID="2018" NeedHonour="40" ItemID="100894" type="2" MaxExchange="1"/>
+	<Exchange ID="2019" NeedHonour="40" ItemID="100895" type="2" MaxExchange="1"/>
+
+
+	<Exchange ID="3001" NeedHonour="2" ItemID="300019" type="3" MaxExchange="999"/>
+	<Exchange ID="3002" NeedHonour="3" ItemID="300015" type="3" MaxExchange="999"/>
+	<Exchange ID="3003" NeedHonour="5" ItemID="400501" type="3" MaxExchange="999"/>
+	<Exchange ID="3004" NeedHonour="20" ItemID="300026" type="3" MaxExchange="999"/>
+	<Exchange ID="3005" NeedHonour="14" ItemID="300005" type="3" MaxExchange="999"/>
+	<Exchange ID="3006" NeedHonour="40" ItemID="300025" type="3" MaxExchange="999"/>
+
+	<Exchange ID="5001" NeedHonour="100" ItemID="500002" type="3" isFitment="1" MaxExchange="1"/>
+	<Exchange ID="5002" NeedHonour="50" ItemID="500511" type="3" isFitment="1" MaxExchange="2"/>
+	<Exchange ID="5003" NeedHonour="40" ItemID="500512" type="3" isFitment="1" MaxExchange="1"/>
+	<Exchange ID="5004" NeedHonour="40" ItemID="500513" type="3" isFitment="1" MaxExchange="1"/>
+	<Exchange ID="5005" NeedHonour="30" ItemID="500520" type="3" isFitment="1" MaxExchange="8"/>
+	<Exchange ID="5006" NeedHonour="35" ItemID="500519" type="3" isFitment="1" MaxExchange="2"/>
+	<Exchange ID="5007" NeedHonour="30" ItemID="500521" type="3" isFitment="1" MaxExchange="4"/>
+	<Exchange ID="5008" NeedHonour="40" ItemID="500522" type="3" isFitment="1" MaxExchange="1"/>
+	<Exchange ID="5009" NeedHonour="40" ItemID="500803" type="3" isFitment="1" MaxExchange="1"/>
+	<Exchange ID="5010" NeedHonour="40" ItemID="500515" type="3" isFitment="1" MaxExchange="1"/>
+
+</root>

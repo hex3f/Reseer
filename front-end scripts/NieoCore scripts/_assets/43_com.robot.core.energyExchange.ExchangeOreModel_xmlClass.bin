@@ -1,0 +1,39 @@
+<!--能够兑换的item id-->
+<Items>
+	<item id="400001"/>
+	<item id="400002"/>
+	<item id="400003"/>
+	<item id="400004"/>
+	<item id="400005"/>
+	<item id="400006"/>
+	<item id="400007"/>
+	<item id="400008"/>
+	<item id="400009"/>
+	<item id="400010"/>
+	<item id="400011"/>
+	<item id="400012"/>
+	<item id="400014"/>
+	<item id="400015"/>
+	<item id="400016"/>
+	<item id="400017"/>
+	<item id="400018"/>
+	<item id="400019"/>
+	<item id="400020"/>
+	<item id="400021"/>
+	<item id="400022"/>
+	<item id="400023"/>
+	<item id="400024"/>
+	<item id="400025"/>
+	<item id="400026"/>
+	<item id="400027"/>
+	<item id="400028"/>
+	<item id="400029"/>
+	<item id="400030"/>
+	<item id="400031"/>
+	<item id="400032"/>
+	<item id="400033"/>
+	<item id="400034"/>
+	<item id="400035"/>
+	<item id="400036"/>
+	<item id="400053"/>
+</Items>

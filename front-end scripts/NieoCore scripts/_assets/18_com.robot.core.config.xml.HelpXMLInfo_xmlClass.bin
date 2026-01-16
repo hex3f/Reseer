@@ -1,0 +1,362 @@
+<!--
+	id:帮助编号
+	type:帮助类型0,例表形式，1，为对话框或弹箭头形式，2，弹写信面版
+	mapId:需要所在地图，如果无值则任何地图都可以
+	arrowX:箭头X坐标,如果不在当前地图则没用
+	arrowY:箭头Y坐标,如果不在当前地图则没用
+	//列表
+	item:列表名
+	clickTo:对应事件
+	isBack：无值则例表没有返回按钮，如果为1，item列表最后一组就为返回id
+	//
+	des:注解
+-->
+<root>
+	<help id="0" type="0" mapId=""  arrowX="" arrowY="" isBack="0">
+		<des><![CDATA[欢迎来到赛尔号！$    尊敬的#nick,有什么我可以帮助您的吗，我很愿意为您效劳!]]>
+		</des>
+		<pro item="我要探索新的地图" clickTo="6"/>
+		<pro item="赛尔号船员能做什么" clickTo="1"/>
+		<pro item="赛尔号船员能玩什么" clickTo="2"/>
+		<pro item="界面功能按钮介绍" clickTo="3"/>
+		<pro item="飞船工作人员方位指引" clickTo="4"/>
+		<pro item="联系飞船工作人员" clickTo="5"/>
+	</help>
+	<help id="6" type="0" mapId=""  arrowX="" arrowY="" isBack="1">
+		<des><![CDATA[下面是隐藏地图，<font color="#ff0000">能做什么</font>，请在下方列表中选择出您需要我为你注解的。]]>
+		</des>
+
+		<!-- <pro item="水草蛙聚集地" clickTo="901"/>
+		<pro item="千年前的赫尔卡星" clickTo="902"/>
+		<pro item="神秘的迷宫" clickTo="903"/>
+		<pro item="苦难的遗址" clickTo="904"/> -->
+		<!-- <pro item="玄武空间" clickTo="905"/> -->
+		<!-- <pro item="精灵学院" clickTo="906"/> -->
+		<!-- <pro item="太空站扩展" clickTo="907"/> -->
+		<pro item="精灵训练室" clickTo="1000"/>
+		<pro item="赫鲁卡城" clickTo="1001"/>
+		<pro item="巅峰之战" clickTo="1002"/>
+		<pro item="返回" clickTo="0"/>
+
+	</help>
+	<!--赛尔号船员能做什么-->
+	<help id="1" type="0" mapId=""  arrowX="" arrowY="" isBack="1">
+		<des><![CDATA[您当前选择的是赛尔船员<font color="#ff0000">能做什么</font>，请在下方列表中选择出您需要我为你注解的。]]>
+		</des>
+		
+		<pro item="新手试炼" clickTo="101"/>
+		<pro item="赛尔精灵" clickTo="102"/>
+		<pro item="购买各式装备" clickTo="103"/>
+		<pro item="修复装备" clickTo="108"/>
+		<pro item="赛尔个性涂鸦" clickTo="104"/>
+		<pro item="赛尔战队" clickTo="138"/>
+		<pro item="返回" clickTo="0"/>
+	</help>
+	<!--赛尔号船员能玩什么-->
+	<help id="2" type="0" mapId=""  arrowX="" arrowY="" isBack="1">
+		<des><![CDATA[您当前选择的是赛尔号船员<font color="#ff0000">能玩什么</font>，以下是赛尔号上的模拟小游戏，请选择您感兴趣的吧，我很愿意带您去参观下。]]>
+		</des>
+		<pro item="保护导航仪" clickTo="109"/>
+		<pro item="星座档案管理" clickTo="110"/>
+		<pro item="舱外回收员" clickTo="111"/>
+		<pro item="防空塔模拟训练" clickTo="112"/>
+		<pro item="超能晶体采矿练习" clickTo="134"/>
+		<pro item="突围磁风暴" clickTo="135"/>
+		<pro item="返回" clickTo="0"/>
+	</help>
+	<!--菜单栏功能介绍-->
+	<help id="3" type="0" mapId="" arrowX="" arrowY="" isBack="1">
+		<des><![CDATA[您当前选择的是<font color="#ff0000">界面功能按钮介绍</font>，请在下方的列表中选择您需要我帮助的选项，另外也祝您在赛尔号上旅途愉快！]]>
+		</des>
+		<pro item="船员日志" clickTo="100"/>
+		<pro item="精灵训练营" clickTo="106"/>
+		<pro item="赛尔先锋队" clickTo="107"/>
+		<pro item="地图按钮" clickTo="105"/>
+		<pro item="快捷语言" clickTo="113"/>
+		<pro item="赛尔表情" clickTo="114"/>
+		<pro item="赛尔动作" clickTo="115"/>
+		<pro item="瞄准射击" clickTo="116"/>
+		<pro item="储存箱" clickTo="117"/>
+		<pro item="战队信息" clickTo="118"/>
+		<pro item="好友列表" clickTo="119"/>
+		<pro item="基地" clickTo="120"/>
+		<pro item="精灵包" clickTo="121"/>
+		<pro item="电池时间" clickTo="122"/>
+		<pro item="声音开关" clickTo="123"/>
+		<pro item="超能NoNo" clickTo="124"/>
+		<pro item="战队" clickTo="137"/>
+		<pro item="返回" clickTo="0"/>
+	</help>
+	<!--飞船主要工作人员方位指引-->
+	<help id="4" type="0" mapId=""  arrowX="" arrowY="" isBack="1">
+		<des><![CDATA[您当前选择的是<font color="#ff0000">飞船工作人员方位指引</font>，请容我带您认识一下赛尔号上的工作人员，现在请您在下方选择您想要拜访的工作人员名单。]]>
+		</des>
+		<pro item="船长罗杰在哪里？" clickTo="125"/>
+		<pro item="机械师茜茜在哪里？" clickTo="126"/>
+		<pro item="博士派特在哪里？" clickTo="127"/>
+		<pro item="发明家肖恩在哪里？" clickTo="128"/>
+		<pro item="总教官雷蒙在哪里？" clickTo="129"/>
+		<pro item="站长贾斯汀在哪里？" clickTo="136"/>
+		<pro item="返回" clickTo="0"/>
+	</help>
+	<!--更多互动-->
+	<help id="5" type="0" mapId=""  arrowX="" arrowY="" isBack="1">
+		<des><![CDATA[您当前选择的是<font color="#ff0000">联系飞船工作人员</font>，如果您对我们有任何意见或者建议，您都可以选择下方的几个途径来给我们写信。]]>
+		</des>
+		<pro item="给教官写信" clickTo="139"/>
+		<pro item="给船长写信" clickTo="130"/>
+		<pro item="给博士写信" clickTo="131"/>
+		<pro item="给发明家写信" clickTo="132"/>
+		<pro item="航行日志投稿" clickTo="133"/>
+		<pro item="返回" clickTo="0"/>
+	</help>
+	<!--查看日志-->
+	<help id="100" type="1" mapId="" arrowX="58" arrowY="47">
+		<des><![CDATA[你可以点击这里查看赛尔号飞船的最新动态哦]]>
+		</des>
+	</help>
+	<!--新手试练-->
+	<help id="101" type="1" mapId="8" arrowX="800" arrowY="174">
+		<des><![CDATA[新入住的船员你可以在<font color="#ff0000">机械室</font>茜茜这里进行新手试炼，成为真正的勇士哦！]]>
+		</des>
+	</help>
+	<!--赛尔精灵-->
+	<help id="102" type="1" mapId="5" arrowX="922" arrowY="344">
+		<des><![CDATA[你想了解更多精灵信息吗？快去<font color="#ff0000">实验室</font>看看<font color="#ff0000">精灵手册</font>吧！]]>
+		</des>
+	</help>
+	<!--购买各式装备-->
+	<help id="103" type="1" mapId="8" arrowX="155" arrowY="233">
+		<des><![CDATA[你可以在<font color="#ff0000">机械室</font>里的<font color="#ff0000">赛尔工厂</font>购买到各式装备哦，要我带你去看看吗？]]>
+		</des>
+	</help>
+	<!--赛尔个性涂鸦-->
+	<help id="104" type="1" mapId="8" arrowX="281" arrowY="57">
+		<des><![CDATA[你可以在<font color="#ff0000">机械室</font>里的<font color="#ff0000">涂装室</font>改变自己外观的颜色哦，要我带你去看看吗？]]>
+		</des>
+	</help>
+	<!--使用航行地图-->
+	<help id="105" type="1" mapId="" arrowX="49" arrowY="516">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--赛尔精灵训练营-->
+	<help id="106" type="1" mapId="" arrowX="837" arrowY="46">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--赛尔先锋队任务-->
+	<help id="107" type="1" mapId="" arrowX="909" arrowY="46">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--修复装备-->
+	<help id="108" type="1" mapId="8" arrowX="413" arrowY="300">
+		<des><![CDATA[你可以在<font color="#ff0000">机械室</font>里的<font color="#ff0000">装备修复机</font>修理已损坏的装备哦，要我带你去看看吗？]]>
+		</des>
+	</help>
+	<!--保护导航仪-->
+	<help id="109" type="1" mapId="4" arrowX="183" arrowY="153">
+		<des><![CDATA[你可以在<font color="#ff0000">船长室</font>加入保护导航仪的行列，拿起手中的武器奋力迎击！]]>
+		</des>
+	</help>
+	<!--星座档案管理-->
+	<help id="110" type="1" mapId="9" arrowX="155" arrowY="436">
+		<des><![CDATA[你可以去<font color="#ff0000">资料室</font>参加星座档案管理哦！快去一展身手！]]>
+		</des>
+	</help>
+	<!--舱外回收员-->
+	<help id="111" type="1" mapId="7" arrowX="500" arrowY="331">
+		<des><![CDATA[你可以去<font color="#ff0000">瞭望舱</font>做一回舱外回收员，注意太空陨石哦！]]>
+		</des>
+	</help>
+	<!--防空塔模拟训练-->
+	<help id="112" type="1" mapId="106" arrowX="414" arrowY="433">
+		<des><![CDATA[你可以去<font color="#ff0000">阿尔法星岩地</font>参加防空塔模拟训练，我们将会是战无不胜的赛尔!]]>
+		</des>
+	</help>
+	<!--快捷语言-->
+	<help id="113" type="1" mapId="" arrowX="140" arrowY="532">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--赛尔表情-->
+	<help id="114" type="1" mapId="" arrowX="194" arrowY="532">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--赛尔动作-->
+	<help id="115" type="1" mapId="" arrowX="250" arrowY="532">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--瞄准射击-->
+	<help id="116" type="1" mapId="" arrowX="302" arrowY="532">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--储存箱-->
+	<help id="117" type="1" mapId="" arrowX="633" arrowY="532">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--战队信息-->
+	<help id="118" type="1" mapId="" arrowX="685" arrowY="532">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--好友列表-->
+	<help id="119" type="1" mapId="" arrowX="732" arrowY="532">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	
+	<!--基地-->
+	<help id="120" type="1" mapId="" arrowX="784" arrowY="532">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--精灵包-->
+	<help id="121" type="1" mapId="" arrowX="836" arrowY="532">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	
+	<!--电池时间-->
+	<help id="122" type="1" mapId="" arrowX="915" arrowY="541">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--声音开关-->
+	<help id="123" type="1" mapId="" arrowX="909" arrowY="498">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--超能NoNo-->
+	<help id="124" type="1" mapId="" arrowX="896" arrowY="450">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--赛尔号船长在哪里-->
+	<help id="125" type="1" mapId="4" arrowX="776" arrowY="325">
+		<des><![CDATA[你要去<font color="#ff0000">船长室</font>拜访船长罗杰吗？]]>
+		</des>
+	</help>
+	<!--机械室-->
+	<help id="126" type="1" mapId="8" arrowX="787" arrowY="173">
+		<des><![CDATA[你要去<font color="#ff0000">机械室</font>拜访我们的装备工程师茜茜吗？]]>
+		</des>
+	</help>
+	<!--v-->
+	<help id="127" type="1" mapId="5" arrowX="390" arrowY="266">
+		<des><![CDATA[你要去<font color="#ff0000">实验室</font>拜访派特博士吗？]]>
+		</des>
+	</help>
+	<!--发明室-->
+	<help id="128" type="1" mapId="107" arrowX="399" arrowY="385">
+		<des><![CDATA[你要去<font color="#ff0000">发明室</font>肖恩老师的发明室看看吗？]]>
+		</des>
+	</help>
+	
+	<!--教官办公室-->
+	<help id="129" type="1" mapId="101" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">教官办公室</font>拜访雷蒙教官吗？]]>
+		</des>
+	</help>
+	<!--给船长写信-->
+	<help id="130" type="2" mapId="" arrowX="0" arrowY="0">
+		<des><![CDATA[2]]>
+		</des>
+	</help>
+	<!--给博士写信-->
+	<help id="131" type="2" mapId="" arrowX="0" arrowY="0">
+		<des><![CDATA[3]]>
+		</des>
+	</help>
+	<!--给发明家写信-->
+	<help id="132" type="2" mapId="" arrowX="0" arrowY="0">
+		<des><![CDATA[4]]>
+		</des>
+	</help>
+	<!--航行日志投稿-->
+	<help id="133" type="2" mapId="" arrowX="0" arrowY="0">
+		<des><![CDATA[1]]>
+		</des>
+	</help>
+	<!--超能晶体采矿练习-->
+	<help id="134" type="1" mapId="107" arrowX="526" arrowY="464">
+		<des><![CDATA[你可以在<font color="#ff0000">发明室</font>进行超能晶体采矿的练习哦！（只有在超能NoNo的陪同下才可以进行哦）]]>
+		</des>
+	</help>
+	<!--突围磁风暴-->
+	<help id="135" type="1" mapId="6" arrowX="625" arrowY="249">
+		<des><![CDATA[你可以在<font color="#ff0000">动力室</font>参与突围磁风暴的训练，只有通过不懈的练习才能让赛尔变得更强大。]]>
+		</des>
+	</help>
+	<!--站长贾斯汀在哪里-->
+	<help id="136" type="1" mapId="102" arrowX="228" arrowY="252">
+		<des><![CDATA[你要去<font color="#ff0000">精灵太空站</font>拜访贾斯汀站长吗？]]>
+		</des>
+	</help>
+	<!--战队-->
+	<help id="137" type="1" mapId="" arrowX="685" arrowY="535">
+		<des><![CDATA[无]]>
+		</des>
+	</help>
+	<!--赛尔战队-->
+	<help id="138" type="1" mapId="102" arrowX="228" arrowY="252">
+		<des><![CDATA[你可以在<font color="#ff0000">精灵太空站</font>里的<font color="#ff0000">贾斯汀</font>那报名组建战队哦，要我带你去看看吗？]]>
+		</des>
+	</help>
+	<!--给教官写信-->
+	<help id="139" type="2" mapId="" arrowX="0" arrowY="0">
+		<des><![CDATA[5]]>
+		</des>
+	</help>
+
+	<!--给教官写信-->
+	<help id="901" type="1" mapId="56" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">聚集地</font>吗？]]>
+		</des>
+	</help>
+	<help id="902" type="1" mapId="320" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">千年以前</font>吗？]]>
+		</des>
+	</help>
+
+	<help id="903" type="1" mapId="302" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">迷宫</font>吗？]]>
+		</des>
+	</help>
+	<help id="904" type="1" mapId="326" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">坠毁遗迹</font>吗？]]>
+		</des>
+	</help>
+	<help id="905" type="1" mapId="401" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">玄武空间</font>吗？]]>
+		</des>
+	</help>
+	<help id="906" type="1" mapId="485" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">精灵学院</font>吗？]]>
+		</des>
+	</help>
+	<help id="907" type="1" mapId="405" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">太空站扩展</font>吗？]]>
+		</des>
+	</help>
+	<!-- 打开精灵训练室面板 -->
+	<help id="1000" type="2" mapId="0" arrowX="0" arrowY="0">
+		<des><![CDATA[6]]>
+		</des>
+	</help>
+	<!-- 赫鲁卡城 -->
+	<help id="1001" type="1" mapId="461" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">赫鲁卡城</font>吗？]]>
+		</des>
+	</help>
+	<!-- 巅峰之战 -->
+	<help id="1002" type="1" mapId="433" arrowX="209" arrowY="320">
+		<des><![CDATA[你要去<font color="#ff0000">巅峰之战</font>吗？]]>
+		</des>
+	</help>
+</root>

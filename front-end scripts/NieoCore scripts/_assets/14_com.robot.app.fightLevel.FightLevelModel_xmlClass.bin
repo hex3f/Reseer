@@ -1,0 +1,10 @@
+<Levels>
+	<level id="1" itemId="1"/>
+	<level id="2" itemId="11"/>
+	<level id="3" itemId="21"/>
+	<level id="4" itemId="31"/>
+	<level id="5" itemId="41"/>
+	<level id="6" itemId="51"/>
+	<level id="7" itemId="61"/>
+    <level id="8" itemId="71"/>
+</Levels>

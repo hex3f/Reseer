@@ -1,0 +1,344 @@
+<word>
+	<!--            你好             -->
+	<menu title="你好">
+		<menu title="Hi"/>
+		<menu title="Hello"/>
+		<menu title="欢迎">
+			<menu title="欢迎来我的基地"/>
+			<menu title="欢迎回来"/>
+		</menu>
+		<menu title="怎么了？"/>
+		<menu title="时间问候">
+			<menu title="早上好"/>
+			<menu title="中午好"/>
+			<menu title="下午好"/>
+			<menu title="晚上好"/>
+		</menu>
+		<menu title="节日问候">
+			<menu title="新年快乐"/>
+			<menu title="万圣节快乐"/>
+			<menu title="感恩节快乐"/>
+			<menu title="圣诞快乐"/>
+			<menu title="暑假快乐"/>
+			<menu title="寒假快乐"/>
+			<menu title="节日快乐"/>
+		</menu>
+	</menu>
+	<!--            再见             -->
+	<menu title="再见">
+		<menu title="Bye"/>
+		<menu title="等会见">
+			<menu title="一会见"/>
+			<menu title="明天见"/>
+		</menu>
+		<menu title="我马上回来"/>
+		<menu title="我必须走了"/>
+		<menu title="问候">
+			<menu title="保重"/>
+			<menu title="好运"/>
+			<menu title="一路好走"/>
+		</menu>
+	</menu>
+	<!--            朋友             -->
+	<menu title="朋友">
+		<menu title="能做朋友吗"/>
+		<menu title="跟着我">
+			<menu title="来我的基地吧"/>
+			<menu title="在我的基地碰头"/>
+		</menu>
+		<menu title="我喜欢">
+			<menu title="我喜欢你的装备"/>
+			<menu title="我喜欢你的基地"/>
+			<menu title="我喜欢你的故事"/>
+		</menu>
+		<menu title="谢谢">
+			<menu title="谢谢你陪我玩"/>
+			<menu title="谢谢你能来"/>
+			<menu title="不用了，依然感谢"/>
+		</menu>
+		<menu title="没问题"/>
+		<menu title="你……">
+			<menu title="你真棒"/>
+			<menu title="你真酷"/>
+			<menu title="你真可爱"/>
+			<menu title="你有点冒傻气"/>
+			<menu title="你酷毙了"/>
+			<menu title="你是我的好朋友"/>
+		</menu>
+		<menu title="基地">
+			<menu title="很不错的基地"/>
+			<menu title="很好的装饰"/>
+			<menu title="很酷的设计"/>
+			<menu title="我喜欢你的基地"/>
+			<menu title="很棒的聚会"/>
+		</menu>
+		<menu title="对不起">
+			<menu title="对不起，我很忙"/>
+			<menu title="对不起，我必须走了"/>
+			<menu title="请原谅"/>
+			<menu title="原谅你"/>
+		</menu>
+	</menu>
+	<!--           问题              -->
+	<menu title="问题">
+		<menu title="是什么">
+			<menu title="你喜欢的动物是什么"/>
+			<menu title="你喜欢的游戏是什么"/>
+			<menu title="你喜欢的运动是什么"/>
+			<menu title="你喜欢什么音乐"/>
+			<menu title="你的爱好是什么"/>
+		</menu>
+		<menu title="在哪里">
+			<menu title="你要去哪里"/>
+			<menu title="你在哪里找到它的"/>
+		</menu>
+		<menu title="什么时候">
+			<menu title="你的聚会是什么时候"/>
+			<menu title="你今天心情如何"/>
+			<menu title="你能带我逛一逛吗"/>
+		</menu>
+	</menu>
+	<!--           回答              -->
+	<menu title="回答">
+		<menu title="动物">
+			<menu title="小猫"/>
+			<menu title="小狗"/>
+			<menu title="大马"/>
+			<menu title="虫子"/>
+			<menu title="鼹鼠"/>
+			<menu title="猴子"/>
+			<menu title="狗熊"/>
+			<menu title="小鱼"/>
+			<menu title="飞鸟"/>
+			<menu title="大象"/>
+		</menu>
+		<menu title="体育">
+			<menu title="篮球"/>
+			<menu title="排球"/>
+			<menu title="足球"/>
+			<menu title="水上运动">
+				<menu title="游泳"/>
+				<menu title="冲浪"/>
+			</menu>
+			<menu title="冬季运动">
+				<menu title="双板滑雪"/>
+				<menu title="单板滑雪"/>
+				<menu title="滑冰"/>
+				<menu title="雪橇"/>
+			</menu>
+			<menu title="探险"/>
+			<menu title="登山"/>
+			<menu title="攀岩"/>
+			<menu title="钓鱼"/>
+			<menu title="棒球"/>
+			<menu title="橄榄球"/>
+		</menu>
+		<menu title="音乐">
+			<menu title="乡村"/>
+			<menu title="爵士"/>
+			<menu title="Rap"/>
+			<menu title="Hip-Hop"/>
+			<menu title="古典"/>
+			<menu title="流行"/>
+			<menu title="摇滚"/>
+			<menu title="电子音乐"/>
+		</menu>
+		<menu title="爱好">
+			<menu title="阅读">
+				<menu title="小说"/>
+				<menu title="科幻"/>
+				<menu title="漫画"/>
+				<menu title="杂志"/>
+			</menu>
+			<menu title="上网"/>
+			<menu title="跳舞">
+				<menu title="芭蕾"/>
+				<menu title="踢踏舞"/>
+				<menu title="爵士舞"/>
+				<menu title="街舞"/>
+				<menu title="现代舞"/>
+			</menu>
+			<menu title="锻炼"/>
+			<menu title="武术">
+				<menu title="空手道"/>
+				<menu title="柔道"/>
+				<menu title="跆拳道"/>
+			</menu>
+			<menu title="听音乐"/>
+			<menu title="音乐课">
+				<menu title="学钢琴"/>
+				<menu title="学小提琴"/>
+				<menu title="学打鼓"/>
+			</menu>
+			<menu title="艺术"/>
+			<menu title="逛街"/>
+		</menu>
+		<menu title="位置">
+			<menu title="东北"/>
+			<menu title="华北"/>
+			<menu title="华中"/>
+			<menu title="华东"/>
+			<menu title="华西"/>
+			<menu title="华南"/>
+			<menu title="港澳"/>
+			<menu title="台湾"/>
+			<menu title="海外"/>
+			<menu title="赛尔号">
+				<menu title="飞船">
+					<menu title="船长室"/>
+					<menu title="瞭望舱"/>
+					<menu title="实验室"/>
+					<menu title="动力舱"/>
+					<menu title="机械舱"/>
+					<menu title="传送舱"/>
+					<menu title="我的基地"/>
+				</menu>
+				<menu title="星球"/>
+			</menu>
+		</menu>
+		<menu title="年龄">
+			<menu title="小婴儿"/>
+			<menu title="幼儿园小朋友"/>
+			<menu title="小学生"/>
+			<menu title="初中生"/>
+			<menu title="中学生"/>
+			<menu title="大学生"/>
+			<menu title="成年人"/>
+		</menu>
+		<menu title="心情">
+			<menu title="挺好"/>
+			<menu title="真棒"/>
+			<menu title="还行"/>
+			<menu title="不错"/>
+		</menu>
+		<menu title="男孩"/>
+		<menu title="女孩"/>
+	</menu>
+	<!--           对战             -->
+	<menu title="精灵">
+        <menu title="后会有期"/>
+		<menu title="再来一局"/>			
+		<menu title="干得漂亮"/>		
+		<menu title="想较量下吗"/>
+		<menu title="来比试一下"/>
+		<menu title="你的精灵真漂亮"/>
+	</menu>
+	<!--           活动              -->
+	<menu title="活动">
+		<menu title="讲个笑话"/>
+		<menu title="带我逛逛"/>
+		<menu title="活动">
+			<menu title="聚会">
+				<menu title="在我的基地碰个头吧"/>
+			</menu>
+			<menu title="训练">
+				<menu title="在我的基地练一下吧"/>
+			</menu>
+			<menu title="挑战">
+				<menu title="在我的基地比试一下"/>
+			</menu>
+			<menu title="捉迷藏">
+				<menu title="我找到你了"/>
+				<menu title="准备好了吗？我来了"/>
+	    	</menu>
+		</menu>
+		<menu title="时间">			
+			<menu title="星期几">
+				<menu title="星期一"/>
+				<menu title="星期二"/>
+				<menu title="星期三"/>
+				<menu title="星期四"/>
+				<menu title="星期五"/>
+				<menu title="星期六"/>
+				<menu title="星期日"/>
+			</menu>			
+			<menu title="时钟">
+			     <menu title="11:00">
+					<menu title="11:45"/>
+					<menu title="11:30"/>
+					<menu title="11:15"/>
+				</menu>
+				<menu title="10:00">
+					<menu title="10:45"/>
+					<menu title="10:30"/>
+					<menu title="10:15"/>
+				</menu>
+				<menu title="9:00">
+					<menu title="9:45"/>
+					<menu title="9:30"/>
+					<menu title="9:15"/>
+				</menu>
+				<menu title="8:00">
+					<menu title="8:45"/>
+					<menu title="8:30"/>
+					<menu title="8:15"/>
+				</menu>
+					<menu title="7:00">
+					<menu title="7:45"/>
+					<menu title="7:30"/>
+					<menu title="7:15"/>
+				</menu>
+				<menu title="6:00">
+					<menu title="6:45"/>
+					<menu title="6:30"/>
+					<menu title="6:15"/>
+				</menu>
+				<menu title="5:00">
+					<menu title="5:45"/>
+					<menu title="5:30"/>
+					<menu title="5:15"/>
+				</menu>
+		    	<menu title="4:00">
+					<menu title="4:45"/>
+					<menu title="4:30"/>
+					<menu title="4:15"/>
+				</menu>
+				<menu title="3:00">
+					<menu title="3:45"/>
+					<menu title="3:30"/>
+					<menu title="3:15"/>
+				</menu>
+				<menu title="2:00">
+					<menu title="2:45"/>
+					<menu title="2:30"/>
+					<menu title="2:15"/>
+				</menu>
+				<menu title="1:00">
+					<menu title="1:45"/>
+					<menu title="1:30"/>
+					<menu title="1:15"/>
+				</menu>
+				<menu title="12:00">
+					<menu title="12:45"/>
+					<menu title="12:30"/>
+					<menu title="12:15"/>
+				</menu>	
+			</menu>
+			<menu title="昨天"/>
+			<menu title="明天"/>
+			<menu title="今天"/>
+			<menu title="一个小时内"/>
+			<menu title="30分钟内"/>
+			<menu title="15分钟内"/>
+			<menu title="10分钟内"/>
+			<menu title="5分钟内"/>
+		</menu>
+	</menu>
+	<!--           不满              -->
+	<menu title="不满">
+		<menu title="这可不好"/>
+		<menu title="请走开"/>
+		<menu title="不要那样做"/>
+		<menu title="你太过分了"/>
+	</menu>
+	<!--           真棒              -->
+	<menu title="真棒">
+		<menu title="太酷了"/>
+		<menu title="不错"/>
+		<menu title="表现不错"/>
+		<menu title="干的漂亮"/>
+	</menu>
+	<menu title="是的"/>
+	<menu title="不是"/>
+	<menu title="好的"/>
+</word>

@@ -1,0 +1,42 @@
+<!--
+	多个地图ID归属于一个星球
+	此XML表主要配置一些各个星球有可能需要用到的共用信息，比如目前在世界地图上显示玩家所在位置
+-->
+<superMaps>
+	<maps id="1" name="传送舱" x="" y=""/>
+	<maps id="4" name="船长室" x="" y=""/>
+	<maps id="5" name="实验室" x="" y=""/>
+	<maps id="6" name="动力室" x="" y=""/>
+	<maps id="7" name="瞭望舱" x="" y=""/>
+	<maps id="8" name="机械室" x="" y=""/>
+	<maps id="9" name="资料室" x="" y=""/>
+	<maps id="19" name="太空站" x="" y="" />
+	<maps id="101" name="教官办公室" x="" y=""/>
+	<maps id="103" name="瞭望露台" x="" y=""/>
+	<maps id="107" name="发明室" x="" y=""/>
+	<maps id="485" name="精灵学院" x="" y=""/>
+	<!--星球-->
+	<maps id="11" name="克洛斯星" galaxy="1" x="358" y="46" />
+	<maps id="12" name="火山星" galaxy="1" x="533" y="46" />
+	<maps id="13" name="海洋星" galaxy="1" x="190" y="11" />
+	<maps id="14" name="云宵星" galaxy="1" x="652" y="24" />
+	<maps id="15" name="赫尔卡星" galaxy="1" x="45" y="34" />
+	<maps id="16" name="塞西利亚星" galaxy="1" x="1012" y="30" />
+	<maps id="17" name="双子阿尔法星" galaxy="1" x="822" y="96" />
+	<maps id="18" name="双子贝塔星" galaxy="1" x="883" y="63" />
+	<maps id="20" name="斯诺星" galaxy="1" x="1290" y="15" />
+	<maps id="21" name="尼古尔星" galaxy="2" x="30" y="50" />
+	<maps id="22" name="塔克星" galaxy="2" x="135" y="44" />
+	<maps id="23" name="艾迪星" galaxy="2" x="250" y="30" />
+	<maps id="24" name="斯科尔星" galaxy="2" x="375" y="40" />
+	<maps id="25" name="拜伦号" galaxy="1" x="1160" y="55" />
+	<maps id="26" name="露希欧星" galaxy="1" x="1405" y="120" />
+	<maps id="27" name="普雷空间站" galaxy="2" x="500" y="50" />
+	<maps id="28" name="哈默星" galaxy="2" x="590" y="70" />
+	<maps id="404" name="比格星" galaxy="3" x="30" y="50" />
+	<maps id="411" name="陨石地带" galaxy="3" x="170" y="70"/>
+	<maps id="424" name="空间补给站" galaxy="3" x="300" y="60"/>
+	<maps id="429" name="拓梯星" galaxy="3" x="415" y="55"/>
+	<maps id="435" name="戴斯星" galaxy="3" x="535" y="60"/>
+	<maps id="437" name="墨杜萨星" galaxy="3" x="670" y="60"/>
+</superMaps>

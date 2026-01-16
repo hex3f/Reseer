@@ -1,0 +1,19 @@
+<!--
+	接任务时的条件检查。通过任务ID号和任务匹配，不满足条件的无法领取任务
+	
+	id - 任务编号
+	step - 检查的阶段。刚点NPC时，还是准备接受任务时(0为刚点时，1为准备接受任务时)
+	
+	<condition>
+	class - 类路径。为空时默认用TaskCondition.as
+	fun - 函数名
+	args - 以后可能用到的传参数
+	每个condition节点里对应一句话，用于条件不满足时可能弹出的提示语
+-->
+<root>
+	<task id="46" step="1">
+		<condition fun="haveTeam" class="" args="">
+			<![CDATA[你必须加入一个战队才能参加这次资格试炼。]]>
+		</condition>
+	</task>
+</root>

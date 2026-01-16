@@ -1,0 +1,44 @@
+<!--
+	金豆购买的物品配置表
+	
+	productID - 商品ID
+	itemID - 游戏里的物品ID
+	price - 金豆价格
+	vip - vip折扣，请填小数，比如6折就是0.6
+	gold - 赠送金豆数
+-->
+<root>
+	<item name="无敌精灵胶囊" productID="240000" itemID="300006" price="50" vip="1"/>
+	<item name="基因重组药剂" productID="240001" itemID="300024" price="5" vip="1"/>
+	<item name="神经元再生胶囊" productID="240002" itemID="300025" price="10" vip="1"/>
+	<item name="降级秘药" productID="240003" itemID="300026" price="4" vip="1"/>
+	<item name="双倍加速器" productID="240004" itemID="300027" price="5" vip="1"/>
+	<item name="灵能束腰" productID="240005" itemID="100266" price="30" vip="1"/>
+	<item name="金布甲" productID="240006" itemID="100267" price="30" vip="1"/>
+	<item name="无敌之气" productID="240007" itemID="100268" price="30" vip="1"/>
+	<item name="强化合成剂" productID="240008" itemID="400054" price="10" vip="1"/>	
+	<item name="自动战斗器S型" productID="240009" itemID="300028" price="10" vip="1"/>	
+	<item name="能量吸收器" productID="240010" itemID="300029" price="5" vip="1"/>		
+	<item name="防御能量珠" productID="240011" itemID="300030" price="2" vip="1"/>		
+	<item name="特防能量珠" productID="240012" itemID="300031" price="2" vip="1"/>	
+	<item name="攻击能量珠" productID="240013" itemID="300032" price="3" vip="1"/>	
+	<item name="特攻能量珠" productID="240014" itemID="300033" price="3" vip="1"/>	
+	<item name="速度能量珠" productID="240015" itemID="300034" price="4" vip="1"/>
+	<item name="精灵学习机" productID="240016" itemID="300035" price="3" vip="1"/>	
+	<item name="元神还原剂" productID="240017" itemID="300036" price="10" vip="1"/>
+	<item name="攻击学习力遗忘剂" productID="240018" itemID="300037" price="6" vip="1"/>
+	<item name="防御学习力遗忘剂" productID="240019" itemID="300038" price="4" vip="1"/>
+	<item name="特攻学习力遗忘剂" productID="240020" itemID="300039" price="6" vip="1"/>
+	<item name="特防学习力遗忘剂" productID="240021" itemID="300040" price="4" vip="1"/>
+	<item name="速度学习力遗忘剂" productID="240022" itemID="300041" price="6" vip="1"/>
+	<item name="体力学习力遗忘剂" productID="240023" itemID="300042" price="5" vip="1"/>
+	<item name="强固精华合剂" productID="240024" itemID="300043" price="50" vip="1"/>
+	<item name="元神凝聚制剂" productID="240025" itemID="300044" price="5" vip="1"/>
+	<item name="时空精灵胶囊" productID="240026" itemID="300009" price="60" vip="1"/>
+	<item name="强效防御能量珠" productID="240027" itemID="300045" price="4" vip="1"/>		
+	<item name="强效特防能量珠" productID="240028" itemID="300046" price="4" vip="1"/>	
+	<item name="强效攻击能量珠" productID="240029" itemID="300047" price="6" vip="1"/>	
+	<item name="强效特攻能量珠" productID="240030" itemID="300048" price="6" vip="1"/>	
+	<item name="强效速度能量珠" productID="240031" itemID="300049" price="6" vip="1"/>
+	<item name="致命能量珠" productID="240032" itemID="300050" price="10" vip="1"/>		
+</root>

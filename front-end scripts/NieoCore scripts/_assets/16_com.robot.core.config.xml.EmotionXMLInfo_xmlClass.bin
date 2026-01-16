@@ -1,0 +1,25 @@
+<!--
+	表情配置表
+	id 对应该素材名
+	shortcut 快捷键
+-->
+<root path="resource/emotion/">
+	<emotion id="1" shortcut="#1" des="高兴" />
+	<emotion id="2" shortcut="#2" des="难过" />
+	<emotion id="3" shortcut="#3" des="汗" />
+	<emotion id="4" shortcut="#4" des="哭" />
+	<emotion id="5" shortcut="#5" des="生气" />
+	<emotion id="6" shortcut="#6" des="仰幕" />
+	<emotion id="7" shortcut="#7" des="疑问" />
+	<emotion id="8" shortcut="#8" des="嘿嘿" />
+	<emotion id="9" shortcut="#9" des="害羞" />
+	<emotion id="10" shortcut="#10" des="惊呆" />
+	<emotion id="11" shortcut="#11" des="吃粽子" />
+	
+	<emotion id="97" shortcut="#97" des="任务提示" />
+	<emotion id="98" shortcut="#98" des="任务提示" />
+	<emotion id="99" shortcut="#99" des="任务提示" />
+
+	<!--下面是回答语句中的表情-->
+	<emotion id="101" shortcut="#101" des="任务感叹号" />
+</root>

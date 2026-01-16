@@ -1,0 +1,95 @@
+<!--
+	米币购买的物品配置表
+	
+	productID - 商品ID
+	itemID - 游戏里的物品ID
+	price - 米币价格
+	vip - vip折扣，请填小数，比如6折就是0.6
+	gold - 赠送金豆数
+-->
+<root>
+	<item name="10金豆" productID="200000" itemID="5" price="1" vip="1" gold="10" />	
+	<item name="50金豆" productID="200001" itemID="5" price="4.5" vip="1" gold="50" />
+	<item name="100金豆" productID="200002" itemID="5" price="8" vip="1" gold="100" />			
+	<item name="机械师头灯" productID="200051" itemID="100020" price="2" vip="0.5" gold="0" />
+	<item name="机械师工具袋" productID="200052" itemID="100021" price="1" vip="0.5" gold="0" />	
+	<item name="机械师滑轮" productID="200053" itemID="100022" price="3" vip="0.5" gold="0" />
+	<item name="机械师帽檐" productID="200054" itemID="100023" price="1.6" vip="0.5" gold="0" />			
+	<item name="机械师装" productID="200055" itemID="100020|100021|100022|100023" price="7.6" vip="0.5" gold="0" />	
+	<item name="训练师头罩" productID="200056" itemID="100036" price="2" vip="0.5" gold="0" />
+	<item name="训练师手臂" productID="200057" itemID="100037" price="3" vip="0.5" gold="0" />
+	<item name="训练师腰带" productID="200058" itemID="100038" price="1" vip="0.5" gold="0" />	
+	<item name="训练师板鞋" productID="200059" itemID="100039" price="2" vip="0.5" gold="0" />	
+	<item name="训练师装" productID="200060" itemID="100036|100037|100038|100039" price="8" vip="0.5" gold="0" />
+	<item name="黑焰头盔" productID="200061" itemID="100255" price="3" vip="0.5" gold="0" />				
+	<item name="黑焰动力臂" productID="200062" itemID="100256" price="2" vip="0.5" gold="0" />	
+	<item name="黑焰弹夹" productID="200063" itemID="100257" price="1" vip="0.5" gold="0" />
+	<item name="黑焰动力靴" productID="200064" itemID="100258" price="3" vip="0.5" gold="0" />	
+	<item name="黑焰面罩" productID="200065" itemID="100259" price="1" vip="0.5" gold="0" />	
+	<item name="黑焰使徒" productID="200066" itemID="100255|100256|100257|100258|100259" price="10" vip="0.5" gold="0" />
+	<item name="利爪重盔" productID="200067" itemID="100261" price="4" vip="0.5" gold="0" />
+	<item name="利爪手臂" productID="200068" itemID="100262" price="0.8" vip="0.5" gold="0" />
+	<item name="利爪腰带" productID="200069" itemID="100263" price="1.2" vip="0.5" gold="0" />
+	<item name="利爪重靴" productID="200070" itemID="100264" price="2.4" vip="0.5" gold="0" />
+	<item name="利爪面罩" productID="200071" itemID="100265" price="1.6" vip="0.5" gold="0" />
+	<item name="利爪机甲" productID="200072" itemID="100261|100262|100263|100264|100265" price="10" vip="0.5" gold="0" />	
+	<item name="侦查眼罩" productID="200073" itemID="100162" price="3" vip="0.5" gold="0" />	
+	<item name="暗能吸纳仪" productID="200074" itemID="100223" price="3" vip="0.5" gold="0" />	
+	<item name="寒流枪" productID="200075" itemID="100245" price="2.4" vip="0.5" gold="0" />
+	<item name="紫晶扭蛋机" productID="200077" itemID="500522" price="3" vip="0.5" gold="0" />
+	<item name="克洛斯基地" productID="200078" itemID="500003" price="5" vip="0.5" gold="0" />
+	<item name="桌上足球" productID="200079" itemID="500505" price="3" vip="0.5" gold="0" />
+	<item name="幻想椅" productID="200080" itemID="500506" price="2" vip="0.5" gold="0" />
+	<item name="悬浮桌" productID="200081" itemID="500507" price="3.2" vip="0.5" gold="0" />
+	<item name="战术研究台" productID="200082" itemID="500508" price="3.2" vip="0.5" gold="0" />	
+	<item name="凌光灯" productID="200083" itemID="500509" price="1.8" vip="0.5" gold="0" />	
+	<item name="重力篮筐" productID="200084" itemID="500523" price="3" vip="0.5" gold="0" />
+	<item name="电磁秋千" productID="200085" itemID="500516" price="2.8" vip="0.5" gold="0" />	
+	<item name="雷伊海报" productID="200086" itemID="500806" price="2" vip="0.5" gold="0" />		
+	<item name="护目镜" productID="200087" itemID="100087" price="1" vip="0.5" gold="0" />
+	<item name="防寒帽" productID="200088" itemID="100088" price="2" vip="0.5" gold="0" />
+	<item name="防寒腰带" productID="200089" itemID="100089" price="1.6" vip="0.5" gold="0" />	
+	<item name="极速滑雪杖" productID="200090" itemID="100090" price="2.4" vip="0.5" gold="0" />		
+	<item name="极速滑板" productID="200091" itemID="100091" price="3" vip="0.5" gold="0" />	
+	<item name="防寒装" productID="200092" itemID="100087|100088|100089|100090|100091" price="10" vip="0.5" gold="0" />			
+	<item name="卫兵腰带" productID="200093" itemID="100033" price="1.4" vip="0.5" gold="0" />		
+	<item name="卫兵帽子" productID="200094" itemID="100034" price="2.2" vip="0.5" gold="0" />	
+	<item name="卫兵鞋" productID="200095" itemID="100035" price="2.6" vip="0.5" gold="0" />		
+	<item name="卫兵装" productID="200096" itemID="100033|100034|100035" price="6.2" vip="0.5" gold="0" />	
+	<item name="钢特拉头盔" productID="200097" itemID="100306" price="3.6" vip="0.5" gold="0" />				
+	<item name="钢特拉面具" productID="200098" itemID="100307" price="1.2" vip="0.5" gold="0" />			
+	<item name="钢特拉铠甲" productID="200099" itemID="100308" price="3" vip="0.5" gold="0" />
+	<item name="钢特拉腰甲" productID="200100" itemID="100309" price="1.8" vip="0.5" gold="0" />				
+	<item name="钢特拉战靴" productID="200101" itemID="100310" price="2.4" vip="0.5" gold="0" />	
+	<item name="钢特拉" productID="200102" itemID="100306|100307|100308|100309|100310" price="12" vip="0.5" gold="0" />			
+	<item name="奥金兜帽" productID="200103" itemID="100311" price="3.8" vip="0.5" gold="0" />	
+	<item name="奥金面甲" productID="200104" itemID="100312" price="1" vip="0.5" gold="0" />	
+	<item name="奥金护甲" productID="200105" itemID="100313" price="2.4" vip="0.5" gold="0" />	
+	<item name="奥金腰带" productID="200106" itemID="100314" price="2.2" vip="0.5" gold="0" />		
+	<item name="奥金战靴" productID="200107" itemID="100315" price="2.6" vip="0.5" gold="0" />		
+	<item name="奥金之锤" productID="200108" itemID="100311|100312|100313|100314|100315" price="12" vip="0.5" gold="0" />		
+	<item name="塞西利亚基地" productID="200109" itemID="500002" price="5.8" vip="0.5" gold="0" />	
+	<item name="阿克希亚抱枕" productID="200110" itemID="500511" price="4" vip="0.5" gold="0" />	
+	<item name="急冻兽摇摆椅" productID="200111" itemID="500512" price="3" vip="0.5" gold="0" />		
+	<item name="索拉电视机" productID="200112" itemID="500513" price="3.2" vip="0.5" gold="0" />			
+	<item name="吞吞花灯" productID="200113" itemID="500515" price="2" vip="0.5" gold="0" />			
+	<item name="玄冰桌" productID="200114" itemID="500519" price="2.6" vip="0.5" gold="0" />		
+	<item name="玄冰凳" productID="200115" itemID="500520" price="1" vip="0.5" gold="0" />		
+	<item name="浮冰灯" productID="200116" itemID="500521" price="2" vip="0.5" gold="0" />		
+	<item name="船长画像" productID="200117" itemID="500803" price="2" vip="0.5" gold="0" />
+	<item name="光束兜帽" productID="200118" itemID="100329" price="3.2" vip="0.5" gold="0" />	
+	<item name="光束重狙" productID="200119" itemID="100330" price="2.4" vip="0.5" gold="0" />	
+	<item name="光束护颚" productID="200120" itemID="100331" price="1.8" vip="0.5" gold="0" />		
+	<item name="战轮" productID="200121" itemID="100332" price="2.6" vip="0.5" gold="0" />		
+	<item name="光束战轮" productID="200122" itemID="100329|100330|100331|100332" price="10" vip="0.5" gold="0" />
+	<item name="疾电重盔" productID="200123" itemID="100334" price="3.8" vip="0.5" gold="0" />	
+	<item name="疾电护肩" productID="200124" itemID="100335" price="2.6" vip="0.5" gold="0" />	
+	<item name="疾电弹夹" productID="200125" itemID="100336" price="2.2" vip="0.5" gold="0" />		
+	<item name="疾电滚轮" productID="200126" itemID="100337" price="3.4" vip="0.5" gold="0" />		
+	<item name="疾电" productID="200127" itemID="100334|100335|100336|100337" price="12" vip="0.5" gold="0" />
+	<item name="银翼头盔" productID="200128" itemID="100338" price="4.2" vip="0.5" gold="0" />	
+	<item name="银翼双剑" productID="200129" itemID="100339" price="3.2" vip="0.5" gold="0" />	
+	<item name="银翼腰带" productID="200130" itemID="100340" price="2" vip="0.5" gold="0" />		
+	<item name="银翼重靴" productID="200131" itemID="100341" price="2.6" vip="0.5" gold="0" />		
+	<item name="银翼猎手" productID="200132" itemID="100338|100339|100340|100341" price="12" vip="0.5" gold="0" />						
+</root>

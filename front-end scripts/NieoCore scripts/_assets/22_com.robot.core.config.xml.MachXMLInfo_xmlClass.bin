@@ -1,0 +1,88 @@
+<!--NoNo配置表-->
+<!--autoEnd是否自动停止，souLoops声音播放次数 odds出现几率-->
+<root>
+	<action>
+		<item id="1" name="充电" autoEnd="0" souLoops="999999"/>
+		<item id="2" name="开机" autoEnd="1" souLoops="1"/>
+		<item id="3" name="关机" autoEnd="0" souLoops="1"/>
+		<item id="4" name="玩球" autoEnd="1" souLoops="1"/>
+		<item id="5" name="吃电池" autoEnd="1" souLoops="1"/>
+		<item id="6" name="召唤" autoEnd="1" souLoops="1"/>
+		<item id="7" name="玩魔方" autoEnd="1" souLoops="1"/>
+	</action>
+	<!--普通nono-->
+	<exp>
+		<item id="1" name="开心" odds="1" lines="1,2,4,5,7,13,15,16,17,18,19,21,24,25,26,27"/>
+		<item id="2" name="生气" odds="1" lines="6,26,27"/>
+		<item id="3" name="惊讶" odds="1" lines="3,10,25,26,27"/>
+		<item id="4" name="悲哀" odds="1" lines="9,11,26,27"/>
+	</exp>
+	<lines>
+		<item id="1" name="早上好！" energy="1,2,3" mate="3"/>
+		<item id="2" name="叭叭，叭叭…" energy="1,2,3" mate="2"/>
+		<item id="3" name="什么？" energy="1,2,3" mate="2"/>
+		<item id="4" name="没事，没事" energy="1,2,3" mate="3"/>
+		<item id="5" name="主人，主人～" energy="1,2,3" mate="3"/>
+		<item id="6" name="别小看我！" energy="3" mate="3"/>
+		<item id="7" name="精灵们都很乖哦" energy="1,2,3" mate="1,2,3"/>
+		<item id="8" name="需要我做什么？" energy="3" mate="1,2,3"/>
+		<item id="9" name="真想出去逛逛" energy="3" mate="1,2,3"/>
+		<item id="10" name="是真的吗？" energy="1,2,3" mate="1,2,3"/>
+		<item id="11" name="又要我看家吗？" energy="1,2,3" mate="1,2,3"/>
+		<item id="12" name="好想你呀" energy="1,2,3" mate="2"/>
+		<item id="13" name="感觉好吗？" energy="1,2,3" mate="2"/>
+		<item id="14" name="能源不足，能源不足" energy="1" mate="1,2,3"/>
+		<item id="15" name="交给我吧" energy="1,2,3" mate="3"/>
+		<item id="16" name="太好了" energy="1,2,3" mate="3"/>
+		<item id="17" name="我明白了" energy="1,2,3" mate="3"/>
+		<item id="18" name="马上开始工作" energy="1,2,3" mate="3"/>
+		<item id="19" name="真能干" energy="1,2,3" mate="3"/>
+		<item id="20" name="睡觉啦，睡觉啦" energy="1,2,3" mate="1,2,3"/>
+		<item id="21" name="太棒啦" energy="1,2,3" mate="1,2,3"/>
+		<item id="22" name="要有精神哟" energy="1,2,3" mate="3"/>
+		<item id="23" name="起床啦，起床啦" energy="1,2,3" mate="1,2,3"/>
+		<item id="24" name="要和我玩吗？" energy="1,2,3" mate="3"/>
+		<item id="25" name="新星球呀，哇好好玩哦！" energy="1,2,3" mate="1,3"/>
+		<item id="26" name="冰系精灵争霸赛闭幕咯！" energy="1,2,3" mate="1,2,3,4"/>
+		<item id="27" name="主人，参加战队战吧！" energy="1,2,3" mate="1,2,3,4"/>				
+	</lines>
+	<!--超能nono-->
+	<superExp>
+		<item id="1" name="开心" odds="3" lines="1,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30"/>
+		<item id="2" name="生气" odds="1" lines="9"/>
+		<item id="3" name="惊讶" odds="1" lines="2,10"/>
+		<item id="4" name="悲哀" odds="1" lines="3,4"/>
+	</superExp>
+	<superLines>
+		<item id="1" name="(*^__^*) NoNo好开心哦，一块玩吧！" energy="1,2,3" mate="1,2,3"/>
+		<item id="2" name="怎么了？怎么了？" energy="1,2,3" mate="1,2,3"/>
+		<item id="3" name="带我出去逛逛嘛" energy="1,2,3" mate="1,2,3"/>
+		<item id="4" name="又是我看家啊？" energy="1,2,3" mate="1,2,3"/>
+		<item id="5" name="跟NoNo捉迷藏吧！" energy="1,2,3" mate="2"/>
+		<item id="6" name="主人辛苦了！休息，休息一会！" energy="1,2,3" mate="2"/>
+		<item id="7" name="主人，我好想你呀！" energy="1,2,3" mate="2"/>
+		<item id="8" name="~\(≧▽≦)/~啦啦~\(≧▽≦)/~啦啦啦" energy="1,2,3" mate="2"/>
+		<item id="9" name="NoNo很能干的，不要小看我！" energy="1,2,3" mate="2"/>
+		<item id="10" name="哎？怎么了？发生什么事了？" energy="1,2,3" mate="2"/>
+		<item id="11" name="NoNo精神满满，主人也要有精神哦！" energy="1,2,3" mate="1"/>
+		<item id="12" name="NoNo是有精神的好宝宝，一块加油吧！" energy="1,2,3" mate="1"/>
+		<item id="13" name="有NoNo帮忙，一切问题立刻搞定" energy="1,2,3" mate="1"/>
+		<item id="14" name="主人，主人，欢迎回家！" energy="1,2,3" mate="1"/>
+		<item id="15" name="有什么任务吗？交给我吧！" energy="1,2,3" mate="1"/>
+		<item id="16" name="好棒哦！" energy="1,2,3" mate="3"/>
+		<item id="17" name="NoNo真开心！" energy="1,2,3" mate="3"/>
+		<item id="18" name="有NoNo帮忙，一切问题立刻搞定" energy="1,2,3" mate="1"/>
+		<item id="19" name="主人，主人，陪我玩嘛！" energy="1,2,3" mate="1"/>
+		<item id="20" name="有什么任务吗？交给我吧！" energy="1,2,3" mate="1"/>
+		<item id="21" name="好棒哦！" energy="1,2,3" mate="1"/>
+		<item id="22" name="主人，我们的战队叫什么呢？" energy="1,2,3" mate="1"/>
+		<item id="23" name="主人，主人，我也要去采超能晶体！" energy="1,2,3" mate="1"/>
+		<item id="24" name="给我玩超能魔方吧！" energy="1,2,3" mate="1"/>
+		<item id="25" name="精灵技能排序哦，我也要学！" energy="1,2,3" mate="1"/>
+		<item id="26" name="主人，让我帮你训练精灵吧！" energy="1,2,3" mate="1"/>
+		<item id="27" name="（*^O^*）主人，让我陪你一块参加精灵战斗吧！" energy="1,2,3" mate="1"/>
+		<item id="28" name="( ⊙ o ⊙ )！厄……泥潭里跑出精灵来了！" energy="1,2,3" mate="1"/>
+		<item id="29" name="克洛斯地心、地心游记，带我去，带我去，我也要玩水晶敲敲！" energy="1,2,3" mate="1"/>		
+		<item id="30" name="\(≧▽≦)/ 哇哦，好开心哦，赛尔历四十年咯！" energy="1,2,3" mate="1"/>	
+	</superLines>
+</root>

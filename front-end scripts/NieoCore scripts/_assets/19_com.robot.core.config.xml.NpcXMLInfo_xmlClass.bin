@@ -1,0 +1,135 @@
+<!--NPC配置表-->
+<!--
+id:npc编号
+mapID:NPC出现的地图
+name:NPC名称
+type:NPC形象
+comp:地图里NPC的MC名
+hit:地图里NPC触发的碰撞点
+startTask:NPC身上绑定的可以接受任务的ID
+proTask:NPC身上绑定的涉及某任务步骤的ID及步骤
+endTask:NPC身上绑定的可以完成任务的ID
+<des>常态下NPC语言
+<dialog>NPC冒泡的话
+注：TASKID > 50000 都是客户端自定的任务ID，用于一些特殊情况使用，可以参见tasks.xml中的50001
+-->
+<NpcConfig>
+	<npc id="1" mapID="4" name="船长罗杰" type="shiper" point="730|370" offSetPoint="0|60"
+		startTask="37|50001|95" endTask="25|37" proTask="1|2|3|4|95">
+		<des> <![CDATA[大家好，我是船长！]]>
+		</des>
+		<question><![CDATA[我知道咯！]]></question>
+		<dialog>
+			<list str="我与赛尔号共存亡！我坚信它会飞的更远……"/>
+		</dialog>
+	</npc>
+	<npc id="2" mapID="8" name="机械师茜茜" type="xixi" point="622|213" offSetPoint="0|50"
+		startTask="4|19|94" endTask="19" proTask="1|2|3|4|94">
+		<des><![CDATA[赛尔们那些酷到极点的装备全都是我设计的哦。还有，你看到左边的设备了吗?，那里可以进行彩色涂装哦。]]></des>
+		<question><![CDATA[我知道咯！]]></question>
+		<dialog>
+			<list str="新加入赛尔号飞船的小赛尔们快来我这里报名吧！"/>
+		</dialog>
+	</npc>
+	<npc id="3" mapID="5" name="博士派特" type="doctor" point="453|342"
+		offSetPoint="55|55" startTask="79|81" endTask="" proTask="1|2|3|4|42|97">
+		<des> <![CDATA[精灵会随着等级的提升学到新技能，甚至还会进化哦。]]></des>
+		<question><![CDATA[哇哦！精灵的世界真的好神奇哦！]]></question>
+		<dialog>
+			<list str="精灵是赛尔的伙伴，我相信我能够发现更多的精灵秘密！！"/>
+		</dialog>
+	</npc>
+	
+	<npc id="4" mapID="325" name="探险家爱丽丝" cloths="100342|100343|100344|100345"
+		color="0xF0378A" point="280|291" type="iris" startTask="" endTask=""
+		proTask="">
+		<des>
+			<![CDATA[右边的那根木柱上似乎刻画着什么东西！琴谱？铃铛草？如果能够弹奏出正确的节奏会发生什么呢？#7]]></des>
+		<question><![CDATA[我这就去看看吧！]]></question>
+		<dialog>
+			<list str="快看！旁边的石柱上似乎有什么东西？"/>
+			<list str="传说只要奏出相应的琴谱！奇迹就会出现！"/>
+			<list str="琴谱？铃铛草？它们之间难道有关联？"/>
+			<list str="哇！你快点击铃铛草！它竟然能够发出不同的音乐哦！！！"/>
+		</dialog>
+	</npc>
+	<npc id="5" mapID="101" name="总教官雷蒙" point="195|371" offSetPoint="55|55"
+		type="instructor" startTask="50002|89" endTask="201|89" proTask="">
+		<des> <![CDATA[我们的小赛尔真是无往不胜。相信你们是最棒的！]]></des>
+		<question><![CDATA[哈哈..还是教官了解我们..]]></question>
+		<dialog>
+			<list str="能够栽培出更多的赛尔教官是我一生的梦想，赛尔号的明天需要大家共同创造！"/>
+			<list str="要塞保卫战正式开幕，请先阅读保卫战手册，壮大自己的战队，成为真正的不败勇士"/>
+		</dialog>
+	</npc>
+	<npc id="6" mapID="107" name="发明家肖恩" point="615|261" offSetPoint="0|0"
+		type="shawn" startTask="96" endTask="" proTask="96">
+		<des></des>
+		<question></question>
+		<dialog>
+			<list str="带上你的超能NoNo去传送舱开始神奇的时空之旅吧！"/>
+		</dialog>
+	</npc>
+	<npc id="7" mapID="35" name="赫尔卡星长老" point="720|165" type="elder" startTask=""
+		endTask="" proTask="">
+		<des> <![CDATA[我是赫尔卡星长老！]]></des>
+		<question><![CDATA[哈哈..原来赫尔卡星长老是这个样子...]]></question>
+	</npc>
+	<npc id="100" mapID="9" name="迪恩" point="650|300" type="dien" startTask=""
+		endTask="" proTask="48|52">
+		<des> </des>
+		<question></question>
+		<dialog>
+		</dialog>
+	</npc>
+	<npc id="8" mapID="55" name="苏克" point="423|274" offSetPoint="55|55" type="suke"
+		startTask="" endTask="" proTask="">
+		<des> <![CDATA[合理开采和运用能源才是硬道理！]]></des>
+		<question><![CDATA[我知道啦...]]></question>
+		<dialog>
+		</dialog>
+	</npc>
+	<npc id="9" mapID="103" name="罗开" point="417|287" offSetPoint="55|55" type="rocky"
+		startTask="" endTask="" proTask="">
+		<des></des>
+		<question></question>
+		<dialog>
+			<list str="火星港最新研制的精灵时空胶囊，目前唯一可以在超时空中使用的限定胶囊！"/>
+			<list str="哎呀，小赛尔们，别冲动别冲动嘛，大家都有，人人有份，一个个来啊。"/>
+			<list str="不用再为训练不出完美的极品精灵而烦恼，学习力遗忘剂帮你把烦恼忘光光。"/>
+			<list str="想让自己的精灵变得天下无敌？你一定需要火星港的最新强效精灵能量珠！"/>
+		</dialog>
+	</npc>
+	<npc id="50" mapID="10" name="皮皮" point="380|99" type="pipi" offSetPoint="20|20"
+		startTask="" endTask="" proTask="">
+		<des></des>
+		<question></question>
+		<dialog>
+		</dialog>
+	</npc>
+	<npc id="10" mapID="7" name="叽哩呱啦" point="586|230" offSetPoint="-55|55"
+		type="dingding" startTask="" endTask="" proTask="">
+		<des></des>
+		<question></question>
+		<dialog>
+		</dialog>
+	</npc>
+
+	<npc id="90001" mapID="108" name="岚岚" cloths="100653|100654|100655|100656" point="210|255" type="common" startTask="" endTask=""
+		proTask="">
+		<des></des>
+		<question></question>
+		<dialog>
+			<list str="希望大家能通过尼尔号，窥见童年的自己"/>
+		</dialog>
+	</npc>
+
+	<npc id="90002" mapID="461" name="圣诞老人" cloths="100565|100566|100567|100568|100569" point="850|738" type="common" startTask="" endTask=""
+		proTask="">
+		<des></des>
+		<question></question>
+		<dialog>
+			<list str="圣诞节快乐！我的孩子"/>
+		</dialog>
+	</npc>
+</NpcConfig>

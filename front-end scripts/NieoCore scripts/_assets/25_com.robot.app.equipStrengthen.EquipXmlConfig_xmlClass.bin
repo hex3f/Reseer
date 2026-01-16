@@ -1,0 +1,26 @@
+<!-- 装备加强配置文件 -->
+<!-- <equip id="100266"> id表示能升级的装备id和item.xml的物品id一致-->
+<!--
+	<level sendId="1" levelId="2" needCatalystId="400054|1" needMatterId="400002|400001|400016" needMatterNum="5|8|3" des="精灵体力+4%" odds="100%"/>
+	sendId 表示发送到服务器的id
+	levelId 表示装置等级
+	needCatalystId 表示需要的催化剂id和数量,用"|"隔开
+	needMatterId 表示升级所需要的物质id,用"|"隔开
+	needMatterNum 表示升级所需要的物质对应所需要的数量,用"|"隔开
+	des 表示升级后队seer的帮助描述
+	odds 表示升级成功的概率
+-->
+<equips>
+	<equip id="100266">
+		<level sendId="1" levelId="2" needCatalystId="400054|1" needMatterId="400002|400001|400016" needMatterNum="5|8|3" des="精灵体力+4%" odds="100%"/>
+		<level sendId="2" levelId="3" needCatalystId="400054|1" needMatterId="400002|400001|400016" needMatterNum="10|15|5" des="精灵体力+5%" odds="100%"/>
+	</equip>
+	<equip id="100267">
+		<level sendId="3" levelId="2" needCatalystId="400054|1" needMatterId="400010|400006|400007" needMatterNum="3|2|2" des="精灵防御+4%" odds="100%"/>
+		<level sendId="4" levelId="3" needCatalystId="400054|1" needMatterId="400010|400006|400007" needMatterNum="5|4|4" des="精灵防御+5%" odds="100%"/>
+	</equip>
+	<equip id="100268">
+		<level sendId="5" levelId="2" needCatalystId="400054|1" needMatterId="400012|400004|400008" needMatterNum="1|5|2" des="精灵特殊防御+4%" odds="100%"/>
+		<level sendId="6" levelId="3" needCatalystId="400054|1" needMatterId="400012|400004|400008" needMatterNum="2|8|4" des="精灵特殊防御+5%" odds="100%"/>
+	</equip>
+</equips>

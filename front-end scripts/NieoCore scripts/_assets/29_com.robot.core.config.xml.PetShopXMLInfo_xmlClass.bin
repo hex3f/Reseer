@@ -1,0 +1,30 @@
+<root>
+	<item itemID="300001" name="普通精灵胶囊" productID="" price="200" vip="1" moneyType="0"/>
+	<item itemID="300002" name="中级精灵胶囊" productID="" price="400" vip="1" moneyType="0"/>
+	<item itemID="300003" name="高级精灵胶囊" productID="" price="800" vip="1" moneyType="0"/>
+	<item itemID="300004" name="超级精灵胶囊" productID="" price="2000" vip="1" moneyType="0"/>
+
+	<item itemID="300011" name="初级体力药剂" productID="" price="20" vip="1" moneyType="0"/>
+	<item itemID="300012" name="中级体力药剂" productID="" price="40" vip="1" moneyType="0"/>
+	<item itemID="300013" name="高级体力药剂" productID="" price="80" vip="1" moneyType="0"/>
+	<item itemID="300014" name="超级体力药剂" productID="" price="200" vip="1" moneyType="0"/>
+	<item itemID="300015" name="特级体力药剂" productID="" price="300" vip="1" moneyType="0"/>
+
+	<item itemID="300016" name="初级活力药剂" productID="" price="30" vip="1" moneyType="0"/>
+	<item itemID="300017" name="中级活力药剂" productID="" price="100" vip="1" moneyType="0"/>
+	<item itemID="300018" name="高级活力药剂" productID="" price="200" vip="1" moneyType="0"/>
+	<item itemID="300019" name="超级活力药剂" productID="" price="300" vip="1" moneyType="0"/>
+
+	<item itemID="400501" name="神奇扭蛋牌" productID="" price="600" vip="1" moneyType="0"/>
+
+	<item itemID="300006" name="无敌精灵胶囊" productID="240000" price="50" vip="1" moneyType="1"/>
+	<item itemID="300024" name="基因重组药剂" productID="240001" price="5" vip="1" moneyType="1"/>
+	<item itemID="300025" name="神经元再生胶囊" productID="240002" price="10" vip="1" moneyType="1"/>
+	<item itemID="300026" name="降级秘药" productID="240003" price="4" vip="1" moneyType="1"/>
+	
+	<item itemID="300651" name="全能学习力注入剂" productID="240033" price="8" vip="1" moneyType="1"/>
+	<!-- <item itemID="300136" name="全能性格转化剂Ω" productID="240034" price="398" vip="1" moneyType="1"/> -->
+	<item itemID="300152" name="形态固定胶囊" productID="240035" price="50" vip="1" moneyType="1"/>
+	<item itemID="300153" name="形态还原胶囊" productID="240036" price="30" vip="1" moneyType="1"/>
+
+</root>

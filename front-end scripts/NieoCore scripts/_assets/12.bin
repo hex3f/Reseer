@@ -1,0 +1,1968 @@
+<!--
+地图功能组件配置表
+dir参数表示地图是以滚动方式切换 1234 分别代表地图上左下右的滚动
+isFB是否切换到的是副本
+isStop 鼠标放上去是否跳到第2帧
+des 鼠标移上去的提示
+-->
+<!-- 从场景FromMap进入本场景时，玩家将出现在 (PosX, PosY)
+<Entries>节点下的表示几个进出点玩家出现的坐标
+<changeMapComp>节点下表示切换场景组件
+<funComp>节点下表示点击，然后走近触发某个动作
+<autoComp>节点下表示不需要点击，走到碰撞区域就触发的动作
+-->
+<Maps>
+	<map id="1" name="传送舱" x="475" y="395" des="超能时空通道">
+		<Entries>
+			<Entry FromMap="0" PosX="475" PosY="395" />
+			<Entry FromMap="2" PosX="160" PosY="270" />
+			<Entry FromMap="10" PosX="475" PosY="395" />
+			<Entry FromMap="15" PosX="475" PosY="395" />
+			<Entry FromMap="20" PosX="475" PosY="395" />
+			<Entry FromMap="22" PosX="475" PosY="395" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="2" />
+
+		</changeMapComp>
+		<funComp>
+			<component name="door_1" hit="comp_1" fun="onCompDoor1" des="拉姆神秘世界" />
+			<component name="door_4" hit="comp_4" fun="onCompDoor4" des="精灵太空站" />
+			<component name="door_2" hit="comp_2" fun="onSptHandler" des="SPT通道" />
+			<component name="door_3" hit="comp_3" fun="onSuperHandler" des="超时空通道" />
+			<component name="hitWbMC" hit="standWBMC" fun="showWBTask" />
+			<component name="screenMC" hit="screenHit" fun="hitScreen" des="" />
+		</funComp>
+		<autoComp>
+			<component name="wbNpc" hit="wbArea" fun="showWbAction" />
+		</autoComp>
+	</map>
+
+	<map id="2" name="飞船底层走廊" x="775" y="600">
+		<Entries>
+			<Entry FromMap="1" PosX="570" PosY="270" />
+			<Entry FromMap="3" PosX="190" PosY="307" />
+			<Entry FromMap="6" PosX="370" PosY="270" />
+			<Entry FromMap="201" PosX="816" PosY="294" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="3" dir="1" />
+			<component name="door_1" hit="comp_1" targetID="6" />
+			<component name="door_2" hit="comp_2" targetID="1" />
+			<component name="door_3" hit="comp_3" targetID="201" dir="4" />
+		</changeMapComp>
+		<autoComp>
+			<component name="wbNpc" hit="wbArea" fun="showWbAction" />
+		</autoComp>
+		<funComp>
+			<component name="hitWbMC" hit="standMC" fun="showTask" />
+		</funComp>
+	</map>
+	<map id="3" name="飞船二层走廊" x="375" y="450">
+		<Entries>
+			<Entry FromMap="2" PosX="190" PosY="307" />
+			<Entry FromMap="4" PosX="190" PosY="307" />
+			<Entry FromMap="5" PosX="370" PosY="270" />
+			<Entry FromMap="7" PosX="570" PosY="270" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="2" dir="3" />
+			<component name="door_1" hit="comp_1" targetID="5" />
+			<component name="door_2" hit="comp_2" targetID="7" />
+		</changeMapComp>
+		<autoComp>
+			<component name="wbNpc" hit="wbArea" fun="showWbAction" />
+		</autoComp>
+		<funComp>
+			<component name="hitWbMC" hit="standMC" fun="showTask" />
+		</funComp>
+	</map>
+	<map id="4" name="船长室" x="253" y="338">
+		<Entries>
+			<Entry FromMap="3" PosX="188" PosY="380" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+		<funComp>
+			<component name="gameMc" hit="funComp_0" fun="showGame" />
+			<component name="hitWbMC" hit="standWBMC" fun="showWBTask" />
+		</funComp>
+		<autoComp>
+			<component name="wbNpc" hit="wbArea" fun="showWbAction" />
+		</autoComp>
+	</map>
+	<map id="5" name="实验室" x="365" y="190" des="尼布守卫战">
+		<Entries>
+			<Entry FromMap="3" PosX="368" PosY="190" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="3" />
+		</changeMapComp>
+		<funComp>
+			<component name="getPet" hit="getPetHit" fun="getPetHandler" des="领取里奥斯精元" />
+			<component name="petPropMC" hit="petBuyMC" fun="showPetProp" />
+			<component name="evDoorMC" hit="evHitMC" fun="evolvePet" />
+			<component name="newMonrMC" hit="newMonStand" fun="showWeekMon" />
+			<component name="hitWbMC" hit="standWBMC" fun="showWBTask" />
+			<component name="fusionMC" hit="hitFusionMC" fun="spriteFusion" />
+			<component name="nibu_npc" hit="npcHit_mc" fun="showNpcDialog" des="尼布" />
+			<component name="petGene" hit="petGeneHit" fun="petGeneHandler" des="基因重组器" />
+
+			<!--<component
+			name="getItemMC" hit="getItemHit" fun="getItem" des="领取寒流枪"/>-->
+		</funComp>
+		<autoComp>
+			<component name="wbNpc" hit="wbArea" fun="showWbAction" />
+		</autoComp>
+	</map>
+
+	<map id="6" name="动力室" x="138" y="246">
+		<Entries>
+			<Entry FromMap="2" PosX="138" PosY="246" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="2" />
+			<component name="door_1" hit="comp_1" targetID="8" />
+		</changeMapComp>
+		<funComp>
+			<component name="exchangBtn" hit="oreExchange" fun="showExChange" />
+			<component name="exchangeCloth_btn" hit="exchangeClothHit_mc"
+				fun="onExchangeClothHandler" />
+			<component name="Army" hit="ArmyHit" fun="gameFun" />
+			<component name="hitWbMC" hit="standWBMC" fun="showWBTask" />
+			<component name="aeroLiteGameMC" hit="aeroLiteGameHit"
+				fun="aeroLiteGame" />
+		</funComp>
+		<autoComp>
+			<component name="wbNpc" hit="wbArea" fun="showWbAction" />
+		</autoComp>
+	</map>
+
+	<map id="7" name="瞭望舱" x="128" y="285">
+		<Entries>
+			<Entry FromMap="3" PosX="128" PosY="285" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="103" />
+			<component name="door_1" hit="comp_1" targetID="3" />
+			<component name="gameMC" hit="gameHit" fun="showGame" />
+		</changeMapComp>
+		<funComp>
+
+		</funComp>
+	</map>
+	<map id="8" name="机械室" x="456" y="143" des="特殊装置领取舱">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="6" />
+		</changeMapComp>
+		<funComp>
+			<!-- 换色 -->
+			<component name="color_door" hit="color_comp" fun="onColor" />
+			<!-- 买装备 -->
+			<component name="buyBtn2" hit="buy_comp" fun="buyHandler" />
+			<!-- 拿钻头 -->
+			<component name="itemBtn" hit="item_comp" fun="buyItem" />
+			<component name="getMach_btn" hit="machHit" fun="onMachHandler" />
+			<component name="hitWbMC" hit="standWBMC" fun="showWBTask" />
+			<component name="door_btn" hit="door_hit" fun="changeToGround"
+				des="地下室" />
+		</funComp>
+		<autoComp>
+			<component name="wbNpc" hit="wbArea" fun="showWbAction" />
+		</autoComp>
+	</map>
+	<map id="9" name="资料室" x="156" y="358">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+		<funComp>
+			<component name="change_btn" hit="changeHit_mc"
+				fun="passExChangeHandler" />
+			<component name="starGame" hit="starGameHit" fun="starGame" />
+			<component name="timeMachine" hit="timeMachineHit" fun="timeMachine"
+				des="时空解读机" />
+		</funComp>
+	</map>
+	<map id="101" name="教官办公室" x="800" y="249">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="201" />
+			<component name="door_1" hit="comp_1" targetID="501" />
+		</changeMapComp>
+		<funComp>
+			<component name="pond_mc" hit="pondHit_mc" fun="showTip" />
+			<component name="npc" hit="npcHit" fun="hitNpc" />
+			<component name="signMC" hit="signHit" fun="pkSign" des="要塞保卫战报名" />
+			<component name="trialsMC" hit="trialsHit" fun="trialsFunc" des="试炼之塔" />
+		</funComp>
+	</map>
+	<map id="102" name="精灵太空站" x="560" y="310" super="19" des="谱尼第三封印">
+		<Entries>
+			<Entry FromMap="108" PosX="240" PosY="344" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_1" hit="comp_1" targetID="108" />
+		</changeMapComp>
+		<funComp>
+			<component name="dou_mc" hit="douHit" fun="douHitHandler" />
+			<component name="enterFight" hit="enterFightHit" fun="enterFight" />
+			<component name="arenaTouchBtn_1" hit="arenaHit_1" fun="onArenaHit" />
+			<component name="arenaTouchBtn_2" hit="arenaHit_2" fun="onArenaHit" />
+			<component name="arenaTouchBtn_3" hit="arenaHit_3" fun="onArenaHit" />
+			<component name="buyMC" hit="buyHit" fun="buyHandler" />
+			<component name="Justin" hit="JustinHit" fun="HitJustin" />
+			<component name="npc" hit="npcHit" fun="hitNpc" />
+			<component name="door_2" hit="comp_2" fun="onEnterHandler" />
+			<component name="dou_mc" hit="douHit" fun="onPetWarHandler" />
+		</funComp>
+	</map>
+	<map id="103" name="瞭望露台" x="200" y="450" des="强效能量珠">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="7" />
+		</changeMapComp>
+		<funComp>
+			<component name="buyItem" hit="buyItemHit" fun="buyItem" des="领取神奇扭蛋牌" />
+			<component name="egg" hit="eggHit" fun="onEggHandler" des="精灵扭蛋机" />
+			<component name="equipMc0" hit="equipHit0" fun="onEquipHandler"
+				des="装备强化装置" />
+		</funComp>
+	</map>
+	<map id="104" name="帕诺空间" x="430" y="300" super="19">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="giftMc" hit="giftHitMc" fun="onGiftHandler" />
+		</funComp>
+	</map>
+	<map id="105" name="双子阿尔法星" x="784" y="282" super="17">
+		<Entries>
+			<Entry FromMap="106" PosX="352" PosY="139" />
+		</Entries>
+		<changeMapComp>
+			<component name="mapMC" hit="mapHit" targetID="106" />
+		</changeMapComp>
+		<funComp>
+			<component name="mineMC" hit="mineHit" fun="hitMine" des="蘑菇结晶" />
+
+
+			<!--<component
+			name="sukeMC" hit="giveThingsHit" fun="workHandler"/>-->
+			<component name="door" hit="doorHit" fun="changeScrene" />
+			<component name="gift2" hit="gift2HitMc" fun="alison" />
+
+
+			<!--<component
+			name="stationMC" hit="stationHit" fun="hitStation"/>-->
+			<component name="yoyoMC" hit="yoyoHit" fun="fightYoyo" />
+		</funComp>
+	</map>
+
+	<map id="106" name="阿尔法星岩地" x="768" y="419" super="17">
+		<Entries>
+			<Entry FromMap="46" PosX="409" PosY="196" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="105" />
+			<component name="door_1" hit="comp_1" targetID="105" />
+		</changeMapComp>
+		<funComp>
+			<component name="fightMC" hit="fightHit" fun="fight" />
+			<component name="doorBtn" hit="doorHit" fun="hitDoor" des="海盗能源站" />
+			<component name="mineMC" hit="mineHit" fun="catchMine" des="豆豆果实" />
+			<component name="mineMC2" hit="mineHit2" fun="catchMine2" des="纳格晶体" />
+		</funComp>
+	</map>
+
+	<map id="107" name="发明室" x="749" y="379">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+		<funComp>
+			<component name="chipMixMc" hit="chipHitMc" fun="chipMixHandler"
+				des="芯片制造机" />
+			<component name="getExpBtn" hit="getExpHit" fun="onGetExpHit"
+				des="经验接收器" />
+			<component name="xinpianMc" hit="xinpianHit" fun="onXinpianHit"
+				des="超能NoNo芯片领取" />
+			<component name="door_109" hit="comp_109" fun="onOreGatherClickHandler"
+				des="超能晶体采集练习" />
+		</funComp>
+	</map>
+	<map id="108" name="太空站左翼" x="803" y="170" super="19">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="102" />
+		</changeMapComp>
+		<funComp>
+			<component name="townMc" hit="townHit" fun="fightTownHandler"
+				des="挑战勇者之塔" />
+		</funComp>
+	</map>
+	<map id="109" name="帕诺太空" x="833" y="302" super="19">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="107" />
+		</changeMapComp>
+		<funComp>
+			<component name="superStone" hit="hitStoneComp"
+				fun="onSuperStoneClickHandler" des="巨大能量石" isStop="1" />
+			<component name="weightLessHouse" hit="houseHit"
+				fun="onWeightLessHouseClickHandler" des="NoNo无重力能量仓" isStop="1" />
+			<component name="oreGather" hit="gameHit" fun="onOreGatherClickHandler"
+				des="超能晶体采集" />
+		</funComp>
+	</map>
+	<map id="110" name="暗黑武斗场" x="600" y="300">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="102" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="111" name="大师杯赛场" x="679" y="134" super="102" sound="BGM_001A" replaceMapId="1147">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="108" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<!--星球-->
+	<map id="10" name="克洛斯星" x="725" y="172" super="11">
+		<Entries>
+			<Entry FromMap="1" PosX="710" PosY="185" />
+			<Entry FromMap="11" PosX="76" PosY="420" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+			<component name="door_1" hit="comp_1" targetID="11" />
+		</changeMapComp>
+		<funComp>
+			<component name="oreMC" hit="funComp_0" fun="exploitOre" />
+		</funComp>
+	</map>
+	<map id="11" name="克洛斯星沼泽" x="735" y="240" super="11">
+		<Entries>
+			<Entry FromMap="10" PosX="830" PosY="240" />
+			<Entry FromMap="12" PosX="165" PosY="360" />
+			<Entry FromMap="13" PosX="490" PosY="270" />
+		</Entries>
+		<funComp>
+			<component name="wasteMC" hit="standWasteMC" fun="clearWaste" />
+			<component name="flowerComp" hit="flowerHitMC" fun="hitFlower" />
+		</funComp>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="10" />
+			<component name="door_1" hit="comp_1" targetID="12" />
+			<component name="plantMc" hit="plantHitMC" targetID="13" />
+		</changeMapComp>
+	</map>
+	<map id="12" name="克洛斯星林间" x="798" y="166" super="11">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="11" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="13" name="克洛斯星地心" x="716" y="378" super="11">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="11" />
+		</changeMapComp>
+		<funComp>
+			<component name="plMc" hit="plHitMc" fun="onPlHandler" />
+			<component name="lightMc" hit="lightHitMc" fun="onLightHandler" />
+		</funComp>
+	</map>
+	<map id="15" name="火山星" x="170" y="270" super="12">
+		<Entries>
+			<Entry FromMap="1" PosX="170" PosY="270" />
+			<Entry FromMap="16" PosX="775" PosY="193" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+			<component name="door_1" hit="comp_1" targetID="16" />
+		</changeMapComp>
+		<funComp>
+			<component name="oreMC" hit="funComp_0" fun="exploitOre" />
+			<component name="wbMC" hit="wbHit" fun="monkeyFun" des="练功石" />
+		</funComp>
+	</map>
+	<map id="16" name="火山星山洞" x="150" y="288" super="12">
+		<Entries>
+			<Entry FromMap="17" PosX="466" PosY="150" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="17" />
+			<component name="door_1" hit="comp_1" targetID="15" />
+		</changeMapComp>
+		<funComp>
+			<component name="gasMC" hit="standMC" fun="exploitGas" />
+		</funComp>
+	</map>
+	<map id="17" name="火山星山洞深处" x="110" y="135" super="12">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="16" />
+		</changeMapComp>
+		<funComp>
+			<component name="wasteMC" hit="standWasteMC" fun="clearWaste" />
+			<component name="brumeMC" hit="brumeHitMC" fun="clickBrume" />
+			<component name="stoneMC" hit="stoneHitMC" fun="catchStone" />
+			<component name="bossHu1" hit="standHu" fun="changeBoss" />
+			<component name="bossHu" hit="standHu" fun="changeBoss" />
+		</funComp>
+	</map>
+
+	<map id="20" name="海洋星" x="718" y="201" super="13" sound="BGM_006A">
+		<Entries>
+			<Entry FromMap="1" PosX="718" PosY="201" />
+			<Entry FromMap="21" PosX="430" PosY="450" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+			<component name="door_1" hit="comp_1" targetID="21" />
+		</changeMapComp>
+		<funComp>
+			<component name="gasMC" hit="standMC" fun="exploitGas" />
+		</funComp>
+		<autoComp>
+			<!--<component
+			name="smMC" hit="smHit" fun="eatMan"/>-->
+		</autoComp>
+	</map>
+	<map id="21" name="海洋星深水区" x="663" y="217" super="13">
+		<Entries>
+			<Entry FromMap="22" PosX="200" PosY="350" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="20" />
+			<component name="door_1" hit="comp_1" targetID="22" />
+		</changeMapComp>
+		<funComp>
+			<component name="oreMC" hit="funComp_0" fun="exploitOre" />
+			<component name="wasteMC" hit="standWasteMC" fun="clearWaste" />
+			<component name="fishComp" hit="fishHit" fun="fishTask" des="精灵口腔护理装置" />
+		</funComp>
+	</map>
+
+	<map id="22" name="海洋星海底" x="203" y="92" super="13">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="21" />
+
+		</changeMapComp>
+		<funComp>
+			<!-- 打boss -->
+			<component name="boss_mc" hit="boss_hit" fun="hitBoss" />
+			<component name="musicBtn" hit="musicHit" fun="onMusicHit" />
+		</funComp>
+		<autoComp>
+			<component name="bom3" hit="bomHit" fun="hitBom" />
+			<component name="bom2" hit="bomHit2" fun="hitBom2" />
+			<component name="bom1" hit="bomHit1" fun="hitBom1" />
+		</autoComp>
+	</map>
+
+	<map id="25" name="云霄星" x="192" y="247" super="14">
+		<Entries>
+			<Entry FromMap="1" PosX="192" PosY="247" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+		<funComp>
+			<component name="hitKMC" hit="standKMC" fun="kettleFun" />
+			<component name="gasMC" hit="standMC" fun="exploitGas" />
+			<component name="wasteMC" hit="standWasteMC" fun="clearWaste" />
+		</funComp>
+	</map>
+	<map id="26" name="云霄星高空层" x="192" y="247" super="14">
+		<changeMapComp>
+			<component name="thirdBtn" hit="standMC" targetID="27" />
+			<component name="door_0" hit="comp_0" targetID="25" />
+		</changeMapComp>
+		<funComp>
+
+		</funComp>
+	</map>
+	<map id="27" name="云霄星最高层" x="633" y="277" super="14">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="26" />
+		</changeMapComp>
+		<funComp>
+			<component name="door_mc" hit="doorHit_mc" fun="showAnswerHandler" />
+			<component name="birdBtn" hit="birdHit" fun="onBirdHit" />
+		</funComp>
+	</map>
+
+	<map id="30" name="赫尔卡星" x="659" y="420" super="15">
+		<Entries>
+			<Entry FromMap="1" PosX="659" PosY="420" />
+			<Entry FromMap="31" PosX="200" PosY="120" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+			<component name="door_1" hit="comp_1" targetID="31" />
+			<component name="door_2" hit="comp_2" targetID="33" />
+		</changeMapComp>
+		<funComp>
+			<component name="cubeMc" hit="cubeHitMc" fun="onBombGameHandler" />
+		</funComp>
+	</map>
+	<map id="31" name="赫尔卡星遗迹" x="298" y="440" super="15">
+		<Entries>
+			<Entry FromMap="30" PosX="298" PosY="440" />
+			<Entry FromMap="32" PosX="836" PosY="135" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="30" />
+			<component name="door_1" hit="comp_1" targetID="32" />
+		</changeMapComp>
+		<funComp>
+			<component name="cableMC" hit="standCable" fun="getCable" />
+			<component name="ear" hit="earHit" fun="onClickEar" isStop="1" />
+		</funComp>
+	</map>
+	<map id="32" name="赫尔卡星荒地" x="263" y="440" super="15">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="31" />
+		</changeMapComp>
+		<funComp>
+			<!-- <component name="wasteMC" hit="standWasteMC" fun="clearWaste"/> -->
+			<component name="rockBtn" hit="rockHit" fun="onRockHit" />
+			<component name="bossBtn" hit="bossHit" fun="hitLY" />
+		</funComp>
+	</map>
+	<map id="33" name="神秘通道" x="165" y="300" super="15">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="30" />
+			<component name="door_1" hit="comp_1" targetID="34" />
+		</changeMapComp>
+	</map>
+	<map id="34" name="精灵广场" x="85" y="350" super="15">
+		<Entries>
+			<Entry FromMap="36" PosX="486" PosY="208" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_1" hit="comp_1" targetID="36" />
+		</changeMapComp>
+		<funComp>
+			<component name="oreMc" hit="oreHit" fun="oreHandler" />
+			<component name="door_0" hit="comp_0" fun="changeToHandler" />
+			<component name="shitou" hit="stoneHit" fun="onClickShitou" isStop="1" />
+			<component name="templeDoorMC" hit="templeDoorHit"
+				fun="clickTempleDoor" isStop="1" />
+			<component name="tengmanMC" hit="tengmanHit" fun="clickTengman"
+				isStop="1" />
+		</funComp>
+	</map>
+	<map id="35" name="千年前的精灵圣殿" x="204" y="458" super="15">
+		<changeMapComp>
+			<component name="door_1" hit="comp_1" targetID="320" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="36" name="精灵圣殿" x="204" y="458" super="15">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="34" />
+		</changeMapComp>
+		<funComp>
+			<component name="pillar_0" hit="pillarHit" fun="hitPillar" isStop="1" />
+			<component name="pillar_1" hit="pillarHit" fun="hitPillar" isStop="1" />
+			<component name="pillar_2" hit="pillarHit" fun="hitPillar" isStop="1" />
+			<component name="pillar_3" hit="pillarHit" fun="hitPillar" isStop="1" />
+		</funComp>
+	</map>
+	<map id="40" name="塞西利亚星" x="657" y="398" super="16">
+		<Entries>
+			<Entry FromMap="41" PosX="300" PosY="233" />
+		</Entries>
+		<changeMapComp>
+			<!-- <component name="door_0" hit="comp_0" targetID="1" /> -->
+			<component name="door_1" hit="comp_1" targetID="41" />
+		</changeMapComp>
+		<funComp>
+			<component name="diaMc" hit="diaHit" fun="getDia" />
+			<component name="bingBlockMc" hit="bingBlockHit" fun="onBingBlockHit" />
+			<component name="akxyMc" hit="akxyHit" fun="onAkxy" />
+			<component name="shouMc" hit="shouHit" fun="onShouHit" />
+		</funComp>
+		<autoComp>
+			<component name="lfMC_1" hit="lfMC_1" fun="changeMap" />
+			<component name="lfMC_2" hit="lfMC_2" fun="changeMap" />
+		</autoComp>
+	</map>
+	<map id="41" name="寒冰溶洞" x="776" y="184" super="16">
+		<Entries>
+			<Entry FromMap="43" PosX="440" PosY="500" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="40" />
+			<component name="door_1" hit="comp_1" targetID="43" />
+
+		</changeMapComp>
+		<funComp>
+			<component name="diaMc_1" hit="diaHit_1" fun="getDia_1" />
+			<component name="holeMC" hit="holeHitMC" fun="hitHole" />
+			<component name="shouMc" hit="shouHit" fun="onShouHit" />
+		</funComp>
+	</map>
+	<map id="42" name="冰窖迷宫" x="470" y="75" super="16">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="43" />
+		</changeMapComp>
+		<funComp>
+			<component name="ice_mc" hit="iceHit_mc" fun="playAniHandler" />
+			<component name="diaMc_1" hit="diaHit_1" fun="getDia_1" />
+			<component name="diaMc_2" hit="diaHit_2" fun="getDia_2" />
+		</funComp>
+	</map>
+	<map id="43" name="赫尔卡飞船" x="230" y="130" super="16">
+		<Entries>
+			<Entry FromMap="42" PosX="810" PosY="188" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="41" />
+		</changeMapComp>
+		<funComp>
+			<component name="redDia" hit="reddiaHit" fun="showXBSDialog" />
+			<component name="xitaNpc" hit="xitaHit" fun="showXita" />
+			<!--<component
+			name="ddMaskMc" hit="ddHit" fun="onDdHandler"/>-->
+		</funComp>
+	</map>
+	<map id="46" name="海盗能源站" x="108" y="368" super="17">
+		<Entries>
+			<Entry FromMap="49" PosX="738" PosY="124" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="106" />
+			<component name="door_1" hit="comp_1" targetID="49" />
+		</changeMapComp>
+	</map>
+	<map id="47" name="双子贝塔星" x="780" y="409" super="18">
+		<Entries>
+			<Entry FromMap="49" PosX="176" PosY="277" />
+		</Entries>
+		<Entries>
+			<Entry FromMap="48" PosX="775" PosY="180" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+			<component name="door_1" hit="comp_1" targetID="49" />
+			<component name="door_2" hit="comp_2" targetID="48" />
+		</changeMapComp>
+		<funComp>
+			<component name="startSpiderGameBtn" hit="spidHit"
+				fun="onStartSpiderGame" />
+		</funComp>
+	</map>
+	<map id="48" name="海盗要塞废墟" x="847" y="120" super="18">
+		<Entries>
+			<Entry FromMap="50" PosX="318" PosY="158" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="47" />
+		</changeMapComp>
+	</map>
+	<map id="49" name="贝塔星荒原" x="774" y="350" super="18">
+		<Entries>
+			<Entry FromMap="502" PosX="170" PosY="186" />
+			<Entry FromMap="46" PosX="165" PosY="360" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="46" />
+			<component name="door_1" hit="comp_1" targetID="501" />
+			<component name="door_2" hit="comp_2" targetID="47" />
+
+
+			<!--<component
+			name="workThing" hit="giveThingsHit" fun="giveThings"/>-->
+		</changeMapComp>
+		<funComp>
+			<component name="stone_0" hit="stone_0" fun="getStone" des="电能石" />
+			<component name="stone_1" hit="stone_1" fun="getStone" des="电能石" />
+			<component name="stone_2" hit="stone_2" fun="getStone" des="电能石" />
+			<component name="stationMC" hit="stationHit" fun="showStationPanel"
+				des="星球勘察站" />
+		</funComp>
+	</map>
+	<map id="50" name="海盗要塞内部" x="770" y="401" super="18">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="48" />
+		</changeMapComp>
+		<funComp>
+			<component name="rescueBtnMC" hit="rescueBtnHitMc"
+				fun="onRescueBtnClick" />
+		</funComp>
+	</map>
+
+	<!--
+	<map id="51" name="蓝队要塞" x="555" y="334">
+	<Entries>
+	</Entries>
+	<changeMapComp>
+	</changeMapComp>
+	<funComp>
+	</funComp>
+	</map>
+	-->
+	<map id="51" name="斯诺星" x="625" y="405" super="20">
+		<Entries>
+			<!--<Entry
+			FromMap="52" PosX="530" PosY="262"/>-->
+			<Entry FromMap="53" PosX="300" PosY="200" />
+		</Entries>
+		<changeMapComp>
+			<!-- <component name="door_0" hit="comp_0" targetID="52"/> -->
+			<component name="door_1" hit="comp_1" targetID="53" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="52" name="斯诺星密林" x="270" y="361" super="20">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLevelHandler" des="斯诺星" />
+		</funComp>
+	</map>
+	<map id="53" name="斯诺岩洞" x="77" y="480" super="20">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="51" />
+		</changeMapComp>
+	</map>
+	<map id="54" name="露希欧星" x="850" y="385" super="26">
+		<Entries>
+			<Entry FromMap="55" PosX="730" PosY="130" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="55" />
+		</changeMapComp>
+		<funComp>
+			<component name="lnyMineralMC" hit="lnyHit" fun="onGatherLny" />
+			<component name="xllMineralMC" hit="xllHit" fun="onGatherXll" />
+			<component name="ogdMineralMC" hit="ogdHit" fun="onGatherOgd" />
+		</funComp>
+	</map>
+	<map id="55" name="露希欧泥潭" x="635" y="480" super="26">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="54" />
+		</changeMapComp>
+		<funComp>
+			<component name="waterMC" hit="lineHitMc" fun="onLineClickHandler" />
+		</funComp>
+	</map>
+	<map id="56" name="NoNo之洋" x="635" y="480" super="26">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="com_0" targetID="55" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="57" name="尼古尔星" x="695" y="418" super="21">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_1" hit="hit_1" targetID="58" />
+		</changeMapComp>
+		<!-- <funComp>
+			<component name="door_2" hit="hit_2" fun="onLineClickHandler" />
+		</funComp> -->
+	</map>
+	<map id="58" name="尼古尔峭壁" x="379" y="438" super="21">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="57" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="59" name="尼古尔水帘" x="379" y="438" super="21">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_2" hit="hit_2" targetID="57" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="60" name="塔克星" x="533" y="388" super="22">
+		<Entries>
+			<Entry FromMap="61" PosX="850" PosY="185" />
+			<Entry FromMap="62" PosX="850" PosY="185" />
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_1" hit="hit_1" fun="onLineClickHandler" />
+		</funComp>
+	</map>
+	<map id="61" name="光之迷城" x="127" y="398" super="22">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="60" />
+		</changeMapComp>
+		<funComp>
+			<component name="door_1" hit="hit_1" fun="changeMap" des="沙漠窑洞入口" />
+		</funComp>
+	</map>
+	<map id="62" name="暗之迷城" x="515" y="419" super="22">
+		<Entries>
+			<Entry FromMap="63" PosX="460" PosY="140" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="60" />
+		</changeMapComp>
+		<funComp>
+			<component name="door_1" hit="hit_1" fun="changeMap" des="月影花园" />
+		</funComp>
+	</map>
+	<map id="63" name="月影花园" x="256" y="440" super="22">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="62" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="64" name="沙漠窑洞" x="256" y="440" super="22">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="61" />
+		</changeMapComp>
+		<funComp>
+			<component name="nonoEffect" hit="hit_mc" fun="playNonoEffect"
+				des="云雾气井" />
+		</funComp>
+	</map>
+	<!--走廊扩展 -->
+	<map id="100" name="英佩恩堡垒" x="190" y="235" super="100" sound="BGM_024">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="336" />
+			<component name="door_1" hit="comp_1" targetID="37" />
+			<component name="door_2" hit="comp_2" targetID="345" />
+			<component name="door_3" hit="comp_3" targetID="431" dir="4" />
+		</changeMapComp>
+		<funComp>
+			<component name="ai_mc" hit="ai_hit" fun="onAIClick" des="智能AI" />
+		</funComp>
+	</map>
+	<map id="336" name="组队训练室" x="480" y="400" super="100" sound="BGM_024">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="100" />
+		</changeMapComp>
+		<funComp>
+			<component name="ai_mc" hit="ai_hit" fun="onAIClick" des="智能AI" />
+			<component name="lodging_mc" hit="lodging_hit" fun="onBossClick"
+				des="寄宿岩" />
+			<component name="lodging_mc1" hit="lodging_hit1" fun="onBossClick1"
+				des="特别训练室" />
+		</funComp>
+	</map>
+	<map id="37" name="精灵决斗卡对战室" x="500" y="410" super="100" sound="BGM_049"
+		npc="118">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="100" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="345" name="高级组队训练室" x="485" y="460" super="100" sound="BGM_024">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="100" />
+			<component name="door_3" hit="comp_3" targetID="349" />
+			<component name="door_4" hit="comp_4" targetID="740" />
+			<component name="door_5" hit="comp_5" targetID="755" />
+			<component name="door_6" hit="comp_6" targetID="777" />
+		</changeMapComp>
+		<funComp>
+			<component name="door_1" hit="comp_1" fun="changeMapOne"
+				des="挑战波戈" />
+			<component name="door_2" hit="comp_2" fun="changeMapTwo"
+				des="挑战波戈强化版" />
+		</funComp>
+	</map>
+	<map id="431" name="英佩恩堡垒二层" x="100" y="260" super="100" sound="BGM_024">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="100" dir="2" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<!--小屋-->
+	<!-- fx,fy是道具从仓库放进地图地上的默认坐标，wx,wy是道具从仓库放进地图墙上的默认坐标-->
+	<map id="500001" name="小屋" x="173" y="338" fx="500" fy="350" wx="330" wy="100">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+	</map>
+	<map id="500002" name="小屋" x="400" y="350" fx="500" fy="370" wx="700" wy="130">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="40" />
+		</changeMapComp>
+	</map>
+	<map id="500003" name="小屋" x="180" y="300" fx="500" fy="350" wx="580" wy="70">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="10" />
+		</changeMapComp>
+	</map>
+	<map id="500004" name="小屋" x="130" y="240" fx="470" fy="350" wx="100" wy="80">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="102" />
+		</changeMapComp>
+	</map>
+	<map id="500005" name="小屋" x="850" y="280" fx="440" fy="380" wx="620" wy="50">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="105" />
+		</changeMapComp>
+	</map>
+	<map id="500006" name="小屋" x="420" y="130" fx="470" fy="370" wx="760" wy="50">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="20" />
+		</changeMapComp>
+	</map>
+	<map id="500007" name="小屋" x="120" y="460" fx="400" fy="400" wx="780" wy="180">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="47" />
+		</changeMapComp>
+	</map>
+	<map id="500008" name="小屋" x="240" y="420" fx="480" fy="400" wx="480" wy="180">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+	</map>
+	<map id="500009" name="小屋" x="480" y="220" fx="480" fy="380" wx="350" wy="80">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="16" />
+		</changeMapComp>
+	</map>
+	<map id="500010" name="小屋" x="250" y="250" fx="350" fy="300" wx="250" wy="60">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="34" />
+		</changeMapComp>
+	</map>
+	<map id="500011" name="云宵星小屋" x="475" y="340" fx="437" fy="400" wx="400" wy="74">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="26" />
+		</changeMapComp>
+	</map>
+	<map id="500012" name="斯诺星小屋" x="250" y="250" fx="357" fy="310" wx="360" wy="39">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="51" />
+		</changeMapComp>
+	</map>
+	<map id="500013" name="赫尔卡星小屋" x="730" y="330" fx="235" fy="355" wx="600" wy="88">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="32" />
+		</changeMapComp>
+	</map>
+	<map id="500014" name="武斗场小屋" x="477" y="369" fx="477" fy="369" wx="165" wy="88">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="102" />
+		</changeMapComp>
+	</map>
+	<map id="500015" name="露希欧星小屋" x="477" y="260" fx="190" fy="270" wx="300" wy="35">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="54" />
+		</changeMapComp>
+	</map>
+	<map id="500016" name="飞船40纪念小屋" x="485" y="360" fx="485" fy="360" wx="300"
+		wy="110">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+	</map>
+	<map id="500017" name="赛尔号启航二周年" x="485" y="360" fx="485" fy="400"
+		wx="485" wy="210" sound="BGM_001">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+	<map id="500018" name="赛尔号启航二周年" x="485" y="360" fx="485" fy="400"
+		wx="485" wy="210" sound="BGM_001">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+	<map id="500019" name="圣诞节小屋" x="680" y="160" fx="480" fy="420" wx="480"
+		wy="200" sound="BGM_001">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+	<map id="500020" name="三周年小屋" x="150" y="490" fx="480" fy="350" wx="670"
+		wy="100" sound="BGM_001">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+	<map id="500021" name="圣诞水晶宫" x="500" y="400" fx="480" fy="350" wx="670"
+		wy="100" sound="BGM_001">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+	<map id="500022" name="四周年纪念基地" x="500" y="400" fx="480" fy="350"
+		wx="370" wy="90" sound="BGM_001">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+	<map id="500023" name="圣诞游乐园" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_001">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+	<map id="500024" name="野营乐园" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_001">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+	<map id="500025" name="萤火之境" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_001">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+
+	<map id="500026" name="十周年派对" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_347">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+
+	<map id="500027" name="星愿水晶宫" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_347">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+
+	<map id="500028" name="星空遨游小屋" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_347">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+
+	<map id="500029" name="动力时代基地" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_252">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+
+	<map id="500030" name="曲径通幽" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_502">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+
+	<map id="500031" name="十二周年纪念基地" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_625">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+
+	<map id="500032" name="星辰远航基地" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_699">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+
+	<map id="500033" name="测试基地" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_699">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+
+	<map id="500034" name="帕诺之巅" x="500" y="400" fx="580" fy="300" wx="480"
+		wy="100" sound="BGM_830">
+		<funComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</funComp>
+		<!-- targetID="1" -->
+	</map>
+	<!--走廊扩展-->
+	<map id="201" name="飞船底层走廊中部" x="114" y="316">
+		<Entries>
+			<Entry FromMap="2" PosX="114" PosY="316" />
+			<Entry FromMap="101" PosX="370" PosY="253" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="2" dir="2" />
+			<component name="door_1" hit="comp_1" targetID="101" />
+		</changeMapComp>
+	</map>
+	<map id="301" name="火之试炼场" x="590" y="165">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="101" />
+		</changeMapComp>
+		<funComp>
+			<component name="sFigMc" hit="figHit_s" fun="onSFigFun" />
+			<component name="tFigMc" hit="figHit_t" fun="onTFigFun" />
+			<component name="prizeBtn" hit="prizeHit" fun="onPrizeFun" />
+			<component name="posmc_1" hit="posHit_1" fun="onPosFun1" />
+			<component name="posmc_2" hit="posHit_2" fun="onPosFun2" />
+		</funComp>
+	</map>
+	<!-- 12个迷宫场景 -->
+	<map id="302" name="闭锁空间" x="300" y="278" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="303" />
+			<component name="door_1" hit="comp_1" targetID="306" />
+		</changeMapComp>
+	</map>
+	<map id="303" name="闭锁空间" x="286" y="260" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="305" />
+			<component name="door_1" hit="comp_1" targetID="307" />
+		</changeMapComp>
+	</map>
+	<map id="304" name="闭锁空间" x="480" y="262" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="307" />
+			<component name="door_1" hit="comp_1" targetID="312" />
+		</changeMapComp>
+	</map>
+	<map id="305" name="闭锁空间" x="286" y="260" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="309" />
+			<component name="door_1" hit="comp_1" targetID="313" />
+		</changeMapComp>
+	</map>
+	<map id="306" name="闭锁空间" x="300" y="278" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="311" />
+			<component name="door_1" hit="comp_1" targetID="313" />
+		</changeMapComp>
+		<funComp>
+			<component name="xita" hit="xitaHit" fun="fightWithXita" />
+		</funComp>
+	</map>
+	<map id="307" name="闭锁空间" x="480" y="262" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="308" />
+			<component name="door_1" hit="comp_1" targetID="310" />
+		</changeMapComp>
+	</map>
+	<map id="308" name="闭锁空间" x="480" y="262" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="310" />
+			<component name="door_1" hit="comp_1" targetID="313" />
+		</changeMapComp>
+	</map>
+	<map id="309" name="闭锁空间" x="286" y="260" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="306" />
+			<component name="door_1" hit="comp_1" targetID="307" />
+		</changeMapComp>
+		<autoComp>
+			<component name="plot_0" hit="plot_0" fun="checkWalkPlot" />
+			<component name="plot_1" hit="plot_1" fun="checkWalkPlot" />
+			<component name="plot_2" hit="plot_2" fun="checkWalkPlot" />
+			<component name="plot_3" hit="plot_3" fun="checkWalkPlot" />
+			<component name="plot_4" hit="plot_4" fun="checkWalkPlot" />
+			<component name="plot_5" hit="plot_5" fun="checkWalkPlot" />
+		</autoComp>
+	</map>
+	<map id="310" name="闭锁空间" x="286" y="260" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="302" />
+			<component name="door_1" hit="comp_1" targetID="304" />
+		</changeMapComp>
+	</map>
+	<map id="311" name="闭锁空间" x="300" y="278" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="303" />
+			<component name="door_1" hit="comp_1" targetID="304" />
+		</changeMapComp>
+	</map>
+	<map id="312" name="闭锁空间" x="480" y="262" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="302" />
+			<component name="door_1" hit="comp_1" targetID="305" />
+		</changeMapComp>
+	</map>
+	<map id="313" name="闭锁空间" x="300" y="278" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="308" />
+			<component name="door_1" hit="comp_1" targetID="309" />
+		</changeMapComp>
+	</map>
+	<!-- -->
+	<map id="314" name="拜伦号" x="512" y="330" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="302" />
+			<component name="door_1" hit="comp_1" targetID="315" />
+		</changeMapComp>
+	</map>
+	<map id="315" name="神秘空间" x="512" y="330" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="314" />
+			<!-- <component name="door_1" hit="comp_1" targetID="316" /> -->
+		</changeMapComp>
+
+		<funComp>
+			<component name="openDoorMC" hit="openDoorHitMc" fun="clickOpenDoor" />
+			<component name="door_switch_mc" hit="door_switch" fun="onStand" />
+			<component name="door_2" hit="door_effect" fun="onChangeMap" />
+		</funComp>
+	</map>
+	<map id="316" name="精灵舱" x="260" y="300" super="25">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="lineBeltMC" hit="lineBeltMcHit" fun="clickLineBelt" />
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" des="神秘空间" />
+		</funComp>
+	</map>
+
+	<map id="320" name="千年前赫尔卡星" x="600" y="390" super="25">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="35" fun="changMap" />
+			<component name="door_1" hit="comp_1" targetID="315" />
+		</changeMapComp>
+	</map>
+
+	<map id="321" name="宇宙遭遇战" x="320" y="395">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+	</map>
+	<!-- 运营任务临时用地图 愚人节-->
+	<map id="322" name="拉姆神秘世界" x="335" y="424">
+		<Entries>
+			<Entry FromMap="323" PosX="888" PosY="332" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+		<funComp>
+			<component name="door_1" hit="comp_1" fun="changeMap" des="拉姆世界丛林" />
+		</funComp>
+	</map>
+	<map id="323" name="拉姆世界丛林" x="140" y="380">
+		<Entries>
+			<Entry FromMap="322" PosX="140" PosY="380" />
+			<Entry FromMap="324" PosX="880" PosY="382" />
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="changeMapOne" des="拉姆神秘世界" />
+			<component name="door_1" hit="comp_1" fun="changeMapTwo" des="云雾迷桥" />
+		</funComp>
+	</map>
+	<map id="324" name="云雾迷桥" x="136" y="354">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="changeMap" des="拉姆世界丛林" />
+		</funComp>
+	</map>
+	<map id="325" name="艾迪星" x="256" y="440" super="23" sound="BGM_228">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="326" />
+		</changeMapComp>
+		<funComp>
+			<component name="oreMC" hit="funComp_0" fun="exploitOre"
+				des="黄晶矿" />
+		</funComp>
+	</map>
+
+	<map id="326" name="暮色之城" x="230" y="435" super="23" sound="BGM_021B">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="325" />
+		</changeMapComp>
+		<funComp>
+
+		</funComp>
+	</map>
+
+	<map id="327" name="虚幻的地下城市" x="180" y="335" super="23" sound="BGM_021B">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="326" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="328" name="斯科尔星" x="320" y="460" super="24" sound="BGM_197">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="330" />
+		</changeMapComp>
+		<funComp>
+			<component name="gasMC" hit="standMC" fun="exploitGas" des="甲烷燃气" />
+		</funComp>
+	</map>
+	<map id="329" name="潘迪拉宝盒" x="105" y="310" super="325" sound="BGM_041">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="325" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="330" name="斯科尔浮岛" x="150" y="450" super="24" sound="BGM_10076">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="328" />
+			<!-- <component name="door_2" hit="comp_2" targetID="1006" /> -->
+		</changeMapComp>
+		<funComp>
+			<component name="door_1" hit="comp_1" fun="changeMap" />
+		</funComp>
+	</map>
+	<map id="331" name="斯科尔高空塔" x="200" y="445" super="24" sound="BGM_10088">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="330" />
+		</changeMapComp>
+		<funComp>
+			<component name="door_1" hit="comp_1" fun="changeMap" />
+		</funComp>
+	</map>
+	<map id="333" name="普雷空间站" x="140" y="220" super="27" sound="BGM_023">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_1" hit="comp_1" targetID="334" />
+			<component name="door_2" hit="comp_2" targetID="339" />
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="changeMap" des="传送舱" />
+			<component name="ballMc" hit="ballHit" fun="clickBall" />
+			<component name="blockMc" hit="blockHit" fun="clickBlock" />
+			<component name="rouletteMc" hit="rouletteHit" fun="clickRoulette" />
+		</funComp>
+	</map>
+	<map id="334" name="几米塔" x="370" y="30" super="27" sound="BGM_023">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="333" />
+		</changeMapComp>
+		<funComp>
+			<component name="switch_mc" hit="switch_hit" fun="onSwitchClick"
+				des="机关" />
+			<component name="box_mc" hit="box_hit" fun="onBoxClick" />
+		</funComp>
+	</map>
+	<map id="338" name="哈默星" x="420" y="420" super="28" sound="BGM_025A">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="340" />
+			<!-- <component name="door" hit="hit" targetID="674" /> -->
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="339" name="遗忘领域" x="900" y="220" super="27" sound="BGM_023">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="333" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="340" name="塔西亚地域" x="735" y="135" super="28" sound="BGM_10072">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="342" />
+			<component name="door_1" hit="comp_1" targetID="338" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="342" name="白沙罗域" x="602" y="471" super="28" sound="BGM_10073">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="344" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="344" name="龙王殿堂" x="600" y="470" super="28" sound="BGM_10074">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="348" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="348" name="龙王圣殿" x="500" y="470" super="28" sound="BGM_10075">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="401" name="玄武空间" x="120" y="480">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="404" name="比格星" x="470" y="420" super="404" sound="BGM_027A">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="doorHit_0" targetID="1" />
+			<component name="door_1" hit="doorHit_1" targetID="414" />
+		</changeMapComp>
+		<funComp>
+			<component name="oreMC" hit="funComp_0" fun="exploitOre"
+				des="黄晶矿" />
+		</funComp>
+	</map>
+	<map id="405" name="太空站扩展" x="714" y="414" super="102" sound="BGM_002">
+		<Entries>
+			<Entry FromMap="520" PosX="240" PosY="200" />
+			<Entry FromMap="540" PosX="600" PosY="120" />
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="stepMc" hit="stepHit" fun="onFightLadder"
+				des="挑战战斗阶梯" />
+			<component name="fateMc" hit="townHit" fun="onFateFightHandler"
+				des="挑战命运之轮" />
+			<!-- <component name="door_0" hit="comp_0" fun="onEnterHandler"
+				des="太空站左翼" />
+			<component name="btn_0" hit="hit_0" fun="onSignUpClick"
+				des="元素之战报名点" />
+			<component name="btn_1" hit="hit_1" fun="onPetRoayleBtn"
+				des="大逃杀报名点" /> -->
+		</funComp>
+	</map>
+	<map id="411" name="陨石地带" x="208" y="420" super="411" sound="BGM_028">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="414" name="觅食林" x="500" y="350" super="404" sound="BGM_10077">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="doorHit_0" targetID="404" />
+			<component name="door_1" hit="doorHit_1" targetID="419" />
+			<!--<component
+			name="door_2" hit="doorHit_2" targetID="423" />-->
+			<!--<component
+			name="door_3" hit="hit3" targetID="804" />-->
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="415" name="巨型陨石" x="50" y="320" super="411" sound="BGM_104">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="411" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="419" name="暗影峭壁" x="50" y="320" super="404" sound="BGM_027A"
+		npc="108">
+		<changeMapComp>
+			<component name="door_0" hit="doorHit_0" targetID="404" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="424" name="空间补给站" x="80" y="450" super="424">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="hit_0" fun="onGo_425" des="//时空罗盘-测试ML" />
+		</funComp>
+	</map>
+	<map id="425" name="时空罗盘" x="96" y="472" super="424" sound="BGM_050">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onGo_424" des="空间补给站" />
+		</funComp>
+	</map>
+	<map id="426" name="博士的秘密基地" x="405" y="350" super="5" sound="BGM_001A">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="427" name="迷宫" x="80" y="450" super="424" sound="BGM_028">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onGoto1" />
+			<component name="door_1" hit="comp_1" fun="onGoto2" />
+			<component name="door_2" hit="comp_2" fun="onGoto3" />
+			<component name="door_3" hit="comp_3" fun="onGoto4" />
+		</funComp>
+	</map>
+	<map id="428" name="废墟" x="847" y="434" super="424" sound="BGM_028">
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="427" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>	
+	<map id="429" name="拓梯星" x="480" y="470" super="429" sound="BGM_031A">
+		<Entries>
+			<Entry FromMap="430" PosX="650" PosY="450" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="430" />
+			<!-- <component name="door_1" hit="comp_1" targetID="510"/> -->
+		</changeMapComp>
+		<funComp>
+			<component name="gasMC" hit="standMC" fun="exploitGas" des="甲烷燃气" />
+		</funComp>
+	</map>
+	<map id="430" name="活力源泉" x="90" y="420" super="429" sound="BGM_031A">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="429" />
+		</changeMapComp>
+		<funComp>
+			<component name="box" hit="box_hit" fun="onBoxClick" />
+		</funComp>
+	</map>	
+	<map id="433" name="巅峰之战" x="130" y="130" super="102" sound="BGM_024">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="102" />
+		</changeMapComp>
+		<funComp>
+			<component name="point_1" hit="hit_1" fun="onPointClick"
+				des="巅峰之战练习赛：突破模式" />
+			<component name="point_2" hit="hit_2" fun="onPointClick"
+				des="巅峰之战练习赛" />
+			<component name="point_3" hit="hit_3" fun="onPointClick"
+				des="巅峰之战练习赛：突破模式" />
+			<component name="point_4" hit="hit_4" fun="onPointClick"
+				des="巅峰之战练习赛" />
+			<component name="point_5" hit="hit_5" fun="onPointClick"
+				des="巅峰之战练习赛：突破模式" />
+			<component name="point_6" hit="hit_6" fun="onPointClick"
+				des="巅峰之战练习赛" />
+		</funComp>
+	</map>
+	<map id="435" name="戴斯星" x="228" y="354" super="435" sound="BGM_032">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="436" name="戴斯星" x="45" y="200" super="435" sound="BGM_032">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="435" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="437" name="墨杜萨星" x="685" y="340" super="437" sound="BGM_032">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="438" />
+		</changeMapComp>
+		<funComp>
+			<component name="door_1" hit="hit_1" fun="onDoorClick" />
+		</funComp>
+	</map>
+	<map id="438" name="石化之城" x="220" y="205" super="437" sound="BGM_029">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="437" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="460" name="赫鲁卡星" x="200" y="200" super="459" sound="BGM_034B">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="459" />
+			<component name="door_1" hit="hit_1" targetID="461" />
+			<component name="door_2" hit="hit_2" targetID="695" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="461" name="赫鲁卡城" x="1261" y="841" super="459" sound="BGM_034B">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="hit_0" targetID="460" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<!-- 预留13个位置给殿 -->
+	<map id="470" name="高级攻击学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="471" name="高级防御学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="472" name="高级特攻学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="473" name="高级特防学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="474" name="高级速度学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="475" name="高级体力学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="485" name="精灵学院" x="614" y="450" super="485" sound="BGM_053">
+		<Entries>
+			<Entry FromMap="711" PosX="350" PosY="250" />
+		</Entries>
+		<changeMapComp>
+			<component name="lowGrade" hit="hit_low" fun="openLowTrainGradePanel" des="初级学习力训练室" />
+			<component name="highGrade" hit="hit_high" fun="openHighTrainGradePanel" des="高级学习力训练室" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="488" name="攻击学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="489" name="防御学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="490" name="特攻学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="491" name="特防学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="492" name="速度学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+
+	<map id="493" name="体力学习力训练室" x="480" y="434">
+		<Entries>
+		</Entries>
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<!-- 500以下是副本 -->
+
+	<map id="500" name="勇者之塔" x="466" y="166" super="19" isLocal="1">
+		<funComp>
+			<component name="door_0" hit="hit0" fun="leaveFight" />
+		</funComp>
+	</map>
+
+	<map id="600" name="新手试炼之塔" x="466" y="86" super="101" isLocal="1">
+		<funComp>
+			<component name="door_0" hit="hit0" fun="leaveFight" />
+		</funComp>
+	</map>
+
+	<map id="501" name="海盗训练场" x="665" y="207">
+		<Entries>
+			<Entry FromMap="502" PosX="776" PosY="406" />
+		</Entries>
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="49" />
+			<component name="door_1" hit="comp_1" targetID="502" />
+		</changeMapComp>
+		<funComp>
+		</funComp>
+	</map>
+	<map id="502" name="精灵召唤场" x="420" y="165">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="501" />
+		</changeMapComp>
+		<funComp>
+			<component name="standMC_0" hit="s_0" fun="onStand" />
+			<component name="standMC_1" hit="s_1" fun="onStand" />
+			<component name="standMC_2" hit="s_2" fun="onStand" />
+		</funComp>
+	</map>
+	<!-- 503到512 预留给暗黑之门-->
+	<map id="503" name="暗黑武斗场第一扇门" x="480" y="380" isLocal="1">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+	<map id="504" name="暗黑武斗场第二扇门" x="480" y="380" isLocal="1">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+	<map id="505" name="暗黑武斗场第三扇门" x="480" y="380" isLocal="1">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+	<map id="506" name="暗黑武斗场第四扇门" x="480" y="330" isLocal="1" sound="BGM_015B">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+	<map id="507" name="暗黑武斗场第五扇门" x="480" y="330" isLocal="1" sound="BGM_015B">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+	<map id="508" name="暗黑武斗场第六扇门" x="480" y="330" isLocal="1" sound="BGM_015B">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+	<map id="509" name="暗黑武斗场第七扇门" x="480" y="330" isLocal="1" sound="BGM_015B">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+	<map id="510" name="暗黑武斗场第八扇门" x="480" y="330" isLocal="1" sound="BGM_015B">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+	<map id="511" name="暗黑武斗场第九扇门" x="480" y="330" isLocal="1" sound="BGM_015B">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+	<map id="512" name="暗黑武斗场第十扇门" x="480" y="330" isLocal="1" sound="BGM_015B">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+		</funComp>
+	</map>
+
+	<map id="513" name="地下室" x="49" y="365" isLocal="1">
+		<changeMapComp>
+			<component name="out_btn" hit="out_hit" targetID="8" />
+		</changeMapComp>
+		<funComp>
+			<component name="npc" hit="npcHit" fun="clickNpc" />
+		</funComp>
+	</map>
+
+	<map id="660" name="飞船残骸区" x="480" y="280" isLocal="1">
+		<!-- <changeMapComp>
+		<component name="out_btn" hit="out_hit" targetID="8"/>
+		</changeMapComp> -->
+		<funComp>
+			<component name="first" hit="first_hit" fun="onFirstHit" />
+			<component name="second" hit="second_hit" fun="onSecondHit" />
+		</funComp>
+	</map>
+	<map id="514" name="勇者之塔神秘领域" x="739" y="342" isLocal="1" sound="BGM_018">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onLeaveHandler" />
+			<component name="cachetMc_0" hit="cachetHit_0" fun="onCachetMc0Handler"
+				isStop="1" des="第一封印-虚无" />
+			<component name="cachetMc_1" hit="cachetHit_1" fun="onCachetMc0Handler"
+				isStop="1" des="第二封印-元素" />
+			<component name="cachetMc_2" hit="cachetHit_2" fun="onCachetMc0Handler"
+				isStop="1" des="第三封印-能量" />
+			<component name="cachetMc_3" hit="cachetHit_3" fun="onCachetMc0Handler"
+				isStop="1" des="第四封印-生命" />
+			<component name="cachetMc_4" hit="cachetHit_4" fun="onCachetMc0Handler"
+				isStop="1" des="第五封印-轮回" />
+			<component name="cachetMc_5" hit="cachetHit_5" fun="onCachetMc0Handler"
+				isStop="1" des="第六封印-永恒" />
+			<component name="cachetMc_6" hit="cachetHit_6" fun="onCachetMc0Handler"
+				isStop="1" des="第七封印-圣洁" />
+		</funComp>
+	</map>
+	<!--要塞保卫站-->
+	<!-- fx,fy是设备从仓库放进地图的默认坐标，hx,hy是总部的固定坐标-->
+	<map id="700001" name="要塞对抗" x="400" y="350" fx="500" fy="370" hx="670" hy="200">
+		<funComp>
+			<component name="clickMC" hit="clickHit" fun="clickPoit" />
+		</funComp>
+	</map>
+	<!--要塞-->
+	<!-- fx,fy是设备从仓库放进地图的默认坐标，hx,hy是总部的固定坐标-->
+	<map id="800001" name="默认要塞" x="400" y="350" fx="500" fy="370" hx="670" hy="200">
+		<changeMapComp>
+			<component name="door_0" hit="comp_0" targetID="1" />
+		</changeMapComp>
+	</map>
+	<!--总部-->
+	<!-- fx,fy是道具从仓库放进地图地上的默认坐标，wx,wy是道具从仓库放进地图墙上的默认坐标,hx,hy是主电脑的固定坐标-->
+	<map id="900001" name="默认总部" x="810" y="280" fx="480" fy="350" wx="480" wy="100"
+		hx="480" hy="180">
+		<changeMapComp>
+		</changeMapComp>
+		<funComp>
+			<component name="door_0" hit="comp_0" fun="onGotoMap" />
+		</funComp>
+	</map>
+
+	<map id="515" name="地下室" x="430" y="452" isLocal="1">
+		<changeMapComp>
+
+		</changeMapComp>
+		<funComp>
+			<component name="npc" hit="npcHit" fun="clickNpc" />
+		</funComp>
+	</map>
+
+</Maps>

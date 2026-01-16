@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 任务档案配置文件 -->
+<!-- id表示任务id -->
+<!-- newOnline表示是否为本周新上线 1为是 0表示不是 -->
+<!-- itemtype值为 不同的item样式而定 -->
+<!-- isVip 表示是否是超级nono才能做的 1表示是-->
+<!-- offline表示是否下线了 0表示没有 1表示已经下线 -->
+<!-- mapId表示接任务所在的地图id -->
+<!-- icon 表示任务icon -->
+<!-- npc  表示接任务的npc -->
+<!-- startDes 表示没有接过的任务描述 -->
+<!-- stopDes  表示完成任务后的描述-->
+<!-- OutPut 是任务输出描述 -->
+<!-- onlineData 是上线时间 每个任务的上线时间不可以填相同的-->
+<config>
+	<item id="1" width="173" height="43" />
+	<item id="2" width="173" height="43" />
+	<item id="3" width="173" height="53" />
+	<item id="4" width="173" height="38" />
+	<item id="5" width="173" height="23" />
+	<!-- 星球图标 -->
+	<star id="1" name="克洛斯星" />
+	<star id="2" name="火山星" />
+	<star id="3" name="海洋星" />
+	<star id="4" name="云霄星" />
+	<star id="5" name="赫尔卡星" />
+	<star id="6" name="塞西利亚星" />
+	<star id="7" name="双子阿尔法星" />
+	<star id="8" name="斯诺星" />
+	<star id="9" name="拜伦号" />
+	<star id="10" name="露希欧星" />
+	<star id="11" name="双子贝塔星" />
+	<star id="12" name="尼古尔星" />
+	<star id="13" name="塔克星" />
+	<star id="14" name="艾迪星" />
+	<star id="100" name="赛尔号飞船" />
+	<tasks>
+		<!-- 星际探索的任务 需要在下面写出任务的配置 ，并把任务相关的星球信息作为上一级节点配置-->
+		<task itemtype="1" name="星际探索"
+			intro="赛尔号上长期发布的固定星际探索任务，这里的每一项任务都可以帮助你更快的了解赛尔号并融入到我们这个集体中。">
+
+			<!-- 星球解释，及跟这个星球有关任务的配置-->
+			<task itemtype="3" name="赛尔号飞船" starid="100"
+				intro="欢迎来到赛尔号！赛尔号是根据赛尔机器人的特质开发的先锋探索船，于赛尔历39年诞生，我们起航是为了寻找更优的生存环境，为了探索更佳能源物资。"
+				starlevel="0" spanlevel="新手用户" >
+				
+				<task itemtype="5" id="94" type="1" name="初识星球能源" parentId="16" newOnline="1" onlineData="20100326" offline="0" mapId="8" npc="xixi" tip="我在机械室等你哦！"
+					startDes="赛尔号飞船能源并不是用之不枯的，在航程中船员们也需要承担起寻找能源矿产的责任。机械师茜茜会负责指导你这方面的知识，去机械室找她吧！"
+					stopDes="你曾经向机械师茜茜学习了寻找能源矿产的知识技能，对星球能源矿产有了初步的了解。"
+					outPut="500 经验值|1000 赛尔豆">
+				</task>	
+
+				<task itemtype="5" id="37" name="帕诺星系星球测绘" parentId="0"
+					newOnline="0" onlineData="20091126" offline="0" mapId="4"
+					npc="shiper" tip="我就在赛尔号的船长室"
+					startDes="小赛尔，外星球的勘察是赛尔号的重大使命，是每一位小赛尔的职责，我相信你们可以独立的完成帕诺星系的测绘工作了，你决定现在就开始测绘吗？"
+					stopDes="外星球的勘察是赛尔号的重大使命，是每一位小赛尔的职责。#（你曾独立完成了繁琐的帕诺星系星球测绘任务。）"
+					outPut="星球勘察套装|3000 赛尔豆|中型智慧芯片">
+				</task>
+				
+				<task itemtype="5" id="89" type="0" name="试炼之塔的磨练" parentId="0" newOnline="1" onlineData="20100317" offline="0" mapId="101" npc="instructor" 
+					tip="我正在教官办公室里"
+					startDes="试炼之塔，这是雷蒙教官为新入住的赛尔船员们量身定制的，这里也被誉为新船员的摇篮！你们可以在这里体验到精灵对战的快感，快去找雷蒙了解下吧！"
+					stopDes="试炼之塔，这是雷蒙教官为新入住的赛尔船员们量身定制的。。#（你和你的精灵伙伴通过了重重考验，终于突破了10层难关！）"
+					outPut="500经验|1000 赛尔豆">
+				</task>
+
+				<task itemtype="5" id="96" type="0" name="旅途中的伙伴" parentId="0" newOnline="1" onlineData="20100401" offline="0" mapId="107" npc="shawn" 				
+					tip="我在发明室等你哦"
+					startDes="发明家肖恩正在发明室等你，他将为你介绍一位可靠的星际旅行好伙伴。"
+					stopDes="你从发明家肖恩处获得了自己可靠的伙伴NoNo，它将陪伴你展开星际探索之旅。）"
+					outPut="500 经验值|1000 赛尔豆">
+				</task>
+
+			</task>
+			
+			<task itemtype="3" name="艾迪星" starid="14"
+				intro="卡兰星系第二颗未知的星球，航行档案中记载，它曾被誉为'龙眠荒漠'之称，在这里有一望无际的沙漠之海。"
+				starlevel="3" spanlevel="50-100级" pet="264|265|266"
+				energy="">
+
+				<task itemtype="5" id="97" type="0" name="我是音乐小麦霸" parentId="0" newOnline="1" onlineData="20100408" offline="0" mapId="325" npc="penny" 				
+					tip="我在艾迪星睡觉！别吵我！"
+					startDes="艾迪星是一颗以音乐而文明的星球，这里的植物和精灵都有着特殊的……特殊的什么呢？快去艾迪星看看吧！"
+					stopDes="艾迪星是一颗不同凡响的星球，这里的植物以及精灵都有着自己的特色。#（你曾在艾迪星上结识了帕尼，还与它一起出演了一场非常出色的表演！）"
+					outPut="1000 经验值|1000 赛尔豆">
+				</task>	
+			</task>	
+			
+			<task itemtype="3" name="克洛斯星" starid="1"
+				intro="帕诺星系第三颗行星，自然生境非常丰富的星球，沼泽和林间有毒性反应。"
+				starlevel="1" spanlevel="1-5级" pet="10|16|27|47|83"
+				energy="400001">
+
+				<task itemtype="5" id="90" type="0" name="克洛斯星的皮皮" parentId="" newOnline="1" onlineData="20100318" offline="0" mapId="10" npc="pipi" 
+					tip="皮皮是克洛斯星最常见的精灵！"
+					startDes="飞行系的皮皮是克洛斯星上一种最常见的精灵，温顺而活泼的它将是赛尔探索精灵世界的得力助手。"
+					stopDes="捕获的皮皮将成为你探索精灵世界的得力助手，或许将成为你日后最信赖伙伴。#（你已经经历了在宇宙中探索精灵世界的第一关。）"
+					outPut="1000 经验值|1000 赛尔豆">
+				</task>	
+			</task>
+			<task itemtype="3" name="云霄星" starid="4"
+				intro="帕诺星系第七颗行星，整个星球物质的质量非常低，引力较小，80%为气体状的星球。"
+				starlevel="1" spanlevel="5-10级" pet="22|53|25|69"
+				energy="400002">
+
+				<task itemtype="5" id="93" type="1" name="云霄星的新来客" parentId="0" newOnline="1" onlineData="20100325" offline="0" mapId="25" npc="instructor" 
+					tip="SOS！SOS！快过来帮帮我们吧！"
+					startDes="帕诺星系第七颗行星，整个星球物质的质量非常低，引力较小，80%为气体状的星球。"
+					stopDes="浮空苗的出现没想到竟然给云霄星带来了一场前未有的骚动！#（你曾用你的善良化解了其中的矛盾，现在它们和提亚斯已经可以有好相处咯！）"
+					outPut="1000经验|500 赛尔豆">
+				</task>		
+			</task>
+			<!-- 星球解释，及跟这个星球有关任务的配置-->
+			<task itemtype="3" name="塞西利亚" starid="6"
+				intro="帕诺星系第八颗行星，钻石般美丽的星球，天寒地冻的圣洁领域。" starlevel="2"
+				spanlevel="11-33级" pet="50|65|51|116" energy="">
+
+				<task itemtype="5" id="8" name="西塔的珍贵回忆" parentId="0"
+					newOnline="0" onlineData="20091001" offline="0" mapId="43"
+					npc="xita" tip="我就在赫尔卡飞船里等你哦！"
+					startDes="我们在塞西利亚星收到了一条微弱的求救信号，原来是西塔的记忆晶体丢失了，那里有着它重要的回忆，你愿意帮助它找回失去的记忆吗？"
+					stopDes="赛尔号在塞西利亚星附近收到了一条微弱的求救信号，西塔告诉赛尔，它的记忆晶体丢失了，那里有着它重要的回忆。#（你曾帮助西塔找回了珍贵的记忆）"
+					outPut="基地家具“记忆晶体”">
+				</task>
+
+			</task>
+			<!-- 星球解释，及跟这个星球有关任务的配置-->
+			<task itemtype="3" name="尼古尔星" starid="12"
+				intro="帕诺星系边缘步入卡兰星系的第一颗星球，也有着草原之土的称号。" starlevel="3"
+				spanlevel="50-51级" pet="235|228" energy="">
+
+				<task itemtype="5" id="81" name="守候宿命的追随者" parentId=""
+					newOnline="0" onlineData="20100305" offline="0" mapId="5"
+					npc="doctor" tip="我正在实验室做研究呢！"
+					startDes="咦？派特博士似乎在尼古尔星球上发现了精灵的踪影！它长的什么样？它的兴趣爱好又是什么呢？还是先去问一下博士吧！"
+					stopDes="博士派特在尼古尔星上发现了新精灵#（你就是它守护了多年的宿命追随者，只要你能战胜它，它将永远追随你左右！）"
+					outPut="1000 经验值|1000 赛尔豆">
+				</task>
+
+			</task>
+			<!-- 星球解释，及跟这个星球有关任务的配置-->
+			<task itemtype="3" name="塔克星" starid="13"
+				intro="卡兰星系第二颗未知的星球，航行档案中记载，它曾被誉为'龙眠荒漠'之称，在这里有一望无际的沙漠之海。"
+				starlevel="3" spanlevel="52-54级" pet="232|237|240"
+				energy="">
+
+				<task itemtype="5" id="83" name="光暗之谜" parentId=""
+					newOnline="1" onlineData="20100312" offline="0" mapId="60"
+					npc="blacksHole" tip="快去塔克星上看看吧！那里似乎有团黑影！"
+					startDes="在卡兰星系中有很多奇妙且不可思议的地方，塔克星光暗迷城就是其中谜题之一！你有信心破解其中的奥秘吗？"
+					stopDes="塔克星的光暗迷城之谜#（你的智慧和你的勇敢得到了神秘精灵的认可，并且还从它那里知道了光暗迷城的秘密！）"
+					outPut="1000 经验值|1000 赛尔豆">
+				</task>
+			</task>
+			
+		</task>
+		<!-- 航行的任务 需要在下面写出任务的配置 -->
+		<task itemtype="2" name="航行任务"
+			intro="赛尔号的突发事件，您可以在这里了解到赛尔号的第一手资讯。新的星系、新的星球、新的冒险，我们一直都在成长，你可以在这里了解到赛尔号最新的动态。">
+
+
+			<task starlevel="2" spanlevel="" itemtype="4" id="84"
+				name="星球改造计划" parentId="" newOnline="0" onlineData="20100311"
+				offline="1" mapId="60" npc="iris" tip="我正在塔克星等你哦！"
+				startDes="赛尔号来到了卡兰星系的第二颗行星-塔克星，星球上的沙漠面积正在不断得扩大。爱丽丝正着手减缓星球表面的沙漠化。作为勇于探索的赛尔，你能帮她解决这个危机吗？"
+				stopDes="通过你的努力塔克星沙漠化的趋势趋于平缓，克洛斯巨木正在茁壮成长。#（你曾帮助爱丽丝一起完成星球改造计划。）"
+				outPut="2000 经验值|2000 赛尔豆">
+			</task>
+			<task starlevel="1" spanlevel="" itemtype="4" id="80"
+				name="重铸贾斯汀站长" parentId="" newOnline="0" onlineData="20100304"
+				offline="1" mapId="4" npc="shiper" tip="我正在船长室等你"
+				startDes="受到海盗重创的贾斯汀站长，虽然找回了芯片，但一直没有任何复苏的迹象。为此其他船员们都非常担心，机械师茜茜只有利用最后的应急手段了…"
+				stopDes="使用升级芯片后，强行启动贾斯汀的机体发生了失控。#（你曾帮助机械师茜茜启动了贾斯汀站长，但是不幸得发生了意外。）"
+				outPut="2000 经验值|3000 赛尔豆">
+			</task>
+			<task starlevel="1" spanlevel="" itemtype="4" id="79"
+				name="寻访哈莫雷特族人" parentId="" newOnline="0" onlineData="20100206"
+				offline="0" mapId="5" npc="doctor" tip="我正在实验室做研究呢！"
+				startDes="我们在卡兰星系发现了与哈莫雷特相似的精灵电波，我感觉它离我们越来越近了！你愿意帮助哈莫寻找失散的族人吗？"
+				stopDes="在塔克星球上，我们竟然发现了和哈莫同族的龙系精灵！#（你曾与哈莫雷特并肩作战，在你们的配合下终于战胜了恶龙。）"
+				outPut="3000 经验值|2000 赛尔豆">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="40" type="0" name="时空之门" parentId="0"
+				newOnline="0" onlineData="20091101" offline="1" mapId="7" npc="iris"
+				tip="我正在赛尔号的瞭望舱"
+				startDes="神秘的拜伦号上有个机关可以开启尘封千年的传送设施，你愿意回到千万年前，揭开这个赫尔卡星之谜的面纱吗？"
+				stopDes="时空之门已经开启！快去千年前的赫尔卡星看看吧！那里究竟发生了什么呢？#（你曾智慧的打开了尘封的时空之门！）"
+				outPut="精灵“迪卢卡”">
+			</task>
+
+			<task starlevel="3" spanlevel="" itemtype="4" id="42" type="0" name="赫尔卡星千年之谜" parentId="40"
+				newOnline="0" onlineData="20091102" offline="1" mapId="7" npc="iris"
+				tip="我正在赛尔号的瞭望舱" startDes="尘封的时空之门终于开启了……赫尔卡星的千年之谜是否能揭开它的神秘面纱？"
+				stopDes="回到了千年前的赫尔卡星，帮助赫尔卡长老制造出了“西塔”和“奇塔”，机械精灵大战即将开幕！#（你曾帮助赫尔卡长老制作出了机械精灵“西塔”和“奇塔”)）"
+				outPut="基地家具“时空之门”|3000 赛尔豆">
+			</task>
+			<task starlevel="4" spanlevel="" itemtype="4" id="44" type="0" name="巨型机械精灵大战" parentId="42"
+				newOnline="0" onlineData="20091103" offline="1" mapId="7" npc="iris"
+				tip="我正在赛尔号的瞭望舱"
+				startDes="时空之门即将关闭，你是否能够帮助赫尔卡长老营救出赫尔卡星人，是否可以改变赫尔卡破败的历史？"
+				stopDes="时空之门已经关闭，虽然没能改变赫尔卡破败的历史，但是总算战胜了巨星机械精灵。#（你曾勇敢的战胜了庞大的巨型机械精灵！）"
+				outPut="5000 赛尔豆|5000 经验值|10 枚扭蛋牌">
+			</task>
+			<task starlevel="4" spanlevel="" itemtype="4" id="47" type="0" name="突围磁风暴" parentId="44"
+				newOnline="0" onlineData="20091104" offline="1" mapId="4"
+				npc="shiper" tip="我就在赛尔号的船长室"
+				startDes="糟糕！赛尔号似乎出现了异常状况！我们的飞船到底怎么了？我们能否安全的离开恐怖小行星带呢？"
+				stopDes="糟糕！赛尔号似乎出现了异常状况！我们的飞船到底怎么了？我们能否安全的离开恐怖小行星带呢？#（你曾勇敢的帮助赛尔号顺利离开恐怖小行星带）"
+				outPut="5000 经验值|5000 赛尔豆|基地家具: 磁力光束枪台">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="48" type="0" name="神秘失踪的爱丽丝" parentId="0"
+				newOnline="0" onlineData="20091105" offline="1" mapId="4"
+				npc="shiper" tip="我就在赛尔号的船长室"
+				startDes="一直忙碌于星际探索第一线的导航员爱丽丝竟然离奇失踪了……这背后又藏着什么样的阴谋？你愿意去寻找失踪的爱丽丝吗？"
+				stopDes="一直忙碌于星际探索第一线的导航员爱丽丝竟然离奇失踪了…… #(运用你的智慧与勇气救出了被绑架的爱丽丝，化解了与米鲁族之间的误会)。"
+				outPut="3000 经验值|2000 赛尔豆|2块中级智慧芯片">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="49" type="0" isVip="1" name="密林中的托尼" parentId="0"
+				newOnline="0" onlineData="20091106" offline="1" mapId="52"
+				npc="tonyAndB" tip="啊！快来斯诺密林救我！"
+				startDes="托尼得知米鲁们的村庄被破坏感到很气愤，想要去讨伐那些搞破坏的邪恶精灵们，没想到反倒被它们欺负的遍体鳞伤。快去帮助可怜的托尼吧！"
+				stopDes="托尼是个爱冒险的孩子，但是一直没有人照顾它，所以总是受伤，大家都很担心！你不但勇敢的帮助过被欺负的托尼，还决定带着托尼去冒险，让它变得更强大！"
+				outPut="精灵托尼|2块中级智慧芯片">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="52" type="0" name="谁偷走了雪球能源？" parentId="48"
+				newOnline="0" onlineData="20091210" offline="1" mapId="51"
+				npc="iris" tip="我正在斯诺星上做研究呢！"
+				startDes="是谁盗取了米鲁族们的能源？是谁破坏了它们的家园？小赛尔们行动起来，缉拿真正的小偷！"
+				stopDes="是谁盗取了米鲁族们的能源？是谁破坏了它们的家园？#（你曾热心的帮助了米鲁族捉拿了能源小偷！）"
+				outPut="3000 经验值|雪球能源10个|赛尔个人背景">
+			</task>
+			<task starlevel="2" spanlevel="" itemtype="4" id="54" type="0" name="米鲁族的两个小不点" parentId="0"
+				newOnline="0" onlineData="20091217" offline="1" mapId="51"
+				npc="snowman_2" tip="我正为他们的事头疼呢!快来斯诺星找我吧！"
+				startDes="米鲁两兄妹不知道为什么事情争吵不休，就连族长也束手无策了，他们可能需要你的帮助哦！"
+				stopDes="米鲁两兄妹不知道为什么事情争吵不休，就连族长也束手无策了#（你曾劝解了米鲁两兄妹，还在米鲁族中受到了米鲁们的敬仰。）"
+				outPut="5000 经验值|雪球能源10个">
+			</task>
+			<task starlevel="2" spanlevel="" itemtype="4" id="57" type="0" name="米鲁族食王选拔赛" parentId="58"
+				newOnline="0" onlineData="20091224" offline="1" mapId="51"
+				npc="snowman_2" tip="我正在斯诺星上,快来找我吧！"
+				startDes="米鲁族们正举行着热火朝天的食王选拔赛，谁才是米鲁族的食王？谁才能够代替米鲁族参加冰系精灵争霸赛呢？"
+				stopDes="米鲁族正在竞选食王，选出的食王才代表他们参加一年一度的冰系精灵争霸赛！#（你曾经和米鲁们一起布置了冰系精灵嘉年华的场地，还参与了他们的食王选拔赛）"
+				outPut="3000 经验值|3000 赛尔豆">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="58" type="0" name="斯诺岩洞的不解之谜" parentId="54"
+				newOnline="0" onlineData="20091225" offline="1" mapId="51"
+				npc="snowman_2" tip="我正在斯诺星上,快来找我吧！"
+				startDes="大脚怪偷走的雪球能源到底去哪里了？两个小不点的父母为什么会在洞穴里神秘失踪？斯诺岩洞，一个充满神秘色彩的地方。赛尔船员行动起来吧，让我们解开这些谜题吧！"
+				stopDes="斯诺岩洞，一个充满神秘色彩的地方。#（你曾经通过你的智慧破解了斯诺洞穴的谜题，还救出了米鲁两兄妹的父母。）"
+				outPut="3000 经验值|3000 赛尔豆|雪球能源10个">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="63" type="0" name="新型试作机SR-01同步调试" parentId="0"
+				newOnline="0" onlineData="20100106" offline="1" mapId="4"
+				npc="shiper" tip="我正在船长室等你"
+				startDes="这个是赛尔号最高机密，机械师茜茜研制出了一种秘密武器SR-01，现在已经进入了调试阶段，你愿意帮助她吗？"
+				stopDes="这是一项伟大的创举#（你曾经帮助茜茜调试了新作机SR-01号的调试工作，对于赛尔号来说，你的贡献非常大！）"
+				outPut="3000 经验值|3000 赛尔豆">
+			</task>
+			<task starlevel="4" spanlevel="" itemtype="4" id="64" type="0" name="铸造斯诺冰冠" parentId="0"
+				newOnline="" onlineData="20100107" offline="1" mapId="51" npc="dalu"
+				tip="我正在斯诺星上,快来找我吧！"
+				startDes="冰系精灵争霸赛，斯诺星上一个赋有悠久历史且相当神圣的精灵比拼仪式，奖杯的制作可不能含糊！你有信心锻造好吗？"
+				stopDes="斯诺冰冠作为冰系精灵争霸赛的最高荣耀。#（你曾亲手锻造了斯诺冰冠，它将成为冰系最高荣耀的象征。）"
+				outPut="3000 经验值|3000 赛尔豆|雪球能源10个">
+			</task>
+			<task starlevel="2" spanlevel="" itemtype="4" id="65" type="1" name="露希欧星勘察" parentId="37" newOnline="" onlineData="20100114" offline="1" mapId="4" npc="shiper" tip="我正在船长室等你呢！"
+				startDes="露希欧星是帕诺星系第十颗行星，这里的星貌又会是怎样的呢？#（完成星球测绘后才能进行勘察哦！）"
+				stopDes="露希欧星是帕诺星系第十颗行星，这里的星貌又会是怎样的呢？#（谢谢你完成了对露希欧星的勘察，并将资料整理给船长。）"
+				outPut="3000 经验值|3000 赛尔豆|#采集星球矿产的资格">
+			</task>
+			<task starlevel="2" spanlevel="" itemtype="4" id="66" type="0" name="合金强化实验" parentId="63" newOnline="" onlineData="20100115" offline="1" mapId="4" npc="shiper" tip="我正在船长室等你呢！"
+				startDes="SR-01是赛尔号的最高机密，对于材质具有极高的要求，经调试我们发现它还是存在很多不足，其中材质不够轻便，就是一个很大的问题！你愿肩帮助我们寻找更合适的材质金属吗？）"
+				stopDes="为了能够使Sr-01材质更加完善#（你曾经去新星球上采矿，并进行了一系列的实验测试，最终成功合成了Luc合金金属，无论是硬度和韧性都达标了！）"
+				outPut="3000 经验值|3000 赛尔豆">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="68" type="0" name="资料室的神秘事件" parentId="" newOnline="0" onlineData="20100118" offline="1" mapId="4" npc="shiper" tip="我正在船长室等你呢！"
+				startDes="赛尔号红色警报，资料室受到严重性破坏！你能否从容侦破这次的神秘事件?"
+				stopDes="受赛尔们敬仰的精灵学者迪恩，原来只是一个假面具……#（你曾通过资料室的种种线索，揭示了迪恩的真面目——宇宙海盗!）"
+				outPut="3000 经验值|3000 赛尔豆">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="69" type="0" name="宇宙遭遇战" parentId="" newOnline="0" onlineData="20100120" offline="1" mapId="4" npc="shiper" tip="我正在船长室等你呢！"
+				startDes="海盗飞船已经逼近，赛尔号正处在最危急的时刻，我们需要船上最勇敢的赛尔们站出来保护我们。证明你价值的时刻到了，你愿意出战吗？"
+				stopDes="你成功得击退了海盗的进攻#（你曾一度击退了海盗们的进攻，但是敌船的主炮发射还是使赛尔号遭到了严重的破坏！）"
+				outPut="3000 经验值|3000 赛尔豆">
+			</task>
+			<task starlevel="2" spanlevel="" itemtype="4" id="70" type="0" name="船体紧急修复" parentId="" newOnline="0" onlineData="20100121" offline="1" mapId="4" npc="shiper" tip="我正在船长室等你呢！"
+				startDes="赛尔号遭遇海盗炮袭，内部损坏严重，需要紧急修复！"
+				stopDes="赛尔号遭遇海盗炮袭，内部损坏严重，需要紧急修复！#（你曾经加入过赛尔号抢修工作，挽救了全体船员的生命。）"
+				outPut="3000 经验值|3000 赛尔豆">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="71" type="0" name="赛尔号大整修" parentId="" newOnline="0" onlineData="20100127" offline="1" mapId="5" npc="doctor" tip="要尽快修好赛尔号！"
+				startDes="赛尔号遭遇海盗的袭击，被敌方主炮袭击后船体严重受损迫降在露希欧星。虽然我们暂时脱离了海盗的追击，不过海盗随时可以发现我们的踪迹，尽快修复赛尔号刻不容缓。"
+				stopDes="赛尔号的船体已经基本整修完毕。#（你曾接到博士的委托，不但修好了赛尔号还获得了机械精灵SRS！）"
+				outPut="1000 经验值|1000 赛尔豆|#机械精灵TOE">
+			</task>
+			<task starlevel="2" spanlevel="" itemtype="4" id="72" type="0" name="站长搜救行动" parentId="" newOnline="0" onlineData="20100128" offline="1" mapId="4" npc="shiper" tip="贾斯汀你到底在哪？"
+				startDes="在海盗袭击事件中，被敌方主炮击中的太空站站长贾斯汀，至今也没有和赛尔号取得联系。为了找回站长的核心芯片，船长派遣一批小赛尔去事发地点做调查。"
+				stopDes="你已经找回了贾斯汀站长的核心芯片。#（你曾接到船长的委托，找回了贾斯汀站长的核心芯片！）"
+				outPut="2000 经验值|1000 赛尔豆">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="73" type="0" name="秘制改良机SR-02" parentId="" newOnline="0" onlineData="20100129" offline="1" mapId="4" npc="shiper" tip="我正在船长室等你"
+				startDes="赛尔号受到海盗飞船的重创，眼前我们只有继续研发改良SR-01，装配上真正的秘密武器来一场强而有力的反击战吧。"
+				stopDes="赛尔号的高端机密SR-01，通过一系列的分析研究我们终于对它弊端进行改良 #（你曾运用你的聪明才智，成功研制了改良机体SR-02）"
+				outPut="SR-02铠甲|30块变形能量块|3000 经验值">
+			</task>
+			<task starlevel="2" spanlevel="" itemtype="4" id="74" type="0" name="露希欧星历险" parentId="" newOnline="0" onlineData="20100204" offline="1" mapId="54" npc="iris" tip="真拿这两兄弟没辙"
+				startDes="赛尔号在露希欧星上的整修工作仍在紧张进行中。那两个兄弟好像又闹起了别扭，爱丽丝让你去看看到底发生什么了，你不得不硬着头皮去做一回和事佬…"
+				stopDes="一场闹剧让我们发现了神秘而又强大的龙系精灵。#（你在两兄弟吵架事件中，偶尔间惊醒了沉睡在露希欧星上的神秘精灵）。"
+				outPut="3000 经验值">
+			</task>
+			<task starlevel="3" spanlevel="" itemtype="4" id="75" type="0" name="哈莫的童年片段Ⅰ" parentId="" newOnline="0" onlineData="20100205" offline="1" mapId="5" npc="doctor" tip="我正在实验室做研究呢！"
+				startDes="精灵们也有着属于自己的童年，就连硕大的哈莫雷特也有小的时候，它的童年是快乐还是难过呢？帮助哈莫雷特寻找遗忘的家园吧……"
+				stopDes="回复部分记忆的哈莫雷特生活在痛苦之中，儿时的它倍受欺压！#（你曾用你的善良与正义帮助哈莫雷特赶走欺负过它的精灵，面对自己的童年！）"
+				outPut="3000 经验值|龙之纪念 （赛尔背景）">
+			</task>
+			<task starlevel="1" spanlevel="" itemtype="4" id="91" type="0" name="月光下的约定" parentId="" newOnline="1" onlineData="20100319" offline="0" mapId="62" npc="gelin" tip="只有从暗之迷城才可以进入到月影花园哦！快来帮帮我吧！"
+				startDes="月影花园，这是所有旅行者们所向往的地方！咦？爱好旅行的格林会不会就在那里呢？快去塔克星球上的月影花园看看吧！可能会有惊喜哦！"
+				stopDes="格林和布鲁的分散，彼此为了寻找最美丽的月光投影，它们终于再次相见！#（你和你的精灵一起救助了缺水的布鲁，帮助了格林和它的相遇）"
+				outPut="2000 经验值|2000 赛尔豆|#神秘精元">
+			</task>	
+			<task starlevel="2" spanlevel="" itemtype="4" id="92" type="0" name="站长归来" parentId="" newOnline="0" onlineData="20100320" offline="1" mapId="4" npc="shiper" tip="我们决不放弃"
+				startDes="在赛尔号上收到了两只精灵正在高速接近的讯号！船长召唤你过去共同处理这次紧急事件。"
+				stopDes="拉博带来了新代码使站长得以复苏。#（你协助茜茜救回了站长，并且获得了尼布的肯定。）"
+				outPut="精灵：尼布|2000 经验值|2000 赛尔豆">
+			</task>	
+			<task starlevel="4" spanlevel="" itemtype="4" id="95" type="0" name="宇宙中的黑色旋涡" parentId="" newOnline="1" onlineData="20100401" offline="0" mapId="4" npc="shiper" tip="全体赛尔听命！船长室集合！"
+				startDes="巨大的黑色旋涡！不可思议的吸引力！这到底是怎么一回事？快去船长室接受船长的重要使命吧！"
+				stopDes="巨大的黑色旋涡！不可思议的吸引力！#（你曾和特派小队一同来到旋涡深处，与摩尔庄园结下了深厚的友谊，关闭了黑洞入口，使赛尔号脱离了危险！）"
+				outPut="4000 经验值|2000 赛尔豆|1套机械装备">
+			</task>
+			
+			<task starlevel="3" spanlevel="" itemtype="4" id="98" type="0" name="尼布守卫战" parentId="" newOnline="1" onlineData="20100408" offline="0" mapId="5" npc="nibu" tip="我在实验室"
+				startDes="尼布究竟是从何而来的？它和海盗之间到底发生了什么？快去询问一下相关情况吧！"
+				stopDes="受伤的尼布，它竟然收到了海盗的虐待！#（你曾和贾斯汀一起联手击退了海盗的攻击！我们守卫了尼布！它自由了！）"
+				outPut="2000 经验值|1000 赛尔豆">
+			</task>
+
+			<task starlevel="3" spanlevel="" itemtype="4" id="133" type="0" name="寻找迷失的心" parentId="" newOnline="1" onlineData="20100701" offline="0" mapId="339" npc="blacksHole" tip="我在遗忘领域"
+				startDes="我们在普雷空间站竟然发现了一个未知入口，点击箭头就可以通向一个被称为“遗忘领域”的地方……"
+				stopDes="精灵也有属于自己的情感，你曾经用你的真情让缺乏心灵的史空领悟了其中的精髓，找回了迷失的心！"
+				outPut="2000 经验值|2000个赛尔豆|神秘精灵">
+			</task>
+		</task>
+	</tasks>
+</config>

@@ -1,0 +1,4 @@
+﻿<Items>
+	<item className="E1_MC" exName="黑武士套装" iconName="C1_MC" id="400051"/>
+	<item className="E2_MC" exName="防寒套装" iconName="C2_MC" id="400052"/>	
+</Items>

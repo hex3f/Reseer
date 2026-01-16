@@ -1,0 +1,28 @@
+﻿<!-- 性格修正 -->
+<root>
+	<item id="0" name="孤独" m_attack="1.1" m_defence="0.9" m_SA="1" m_SD="1" m_speed="1" desc="攻击+ 防御-"/>
+	<item id="1" name="固执" m_attack="1.1" m_defence="1" m_SA="0.9" m_SD="1" m_speed="1" desc="攻击+ 特攻-"/>
+	<item id="2" name="调皮" m_attack="1.1" m_defence="1" m_SA="1" m_SD="0.9" m_speed="1" desc="攻击+ 特防-"/>
+	<item id="3" name="勇敢" m_attack="1.1" m_defence="1" m_SA="1" m_SD="1" m_speed="0.9" desc="攻击+ 速度-"/>
+	<item id="4" name="大胆" m_attack="0.9" m_defence="1.1" m_SA="1" m_SD="1" m_speed="1" desc="防御+ 攻击-"/>
+	<item id="5" name="顽皮" m_attack="1" m_defence="1.1" m_SA="0.9" m_SD="1" m_speed="1" desc="防御+ 特攻-"/>
+	<item id="6" name="无虑" m_attack="1" m_defence="1.1" m_SA="1" m_SD="0.9" m_speed="1" desc="防御+ 特防-"/>
+	<item id="7" name="悠闲" m_attack="1" m_defence="1.1" m_SA="1" m_SD="1" m_speed="0.9" desc="防御+ 速度-"/>
+	<item id="8" name="保守" m_attack="0.9" m_defence="1" m_SA="1.1" m_SD="1" m_speed="1" desc="特攻+ 攻击-"/>
+	<item id="9" name="稳重" m_attack="1" m_defence="0.9" m_SA="1.1" m_SD="1" m_speed="1" desc="特攻+ 防御-"/>
+	<item id="10" name="马虎" m_attack="1" m_defence="1" m_SA="1.1" m_SD="0.9" m_speed="1" desc="特攻+ 特防-"/>
+	<item id="11" name="冷静" m_attack="1" m_defence="1" m_SA="1.1" m_SD="1" m_speed="0.9" desc="特攻+ 速度-"/>
+	<item id="12" name="沉着" m_attack="0.9" m_defence="1" m_SA="1" m_SD="1.1" m_speed="1" desc="特防+ 攻击-"/>
+	<item id="13" name="温顺" m_attack="1" m_defence="0.9" m_SA="1" m_SD="1.1" m_speed="1" desc="特防+ 防御-"/>
+	<item id="14" name="慎重" m_attack="1" m_defence="1" m_SA="0.9" m_SD="1.1" m_speed="1" desc="特防+ 特攻-"/>
+	<item id="15" name="狂妄" m_attack="1" m_defence="1" m_SA="1" m_SD="1.1" m_speed="0.9" desc="特防+ 速度-"/>
+	<item id="16" name="胆小" m_attack="0.9" m_defence="1" m_SA="1" m_SD="1" m_speed="1.1" desc="速度+ 攻击-"/>
+	<item id="17" name="急躁" m_attack="1" m_defence="0.9" m_SA="1" m_SD="1" m_speed="1.1" desc="速度+ 防御-"/>
+	<item id="18" name="开朗" m_attack="1" m_defence="1" m_SA="0.9" m_SD="1" m_speed="1.1" desc="速度+ 特攻-"/>
+	<item id="19" name="天真" m_attack="1" m_defence="1" m_SA="1" m_SD="0.9" m_speed="1.1" desc="速度+ 特防-"/>
+	<item id="20" name="害羞" m_attack="1" m_defence="1" m_SA="1" m_SD="1" m_speed="1" desc="平衡发展"/>
+	<item id="21" name="实干" m_attack="1" m_defence="1" m_SA="1" m_SD="1" m_speed="1" desc="平衡发展"/>
+	<item id="22" name="坦率" m_attack="1" m_defence="1" m_SA="1" m_SD="1" m_speed="1" desc="平衡发展"/>
+	<item id="23" name="浮躁" m_attack="1" m_defence="1" m_SA="1" m_SD="1" m_speed="1" desc="平衡发展"/>
+	<item id="24" name="认真" m_attack="1" m_defence="1" m_SA="1" m_SD="1" m_speed="1" desc="平衡发展"/>
+</root>

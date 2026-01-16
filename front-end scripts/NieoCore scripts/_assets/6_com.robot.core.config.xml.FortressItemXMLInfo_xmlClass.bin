@@ -1,0 +1,241 @@
+<!--
+说明:
+	Max: 数量限制
+	Price: 购买价格
+	Form: 形态ID (1 - 10)
+	DailyWorkMax: 该设备每天被打工最大次数
+	DailyDonateMax: 该设备每天被捐赠的最多资源总数
+	NeedTeamExp: 所需战队经验
+	PreBuildingID: 必须摆出来的前置建筑ID
+					(对总部而言: 升第一级的条件; 对其它养成设施而言: 购买的条件)
+	PreBuildingForm: 必须摆出来的前置建筑形态ID
+	NextForm: 可升级到的形态ID(0 - 4个);
+	ResID: 资源ID(item表中的ID), 最多到 ResID4;  ResMax: 该项资源所需数量;
+		注意: 400050: 表示打工资源
+
+	MaxHP: 耐久度; Atk: 攻; Def: 防; Science: 科技; Research: 研究; Energy: 能源;
+		ShootRadius: 打击半径(ShootAble==1时, 不能为0); ShootAble: 是否可以射击; ShootGap: 射击间隔;
+
+	Buyable: 可买 (默认: 1)
+	Sellable: 可卖 (默认: 1)
+	Destroyable: 可销毁 (默认: 1)
+	VipOnly: 仅付费用户才可使用(购买) (默认: 0)
+
+ID分配:
+总部:		1
+工业设备:	2~60
+军事设备:	61~140
+防御设备:	141~200
+
+形态说明:
+1: 空形态;
+2: 打工完成 / 开始捐赠;
+3: 捐赠完成 / 再开始捐赠;
+4: 再捐赠完成;
+
+400001:  黄晶矿     400002:  甲烷燃气  400003:  玄冰        400004:  空气结晶
+400005:  光合能量   400006:  水之精华  400007:  火焰元素  	400008:  电容球
+400009:  藤结晶     400010:  蘑菇结晶  400011:  纳格晶体  	400012:  豆豆果实
+400035:  露希欧坚钢
+400050:  打工
+-->
+
+<!-- 没有Fun属性的是没有功能的道具,Fun= 为道具功能ID，没有属性isCom和isCom='0'为私有的道具功能，也就是只有在自己基地才能用的 isCom='1'为公有功能，所有人都可以用-->
+<LiveItems>
+	<!-- 总部ID: 1 -->
+	<LiveItem ID="1" Name="总部" Max="1" Price="0" Buyable="0" Sellable="0" Destroyable="0" PreBuildingID="61" PreBuildingForm="2"
+		Fun="8" isCom="1" Des="战队总部是战队要塞的核心，是赛尔智慧与科技的最成就。指挥官在这里发布命令，平时战队队员在这里整备和训练。" >
+		<Form ID="2" Name="初级总部" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="0" NextForm="3" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="800" ResID2="400002" ResMax2="300" ResID3="400007" ResMax3="200" ResID4="400008" ResMax4="100"
+			MaxHP="4000" Atk="200" Def="250" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="400" ShootGap="15" >
+		</Form>
+
+		<Form ID="3" Name="星际堡垒" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="5460" NextForm="4" Workable="0" Donateable="1"
+			ResID1="400035" ResMax1="400" ResID2="400002" ResMax2="400" ResID3="400007" ResMax3="400" ResID4="400008" ResMax4="200"
+			MaxHP="8000" Atk="300" Def="500" Science="300" Research="0" Energy="300" ShootAble="1" ShootRadius="500" ShootGap="15" >
+		</Form>
+
+		<Form ID="4" Name="星际堡垒II" DailyWorkMax="0" DailyDonateMax="0"
+			NeedTeamExp="56660" NextForm="" Workable="0" Donateable="0"
+			ResID1="0" ResMax1="0" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0"
+			MaxHP="10000" Atk="400" Def="600" Science="400" Research="0" Energy="600" ShootAble="1" ShootRadius="600" ShootGap="12" >
+		</Form>
+	</LiveItem>
+
+
+	<!-- 工业设备ID: 2 - 60 -->
+	<LiveItem ID="2" Name="精炼厂" Max="2" Price="2000" Buyable="1" Sellable="0" Destroyable="0" PreBuildingID="0" PreBuildingForm="0"
+		 Des="精炼厂可以为战队要塞提供能源值，随着升级获得的能源值会更多。" >
+		<Form ID="1" Name="精炼厂雏形" DailyWorkMax="5" DailyDonateMax="0"
+			NeedTeamExp="0" NextForm="2" Workable="1" Donateable="0"
+			ResID1="400050" ResMax1="5000" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0">
+		</Form>
+
+		<Form ID="2" Name="初级精炼厂" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="0" NextForm="3" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="300" ResID2="400005" ResMax2="100" ResID3="400007" ResMax3="100" ResID4="0" ResMax4="0"
+			MaxHP="2000" Atk="0" Def="100" Science="0" Research="0" Energy="200" >
+		</Form>
+
+		<Form ID="3" Name="中级精炼厂" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="560" NextForm="4" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="300" ResID2="400005" ResMax2="100" ResID3="400007" ResMax3="100" ResID4="0" ResMax4="0"
+			MaxHP="3000" Atk="0" Def="150" Science="0" Research="0" Energy="300" >
+		</Form>
+
+		<Form ID="4" Name="高级精炼厂" DailyWorkMax="0" DailyDonateMax="0"
+			NeedTeamExp="5460" NextForm="" Workable="0" Donateable="0"
+			ResID1="0" ResMax1="0" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0"
+			MaxHP="3000" Atk="0" Def="200" Science="0" Research="0" Energy="400" >
+		</Form>
+	</LiveItem>
+
+	<LiveItem ID="3" Name="战队装备工厂" Max="1" Price="4000" Buyable="1" Sellable="0" Destroyable="0" PreBuildingID="2" PreBuildingForm="2"
+		 Fun="15" Des="战队要塞中制造装备的所在，每个战队队员都可以在这里制造各种装备，随着要塞科技值的提升可以制造更高级的装备。" >
+		<Form ID="1" Name="战队装备工厂雏形" DailyWorkMax="5" DailyDonateMax="0"
+			NeedTeamExp="0" NextForm="2" Workable="1" Donateable="0"
+			ResID1="400050" ResMax1="5000" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0">
+		</Form>
+
+		<Form ID="2" Name="战队装备工厂" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="0" NextForm="" Workable="0" Donateable="1"
+			ResID1="0" ResMax1="0" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0"
+			MaxHP="2000" Atk="0" Def="0" Science="200" Research="0" Energy="0" >
+		</Form>
+	</LiveItem>
+
+	<!-- 军事设备ID: 61 - 140 -->
+	<LiveItem ID="61" Name="研究所" Max="1" Price="4000" Buyable="1" Sellable="0" Destroyable="0" PreBuildingID="0" PreBuildingForm="0"
+		Des="工程研究所使战队获得开发防御设施的能力，随着等级提升可以建造的防御设施种类就越多，效果也越强大。" >
+		<Form ID="1" Name="工程研究所雏形" DailyWorkMax="5" DailyDonateMax="0"
+			NeedTeamExp="0" NextForm="2" Workable="1" Donateable="0"
+			ResID1="400050" ResMax1="5000" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0" >
+		</Form>
+
+		<Form ID="2" Name="初级工程研究所" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="0" NextForm="3" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="300" ResID2="400005" ResMax2="200" ResID3="400007" ResMax3="100" ResID4="0" ResMax4="0"
+			MaxHP="4000" Atk="0" Def="100" Science="300" Research="0" Energy="0" >
+		</Form>
+
+		<Form ID="3" Name="中级工程研究所" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="560" NextForm="4" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="300" ResID2="400005" ResMax2="200" ResID3="400007" ResMax3="100" ResID4="0" ResMax4="0"
+			MaxHP="5000" Atk="0" Def="150" Science="400" Research="0" Energy="0" >
+		</Form>
+
+		<Form ID="4" Name="高级工程研究所" DailyWorkMax="0" DailyDonateMax="0"
+			NeedTeamExp="5460" NextForm="" Workable="0" Donateable="0"
+			ResID1="0" ResMax1="0" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0"
+			MaxHP="6000" Atk="0" Def="200" Science="500" Research="0" Energy="0" >
+		</Form>
+	</LiveItem>
+
+
+	<!-- 防御设备ID: 141 - 200 -->
+	<LiveItem ID="141" Name="CS炮防御塔" Max="5" Price="1000" Buyable="1" Sellable="0" Destroyable="0" PreBuildingID="61" PreBuildingForm="2"
+		 Des="CS炮是赛尔号研发的一种防御武器，在摧毁各种类型的目标上都表现良好，配给战队要塞使用时输出功率有所降低。" >
+		<Form ID="1" Name="CS炮防御塔雏形" DailyWorkMax="5" DailyDonateMax="0"
+			NeedTeamExp="0" NextForm="2" Workable="1" Donateable="0"
+			ResID1="400050" ResMax1="5000" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0" >
+		</Form>
+
+		<Form ID="2" Name="CS炮防御塔I" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="0" NextForm="3" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="200" ResID2="400002" ResMax2="100" ResID3="400007" ResMax3="100" ResID4="0" ResMax4="0"
+			MaxHP="800" Atk="50" Def="100" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="300" ShootGap="10" >
+		</Form>
+
+		<Form ID="3" Name="CS炮防御塔II" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="560" NextForm="4" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="200" ResID2="400002" ResMax2="100" ResID3="400007" ResMax3="100" ResID4="0" ResMax4="0"
+			MaxHP="1600" Atk="75" Def="150" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="350" ShootGap="10" >
+		</Form>
+
+		<Form ID="4" Name="CS炮防御塔III" DailyWorkMax="0" DailyDonateMax="0"
+			NeedTeamExp="5460" NextForm="" Workable="0" Donateable="0"
+			ResID1="0" ResMax1="0" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0"
+			MaxHP="2400" Atk="100" Def="200" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="400" ShootGap="10" >
+		</Form>
+	</LiveItem>
+
+	<LiveItem ID="142" Name="火箭炮防御塔" Max="5" Price="1000" Buyable="1" Sellable="0" Destroyable="0" PreBuildingID="61" PreBuildingForm="2"
+		 Des="火箭炮防御塔在对付地面目标时欠缺致命的打击效果，但是对付空中目标时却非常有效。" >
+		<Form ID="1" Name="火箭炮防御塔雏形" DailyWorkMax="5" DailyDonateMax="0"
+			NeedTeamExp="0" NextForm="2" Workable="1" Donateable="0"
+			ResID1="400050" ResMax1="5000" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0" >
+		</Form>
+		<Form ID="2" Name="火箭炮防御塔I" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="0" NextForm="3" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="200" ResID2="400002" ResMax2="100" ResID3="400007" ResMax3="100" ResID4="0" ResMax4="0"
+			MaxHP="800" Atk="50" Def="100" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="300" ShootGap="12" >
+		</Form>
+
+		<Form ID="3" Name="火箭炮防御塔II" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="560" NextForm="4" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="200" ResID2="400002" ResMax2="100" ResID3="400007" ResMax3="100" ResID4="0" ResMax4="0"
+			MaxHP="1600" Atk="75" Def="150" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="400" ShootGap="12" >
+		</Form>
+
+		<Form ID="4" Name="火箭炮防御塔III" DailyWorkMax="0" DailyDonateMax="0"
+			NeedTeamExp="5460" NextForm="" Workable="0" Donateable="0"
+			ResID1="0" ResMax1="0" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0"
+			MaxHP="2400" Atk="100" Def="200" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="450" ShootGap="12" >
+		</Form>
+	</LiveItem>
+
+	<LiveItem ID="143" Name="强袭浮游炮" Max="2" Price="4000" Buyable="1" Sellable="0" Destroyable="0" PreBuildingID="61" PreBuildingForm="2"
+		 Des="强袭浮游炮是最新配属给各战队使用的强袭浮游炮拥有超强的精确性和打击力，能对单一目标造成毁灭性的打击。" >
+		<Form ID="1" Name="强袭浮游炮雏形" DailyWorkMax="5" DailyDonateMax="0"
+			NeedTeamExp="0" NextForm="2" Workable="1" Donateable="0"
+			ResID1="400050" ResMax1="5000" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0" >
+		</Form>
+
+		<Form ID="2" Name="强袭浮游炮I" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="0" NextForm="3" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="300" ResID2="400002" ResMax2="100" ResID3="400007" ResMax3="200" ResID4="0" ResMax4="0"
+			MaxHP="600" Atk="75" Def="100" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="300" ShootGap="12" >
+		</Form>
+
+		<Form ID="3" Name="强袭浮游炮II" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="560" NextForm="4" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="300" ResID2="400002" ResMax2="200" ResID3="400007" ResMax3="200" ResID4="0" ResMax4="0"
+			MaxHP="1200" Atk="100" Def="100" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="400" ShootGap="12" >
+		</Form>
+
+		<Form ID="4" Name="强袭浮游炮III" DailyWorkMax="0" DailyDonateMax="0"
+			NeedTeamExp="5460" NextForm="" Workable="0" Donateable="0"
+			ResID1="0" ResMax1="0" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0"
+			MaxHP="2000" Atk="125" Def="100" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="500" ShootGap="12" >
+		</Form>
+	</LiveItem>
+
+	<LiveItem ID="144" Name="SRM覆盖式聚能炮" Max="2" Price="4000" Buyable="1" Sellable="0" Destroyable="0" PreBuildingID="61" PreBuildingForm="2"
+		 Des="SRM覆盖式聚能炮能够对多个地面目标一瞬间进行多次打击，火力覆盖面和造成创伤的程度是它最大的优势。" >
+		<Form ID="1" Name="SRM覆盖式聚能炮雏形" DailyWorkMax="5" DailyDonateMax="0"
+			NeedTeamExp="0" NextForm="2" Workable="1" Donateable="0"
+			ResID1="400050" ResMax1="5000" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0" >
+		</Form>
+
+		<Form ID="2" Name="SRM覆盖式聚能炮I" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="0" NextForm="3" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="300" ResID2="400002" ResMax2="100" ResID3="400007" ResMax3="200" ResID4="0" ResMax4="0"
+			MaxHP="1000" Atk="40" Def="100" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="100" ShootGap="8" >
+		</Form>
+
+		<Form ID="3" Name="SRM覆盖式聚能炮II" DailyWorkMax="0" DailyDonateMax="200"
+			NeedTeamExp="560" NextForm="4" Workable="0" Donateable="1"
+			ResID1="400001" ResMax1="300" ResID2="400002" ResMax2="100" ResID3="400007" ResMax3="200" ResID4="0" ResMax4="0"
+			MaxHP="2000" Atk="50" Def="100" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="150" ShootGap="8" >
+		</Form>
+
+		<Form ID="4" Name="SRM覆盖式聚能炮III" DailyWorkMax="0" DailyDonateMax="0"
+			NeedTeamExp="5460" NextForm="" Workable="0" Donateable="0"
+			ResID1="0" ResMax1="0" ResID2="0" ResMax2="0" ResID3="0" ResMax3="0" ResID4="0" ResMax4="0"
+			MaxHP="3000" Atk="60" Def="100" Science="0" Research="0" Energy="0" ShootAble="1" ShootRadius="200" ShootGap="8" >
+		</Form>
+	</LiveItem>
+
+</LiveItems>

@@ -1,0 +1,128 @@
+<!-- id 技能类型，cloth 需要装备id列表，逗号隔开 ，speed 速度,tranID 变形后的射击效果-->
+<!-- type 为射击类型 1为射出去的射击，2为不射出去,3为射出去的效果后消失效果角度要一致的,4射出去的射击但没有效果-->
+<!-- soundStart 1为有射击声音，0为没有射击声音-->
+<!-- soundEnd 1为射中有声音，0为射中没声音-->
+<!-- isState 0 为没有射中状态，1为播放MC神中状态,2为射中后变黑效果,3，变身为精灵-->
+<root>
+	<!--激光-->
+	<item id="0" cloth="" speed="50"/>
+	<!--火弹-->
+	<item id="10001" cloth="100044" speed="36"/>
+	<!--水枪-->
+	<item id="10002" cloth="100052" speed="36"/>
+	<!--闪电-->
+	<item id="10003" cloth="100056" speed=""/>
+	<!--泡泡-->
+	<item id="10004" cloth="100029" speed="20"/>
+	<!--喷雾剂-->
+	<item id="10005" cloth="100040" speed=""/>
+	<!--狮子座-->
+	<item id="10006" cloth="100104" speed="36"/>
+	<!--绿光队-->
+	<item id="10007" cloth="100111" speed=""/>
+	<!--海啸队-->
+	<item id="10008" cloth="100114" speed=""/>
+	<!--烈焰队-->
+	<item id="10009" cloth="100117" speed=""/>
+	<!--布布花粉-->
+	<item id="10010" cloth="100138" speed=""/>
+	<!--光能射线-->
+	<item id="10011" cloth="100151" speed=""/>
+	<!--水晶激光-->
+	<item id="10012" cloth="100219" speed="36"/>
+	<!--战神射线-->
+	<item id="10013" cloth="100701" speed="36"/>
+	<!--将军-->
+	<item id="10014" cloth="100705" speed="50"/>
+	<!--武士-->
+	<item id="10015" cloth="100709" speed="36"/>
+	<!--炫光-->
+	<item id="10016" cloth="100713" speed=""/>
+	<!--RX-78-->
+	<item id="10017" cloth="100718" speed=""/>
+	<!--MS-06A-->
+	<item id="10018" cloth="100722" speed="36"/>
+	<!--天枰魔光-->
+	<item id="10019" cloth="100159" speed="36"/>
+	<!--南瓜-->
+	<item id="10020" cloth="100182" speed="36"/>
+	<!--幽灵-->
+	<item id="10021" cloth="100224" speed="36"/>
+	<!--闇灵-->
+	<item id="10022" cloth="100726" speed="36"/>
+	<!--暗金-->
+	<item id="10023" cloth="100727" speed="36"/>
+	<!--冰掌-->
+	<item id="10024" cloth="100731" speed="36"/>
+	<!--火蜂-->
+	<item id="10025" cloth="100735" speed="36"/>
+	<!--魔刀-->
+	<item id="10026" cloth="100739" speed="36"/>
+	<!--陀螺-->
+	<item id="10027" cloth="100743" speed="36"/>
+	<!--蓝激光-->
+	<item id="10028" cloth="100233" speed="50"/>
+	<!--红激光-->
+	<item id="10029" cloth="100747" speed="50"/>
+	<!--圣堂激光-->
+	<item id="10030" cloth="100241" speed="36"/>
+	<!--寒流-->
+	<item id="10031" cloth="100245" speed="36"/>
+	<!--冰晶-->
+	<item id="10032" cloth="100751" speed="36"/>
+	<!--刻蹄-->
+	<item id="10033" cloth="100755" speed="36"/>
+	<!--迦玛炮-->
+	<item id="10034" cloth="100759" speed="36"/>
+	<!--寅虎加农-->
+	<item id="10035" cloth="100260" speed="36"/>
+	<!--黑焰机枪-->
+	<item id="10036" cloth="100255" speed="36"/>
+	<!--利爪榴弹炮-->
+	<item id="10037" cloth="100261" speed="36"/>
+	<!--雪球-->
+	<item id="10038" cloth="100273" speed="36"/>
+	<!--紫荆飞刺-->
+	<item id="10039" cloth="100764" speed="36"/>
+	<!--电流激光炮-->
+	<item id="10041" cloth="100768" speed="36"/>
+	<!--飞翅回力-->
+	<item id="10040" cloth="100772" speed="36"/>
+	<!--米鲁射线-->
+	<item id="10042" cloth="100269" speed="36"/>
+	<!--橙色聚光束-->
+	<item id="10043" cloth="100282" speed="36"/>
+	<!--交叉飞爪-->
+	<item id="10044" cloth="100286" speed="36"/>
+	<!--火焰喷射-->
+	<item id="10045" cloth="100776" speed="36"/>
+	<!--冰晶锁链-->
+	<item id="10046" cloth="100290" speed="36"/>
+	<!--紫电加农-->
+	<!--<item id="10047" cloth="100302" speed="36"/>-->
+	<!--坦克炮-->
+	<item id="10048" cloth="100306" speed="36" tranID="10050"/>
+	<!--米加离子炮-->
+	<item id="10049" cloth="100311" speed="36"/>
+	<!--导弹-->
+	<item id="10051" cloth="100785" speed="36"/>
+	<!--虎头射线-->
+	<item id="10052" cloth="100789" speed="36"/>
+	<!--落雷-->
+	<item id="10053" cloth="100320" speed="36"/>
+	<!--龙王波-->
+	<item id="10054" cloth="100329" speed="36" type = "2" soundStart = "1" soundEnd = "1" isState = "1"/>
+	<!--绿色光束-->
+	<item id="10055" cloth="100793" speed="36" type = "1" soundStart = "0" soundEnd = "0" isState = "0"/>
+	<!--三色疾电-->
+	<item id="10056" cloth="100334" speed="36" type="1" soundStart="1" soundEnd="0" isState="2"/>
+	<!--挥剑-->
+	<item id="10057" cloth="100338" speed="36" type="3" soundStart="1" soundEnd="0" isState="1"/>
+	<!--刺锋-->
+	<item id="10058" cloth="100346" speed="36" type="1" soundStart="0" soundEnd="0" isState="3"/>
+	<!--锡蝶-->
+	<item id="10058" cloth="100350" speed="36" type="1" soundStart="0" soundEnd="0" isState="3"/>
+
+	<!--深雷射线-->
+	<item id="10065" cloths="100403" speed="36" type = "2"/>
+</root>

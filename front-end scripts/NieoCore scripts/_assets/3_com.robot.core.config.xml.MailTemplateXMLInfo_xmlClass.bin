@@ -1,0 +1,48 @@
+<!--
+	邮件模板配置表
+	
+	id - 模板编号,与素材文件名对应
+	x、y - 模块中的文本框的位置
+	width、height - 模板中文本框的宽高 
+	
+	type - 贺卡类型 1：精灵 2：战队 3：NONO 4：祝福 5：节日
+	<![CDATA[ xxx ]]> - 'xxx' 是当前模块对应的标题(也就是代码中的getTitle)。用来决定收到邮件以后显示的标题信息
+-->
+<root>
+	<item id="10007" x="200" y="180" width="300" height="100" type="0">
+		<![CDATA[赛尔号船员信息！]]>
+	</item>
+	<item id="10008" x="220" y="70" width="300" height="50" type="0">
+		<![CDATA[超能新春祝福！]]>
+	</item>
+	<item id="10009" x="220" y="70" width="300" height="50" type="0">
+		<![CDATA[超能新春祝福！]]>
+	</item>
+	<item id="10010" x="220" y="70" width="300" height="50" type="0">
+		<![CDATA[超能新春祝福！]]>
+	</item>
+	<item id="10011" x="220" y="70" width="300" height="50" type="0">
+		<![CDATA[超能新春祝福！]]>
+	</item>
+	<item id="10012" x="311" y="100" width="160" height="118" type="0" desc="虎年新模板">
+		<![CDATA[虎虎生威！]]>
+	</item>
+	<item id="1" x="350" y="200" width="146" height="86" type="1">
+		<![CDATA[一起去捉闪光皮皮吧！]]>
+	</item>
+	<item id="2" x="400" y="135" width="100" height="134" type="2">
+		<![CDATA[一起去参加战队要塞保卫战吧！]]>
+	</item>
+	<item id="3" x="142" y="245" width="256" height="52" type="3">
+		<![CDATA[一起去参加超能NoNo派对吧！]]>
+	</item>
+	<item id="4" x="320" y="140" width="144" height="84" type="4">
+		<![CDATA[生日快乐！]]>
+	</item>
+	<item id="5" x="290" y="180" width="144" height="84" type="5">
+		<![CDATA[圣诞快乐！]]>
+	</item>
+	<item id="6" x="110" y="190" width="144" height="84" type="5">
+		<![CDATA[元旦快乐！]]>
+	</item>
+</root>

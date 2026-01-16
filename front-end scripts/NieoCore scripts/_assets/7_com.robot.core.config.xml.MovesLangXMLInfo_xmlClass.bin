@@ -1,0 +1,1182 @@
+<root>
+	<moves id="1">
+		<lang>咿呀，偶要做小小医生噢，万岁！</lang>
+		<lang>我可是很厉害的哟！</lang>
+	</moves>
+	<moves id="2">
+		<lang>不要动！我来帮你打针……</lang>
+		<lang>主人，你就带我出去走走吧！</lang>
+	</moves>
+	<moves id="3">
+		<lang>( ⊙ o ⊙ )！我长出花来了</lang>
+		<lang>啦啦啦！我是最美丽动人的布布花~</lang>
+	</moves>
+	<moves id="4">
+		<lang>哗哗哗…我最喜欢在海水中游来游去咯！</lang>
+		<lang>我一定会战胜所有的精灵！</lang>
+	</moves>
+	<moves id="5">
+		<lang>你敢欺负我主人，我就揍你！</lang>
+		<lang>我不会让你受到任何伤害！</lang>
+	</moves>
+	<moves id="6">
+		<lang>我可离不开水……</lang>
+		<lang>只要让我喝饱水，我就是战场上最强的战士！</lang>
+	</moves>
+	<moves id="7">
+		<lang>额……你好……</lang>
+		<lang>……</lang>
+	</moves>
+	<moves id="8">
+		<lang>我会是你最得力的助手！</lang>
+		<lang>哈哈，我终于进化啦！</lang>
+	</moves>
+	<moves id="9">
+		<lang>吼吼……吼…</lang>
+		<lang>我要成为战斗场上强悍无敌的斗士</lang>
+	</moves>
+	<moves id="10">
+		<lang>哦哒哒哒……</lang>
+		<lang>飞啊飞啊</lang>
+	</moves>
+	<moves id="11">
+		<lang>哟唔……飞啊……</lang>
+		<lang>Bibo……Bibo……</lang>
+	</moves>
+	<moves id="12">
+		<lang>你愿意和我做朋友吗？</lang>
+		<lang>咿呀，偶的脸都红了呢！</lang>
+	</moves>
+	<moves id="13">
+		<lang>我的力气最大！我的速度最快！</lang>
+		<lang>Bi……bibi……</lang>
+	</moves>
+	<moves id="14">
+		<lang>女士优先!</lang>
+		<lang>您好，很高兴遇到你~</lang>
+	</moves>
+	<moves id="15">
+		<lang>电力来的再猛烈些吧！</lang>
+		<lang>唷唷唷……闪电鼠进化！</lang>
+	</moves>
+	<moves id="16">
+		<lang>别碰我！我有刺！</lang>
+		<lang>喂！叫你别碰我，没听见吗？</lang>
+	</moves>
+	<moves id="17">
+		<lang>嘿！就你还想战胜我？</lang>
+		<lang>来啊，想要和我对战就来啊！</lang>
+	</moves>
+	<moves id="18">
+		<lang>谁敢和我对战？</lang>
+		<lang>你再靠近我，我就攻击你！</lang>
+	</moves>
+	<moves id="19">
+		<lang>你抓不到我！你抓不到我！</lang>
+		<lang>嘿嘿，你能抓住我吗？</lang>
+	</moves>
+	<moves id="20">
+		<lang>吃香喷喷的面包咯！</lang>
+		<lang>嘿嘿，人家都管我叫面包机~</lang>
+	</moves>
+	<moves id="21">
+		<lang>快闪开，被我电到可不得了！</lang>
+		<lang>特殊攻击……Bibi…</lang>
+	</moves>
+	<moves id="22">
+		<lang>哎呀……我要晕啦！</lang>
+		<lang>看你还敢欺负我？</lang>
+	</moves>
+	<moves id="23">
+		<lang>只有我最摇摆！啦啦啦~~~</lang>
+		<lang>哟呼~你想不想要我的签名？</lang>
+	</moves>
+	<moves id="24">
+		<lang>快看我的爆炸头……酷！</lang>
+		<lang>你有没有觉得我很英俊呢?</lang>
+	</moves>
+	<moves id="25">
+		<lang>哟哟……看我飞的多优美！</lang>
+		<lang>猜猜我在哪里呢？</lang>
+	</moves>
+	<moves id="26">
+		<lang>看我来去自如的穿梭！</lang>
+		<lang>咻咻……</lang>
+	</moves>
+	<moves id="27">
+		<lang>你喜欢我吗？我可是你的宝贝呐！</lang>
+		<lang>呀！被你发现我了……</lang>
+	</moves>
+	<moves id="28">
+		<lang>别伤害我，我没有恶意……</lang>
+		<lang>小豆芽变身！</lang>
+	</moves>
+	<moves id="29">
+		<lang>小心，你可别踩到我！</lang>
+		<lang>哟~</lang>
+	</moves>
+	<moves id="30">
+		<lang>咕嘟咕嘟……咕嘟……咕嘟</lang>
+		<lang>我最最最最最喜欢晒太阳咯，哟呼！</lang>
+	</moves>
+	<moves id="31">
+		<lang>你是伤害不了我的……</lang>
+		<lang>快看我长犄角咯！</lang>
+	</moves>
+	<moves id="32">
+		<lang>看我巴拉龟的厉害吧！</lang>
+		<lang>哼！哼！</lang>
+	</moves>
+	<moves id="33">
+		<lang>喂！别来惹我！</lang>
+		<lang>呀，我的牙齿好像有蛀牙菌了！</lang>
+	</moves>
+	<moves id="34">
+		<lang>嘿嘿……看我不把你吃掉！</lang>
+		<lang>想试试我牙齿的威力吗？</lang>
+	</moves>
+	<moves id="35">
+		<lang>哎呀！这里好热哦……</lang>
+		<lang>小家伙，你就是我的主人吗？</lang>
+	</moves>
+	<moves id="36">
+		<lang>咻……滑呀滑！</lang>
+		<lang>哎呀！我的背上好像长出了什么……</lang>
+	</moves>
+	<moves id="37">
+		<lang>我竟然可以飞咯！</lang>
+		<lang>看我的火焰，接招吧！</lang>
+	</moves>
+	<moves id="38">
+		<lang>锵锵锵……锵锵…</lang>
+		<lang>想要过此路？就要战胜我！</lang>
+	</moves>
+	<moves id="39">
+		<lang>你可别把我当成栗子咯！</lang>
+		<lang>我可是能够喷射出火焰哒！</lang>
+	</moves>
+	<moves id="40">
+		<lang>我的外壳变的更坚硬咯~~~</lang>
+		<lang>O(∩_∩)O我的利爪可是很厉害哦！</lang>
+	</moves>
+	<moves id="41">
+		<lang>谁才是真正的王者？</lang>
+		<lang>让火焰烧的更猛烈些吧！</lang>
+	</moves>
+	<moves id="42">
+		<lang>快来挑战我吧！</lang>
+		<lang>我要击败所有强敌！！！</lang>
+	</moves>
+	<moves id="43">
+		<lang>你有金属给我吃吗？</lang>
+		<lang>我的梦想就是打造金属小窝！</lang>
+	</moves>
+	<moves id="44">
+		<lang>呀呀呀呀……</lang>
+		<lang>好美丽的光环(⊙o⊙)哦！</lang>
+	</moves>
+	<moves id="45">
+		<lang>进化后的我速度变得更快啦！</lang>
+		<lang>你还不知道我的厉害？</lang>
+	</moves>
+	<moves id="46">
+		<lang>嘿嘿……你可别小看我！</lang>
+		<lang>快离开我的地盘！-</lang>
+	</moves>
+	<moves id="47">
+		<lang>这里是我的地盘！</lang>
+		<lang>整个克洛斯星都是我的！</lang>
+	</moves>
+	<moves id="48">
+		<lang>我守卫着塞西利亚的许多秘密……</lang>
+		<lang>我要捍卫我的冰雪王国！</lang>
+	</moves>
+	<moves id="49">
+		<lang>你再惹我，我可就要发脾气啦！</lang>
+		<lang>嘘，给我小声一点！</lang>
+	</moves>
+	<moves id="50">
+		<lang>我要捍卫整个冰雪王国！</lang>
+		<lang>塞西利亚星</lang>
+	</moves>
+	<moves id="51">
+		<lang>喂！你有冰能量给我吃吗？</lang>
+		<lang>想要我头上的玄冰结晶？没门！</lang>
+	</moves>
+	<moves id="52">
+		<lang>我要去参加精灵对战!</lang>
+		<lang>我在冰湖当中的移动速度可是超快的！</lang>
+	</moves>
+	<moves id="53">
+		<lang>吼吼吼吼……</lang>
+		<lang>我会守候我的主人直到永远！</lang>
+	</moves>
+	<moves id="54">
+		<lang>我永远会陪伴你左右！</lang>
+		<lang>只要你不离开我，我就会一直保护你！</lang>
+	</moves>
+	<moves id="55">
+		<lang>嚯嚯……</lang>
+		<lang>我可是具有坚硬的外表哦</lang>
+	</moves>
+	<moves id="56">
+		<lang>我坚信我很快就会进化！</lang>
+		<lang>我要走遍各个星球，做一个伟大的旅行家！</lang>
+	</moves>
+	<moves id="57">
+		<lang>我不想说话……</lang>
+		<lang>我要寻找到最佳的材料，来构建我的巢穴！</lang>
+	</moves>
+	<moves id="58">
+		<lang>我惊人的防御力你可不能小瞧！</lang>
+		<lang>杰拉特进化，我是不是更加酷拉？</lang>
+	</moves>
+	<moves id="59">
+		<lang>赫尔卡星的千年之谜……</lang>
+		<lang>我是机械精灵战士，守卫着这片土地！</lang>
+	</moves>
+	<moves id="60">
+		<lang>赫卡特我是不会怕你的！</lang>
+		<lang>机械大战，让我们一决高下！</lang>
+	</moves>
+	<moves id="61">
+		<lang>铁达斯进化完毕，超强智能机械精灵诞生！</lang>
+		<lang>你的智慧加上我的智慧，我们会成为最佳拍档！</lang>
+	</moves>
+	<moves id="62">
+		<lang>寻寻觅觅……</lang>
+		<lang>哟呼！我又准备出去旅行咯！</lang>
+	</moves>
+	<moves id="63">
+		<lang>我遇到问题不会再退缩了！</lang>
+		<lang>快看雷伊！哈哈骗你的……</lang>
+	</moves>
+	<moves id="64">
+		<lang>我可以为了捍卫族群而拼死战斗！</lang>
+		<lang>我是勇敢无畏的格鲁奇高!</lang>
+	</moves>
+	<moves id="65">
+		<lang>嘿嘿，接下来会有什么事发生呢？</lang>
+		<lang>你会关心我吗？你会好好对我吗？</lang>
+	</moves>
+	<moves id="66">
+		<lang>我胸口的红宝石可是孕育着大量的冰雪能量哦！</lang>
+		<lang>我是由林克进化而来的！哟呼！</lang>
+	</moves>
+	<moves id="67">
+		<lang>我曾经生活在寒冷阴暗环境中……</lang>
+		<lang>我一定会变得更加坚强！</lang>
+	</moves>
+	<moves id="68">
+		<lang>离开我的地盘！这是我的！</lang>
+		<lang>靠近我5米范围内,我就要进攻了！</lang>
+	</moves>
+	<moves id="69">
+		<lang>我说了！离开我的地盘！</lang>
+		<lang>你是哪里来的？快离开！</lang>
+	</moves>
+	<moves id="70">
+		<lang>我和赫尔卡星人曾有过一个约定……</lang>
+		<lang>下一个雷暴天气，赫尔卡星人会回来吗？</lang>
+	</moves>
+	<moves id="71">
+		<lang>啊！我的主人……</lang>
+		<lang>我的主人啊！</lang>
+	</moves>
+	<moves id="72">
+		<lang>我感觉我的攻击力变强了！你觉得呢？</lang>
+		<lang>嘿嘿，带我出去走走吧！</lang>
+	</moves>
+	<moves id="73">
+		<lang>派鲁基达是最厉害的！</lang>
+		<lang>啊哈哈……</lang>
+	</moves>
+	<moves id="74">
+		<lang>嘻嘻……你是不是看不到我呀？</lang>
+		<lang>嘿！我就在你旁边呢！</lang>
+	</moves>
+	<moves id="75">
+		<lang>呼，我要去冲浪啦！</lang>
+		<lang>我最最最向往去海上冲浪了！</lang>
+	</moves>
+	<moves id="76">
+		<lang>主人…主人……我的背上长出水晶啦！</lang>
+		<lang>哟…哟哟哟呼！</lang>
+	</moves>
+	<moves id="77">
+		<lang>一=孤单，二=朋友，三=……</lang>
+		<lang>我的样子，好奇怪呀…</lang>
+	</moves>
+	<moves id="78">
+		<lang>我会很多好看的表演噢！</lang>
+		<lang>铛铛铛……魔法表演就要开始咯！</lang>
+	</moves>
+	<moves id="79">
+		<lang>我是穿梭银河的魔法师！</lang>
+		<lang>想和我去浩瀚的宇宙吗？</lang>
+	</moves>
+	<moves id="80">
+		<lang>我可是精灵王争霸赛的荣誉奖励哦！</lang>
+		<lang>你可真了不起能得到我，哈哈！</lang>
+	</moves>
+	<moves id="81">
+		<lang>嗞~~电，都在我的肚子里</lang>
+		<lang>看，我好像要飞起来啦！</lang>
+	</moves>
+	<moves id="82">
+		<lang>蜂胶，蜂胶，嗞~~吧嗒吧嗒，好吃！</lang>
+		<lang>所有的光都能成为我的力量！</lang>
+	</moves>
+	<moves id="83">
+		<lang>嗖嗖嗖……</lang>
+		<lang>哎呀你别拿火焰烧我嘛！</lang>
+	</moves>
+	<moves id="84">
+		<lang>生气吗？生气吗？啦啦啦，来抓我啊！</lang>
+		<lang>哈哈哈哈…又被我骗啦！</lang>
+	</moves>
+	<moves id="85">
+		<lang>你出谜语，我来猜</lang>
+		<lang>哼，欺凌弱小，不算英雄！</lang>
+	</moves>
+	<moves id="86">
+		<lang>我才不是胆小鬼！</lang>
+		<lang>啊啊啊！你要打我啦……</lang>
+	</moves>
+	<moves id="87">
+		<lang>说了我不是胆小鬼啦！</lang>
+		<lang>等我长大了，就去沙漠探险！</lang>
+	</moves>
+	<moves id="88">
+		<lang>哟，我们来换换属性吧！</lang>
+		<lang>想打破我的防护，可没那么容易！</lang>
+	</moves>
+	<moves id="89">
+		<lang>暖暖的温泉，好舒服啊！</lang>
+		<lang>泡泡温泉精神舒畅，啦啦啦……</lang>
+	</moves>
+	<moves id="90">
+		<lang>哼，你走路太大声，吵到我啦！</lang>
+		<lang>呼~~不能生气，不能生气……</lang>
+	</moves>
+	<moves id="91">
+		<lang>好孤单呀，你能陪我玩吗？</lang>
+		<lang>我想有个家……</lang>
+	</moves>
+	<moves id="92">
+		<lang>从天上往下看的感觉真好！</lang>
+		<lang>哇哈哈，我是会飞的小风筝！</lang>
+	</moves>
+	<moves id="93">
+		<lang>喝！我觉得浑身充满了力量！</lang>
+		<lang>嗨~~让我来帮你吧！</lang>
+	</moves>
+	<moves id="94">
+		<lang>我分点鬼点子给你吧。</lang>
+		<lang>把自己冻住，大家就会关心我了吧？</lang>
+	</moves>
+	<moves id="95">
+		<lang>说，我像天使，还是恶魔！</lang>
+		<lang>污染，污染，全清光！</lang>
+	</moves>
+	<moves id="96">
+		<lang>唔…大家怎么都吓跑了？</lang>
+		<lang>唔…我可怕吗？</lang>
+	</moves>
+	<moves id="97">
+		<lang>Bi……bibi……让我电一下！</lang>
+		<lang>快看我的神奇电力，Bi……</lang>
+	</moves>
+	<moves id="98">
+		<lang>我跑起来比光还要快呢！</lang>
+		<lang>战斗，战斗，谁也别想打着我！</lang>
+	</moves>
+	<moves id="99">
+		<lang>玆~~劈焦你！</lang>
+		<lang>我很危险噢，我有很多电！</lang>
+	</moves>
+	<moves id="100">
+		<lang>哟呼，快号召更多的船员来加入我们吧！</lang>
+		<lang>耶耶耶~我是最快的赛车精灵！咻……</lang>
+	</moves>
+	<moves id="101">
+		<lang>哼哼，我是力量与速度的完美化身！</lang>
+		<lang>想当我的拍档，没那么容易！</lang>
+	</moves>
+	<moves id="102">
+		<lang>是你把我从沉睡中唤醒！</lang>
+		<lang>你就是我的主人，我会一直守候你！</lang>
+	</moves>
+	<moves id="103">
+		<lang>战斗让我充满力量！</lang>
+		<lang>哼，像我这样才算机械精灵。</lang>
+	</moves>
+	<moves id="104">
+		<lang>我能摧毁一切，你信吗？</lang>
+		<lang>你太弱了……</lang>
+	</moves>
+	<moves id="105">
+		<lang>叮叮叮……</lang>
+		<lang>到底是丁丁还是叮叮呢？</lang>
+	</moves>
+	<moves id="106">
+		<lang>叮…哪里才安全呢？</lang>
+		<lang>噢！地缝，地缝是个好地方！</lang>
+	</moves>
+	<moves id="107">
+		<lang>叮…我不会再躲了！</lang>
+		<lang>叮…进攻也能保护自己！</lang>
+	</moves>
+	<moves id="108">
+		<lang>我希望可以去好多好多地方遨游……</lang>
+		<lang>海洋为什么是蓝色的？因为忧伤吗……</lang>
+	</moves>
+	<moves id="109">
+		<lang>海洋里，有幸福的味道……</lang>
+		<lang>Woo…深海里的秘密真多呀！</lang>
+	</moves>
+	<moves id="110">
+		<lang>游泳是一种享受！</lang>
+		<lang>我能感受到海洋的呼吸……</lang>
+	</moves>
+	<moves id="111">
+		<lang>锵…泥土…锵锵…好玩…</lang>
+		<lang>锵锵锵……锵锵…</lang>
+	</moves>
+	<moves id="112">
+		<lang>锵锵…土…锵锵锵…</lang>
+		<lang>锵锵…使命…锵锵…</lang>
+	</moves>
+	<moves id="113">
+		<lang>锵锵…使命…守护…</lang>
+		<lang>锵锵锵…守护…</lang>
+	</moves>
+	<moves id="114">
+		<lang>这个…那个…吓死了……</lang>
+		<lang>我…不要看我……</lang>
+	</moves>
+	<moves id="115">
+		<lang>嘿嘿，来吧，来吧，让我捏碎你！</lang>
+		<lang>站住！我是海盗，我不是树！</lang>
+	</moves>
+	<moves id="116">
+		<lang><![CDATA[……&*……*&%]]></lang>
+		<lang><![CDATA[……&*……￥……%#@%%￥……%]]></lang>
+	</moves>
+	<moves id="117">
+		<lang>战斗，才会变强！</lang>
+		<lang>再战一场！</lang>
+	</moves>
+	<moves id="118">
+		<lang>水里，是战斗的好地方</lang>
+		<lang>嘿，敢和我在水里比比吗？</lang>
+	</moves>
+	<moves id="119">
+		<lang>大大的头小小的身体，嘻嘻……</lang>
+		<lang>哎呀，别推我我要倒了！</lang>
+	</moves>
+	<moves id="120">
+		<lang>我的防护罩还不够强大</lang>
+		<lang>我不做无谓的战斗</lang>
+	</moves>
+	<moves id="121">
+		<lang>我喜欢这里的一切！</lang>
+		<lang>要生活，也要战斗……</lang>
+	</moves>
+	<moves id="122">
+		<lang>嘿咻嘿咻……</lang>
+		<lang>我要坚持每天锻炼自己！</lang>
+	</moves>
+	<moves id="123">
+		<lang>哪里能让我打一场？</lang>
+		<lang>喝！力量，最重要！</lang>
+	</moves>
+	<moves id="124">
+		<lang>没有最强，只有更强</lang>
+		<lang>见识见识我的手刀吧！</lang>
+	</moves>
+	<moves id="125">
+		<lang>黑暗，我爱这无边的黑暗！</lang>
+		<lang>哈，挑战我吗，鲁莽的家伙！</lang>
+	</moves>
+	<moves id="126">
+		<lang>我是来自卡兰星系的神奇战斗系精灵~</lang>
+		<lang>武学可是博大精深……</lang>
+	</moves>
+	<moves id="127">
+		<lang>只有强大而高尚才能被称为武者</lang>
+		<lang>我只是在不停的锻炼</lang>
+	</moves>
+	<moves id="128">
+		<lang>你看不到我…你看不到我……</lang>
+		<lang>你抓不到我…你抓不到我……</lang>
+	</moves>
+	<moves id="129">
+		<lang>我才不屑拼力气的战斗</lang>
+		<lang>脑子，才是战斗的关键</lang>
+	</moves>
+	<moves id="130">
+		<lang>呼…有点怀念脚踏实地的感觉</lang>
+		<lang>一切都在我的掌握之中</lang>
+	</moves>
+	<moves id="131">
+		<lang>游戏才刚刚开始……</lang>
+		<lang>我的力量将会越来越强大！</lang>
+	</moves>
+	<moves id="132">
+		<lang>嚯嚯嚯……想见见我恐怖的力量吗？</lang>
+		<lang>黑洞，我能量的来源</lang>
+	</moves>
+	<moves id="133">
+		<lang>岩浆里有多红泡泡哦……</lang>
+		<lang>哑谜哑谜……</lang>
+	</moves>
+	<moves id="134">
+		<lang>嘿，这些难不倒我！</lang>
+		<lang>我是火海中的勇士！</lang>
+	</moves>
+	<moves id="135">
+		<lang>我不喜欢浪费力气</lang>
+		<lang>我不喜欢说话</lang>
+	</moves>
+	<moves id="136">
+		<lang>Lulu……</lang>
+		<lang>想不想抓到我呀？</lang>
+	</moves>
+	<moves id="137">
+		<lang>我静悄悄的来…静悄悄的走</lang>
+		<lang>小心后背噢！</lang>
+	</moves>
+	<moves id="138">
+		<lang>哼，王者注定就是王者！</lang>
+		<lang>我对除了我之外的精灵没兴趣</lang>
+	</moves>
+	<moves id="139">
+		<lang>咻咻……我登场咯！</lang>
+		<lang>嗖嗖……我离开啦！</lang>
+	</moves>
+	<moves id="140">
+		<lang>……</lang>
+		<lang>我想静静的呆着…</lang>
+	</moves>
+	<moves id="141">
+		<lang>小，能让我更灵巧</lang>
+		<lang>运用得好，缺陷也能转化为优势</lang>
+	</moves>
+	<moves id="142">
+		<lang>战斗不是花哨的表演</lang>
+		<lang>对手，不是敌人</lang>
+	</moves>
+	<moves id="143">
+		<lang>卡卡……塔……</lang>
+		<lang>卡卡……塔……保护…</lang>
+	</moves>
+	<moves id="144">
+		<lang>站住，不许靠近</lang>
+		<lang>危险…防御模式…启动…</lang>
+	</moves>
+	<moves id="145">
+		<lang>是谁开启了精灵神殿的机关？</lang>
+		<lang>赫尔卡星人，我永远的朋友！</lang>
+	</moves>
+	<moves id="146">
+		<lang>你是我的主人？</lang>
+		<lang>是我的主人，我就永远跟随他左右！</lang>
+	</moves>
+	<moves id="147">
+		<lang>我一定不能松懈！</lang>
+		<lang>随时提高警惕，捍卫我的主人！</lang>
+	</moves>
+	<moves id="148">
+		<lang>团结就是力量！</lang>
+		<lang>智慧、英勇和团结，才是取胜的关键所在！</lang>
+	</moves>
+	<moves id="149">
+		<lang>喂！你惹怒我了……</lang>
+		<lang>锻炼锻炼！我不能松懈自己！</lang>
+	</moves>
+		<moves id="150">
+		<lang></lang>
+		<lang></lang>
+	</moves>
+		<moves id="151">
+		<lang></lang>
+		<lang></lang>
+	</moves>
+		<moves id="152">
+		<lang></lang>
+		<lang></lang>
+	</moves>
+		<moves id="153">
+		<lang>嗡嗡……嗡……</lang>
+		<lang>咿呀，被你发现我咯！</lang>
+	</moves>
+		<moves id="154">
+		<lang><![CDATA[我最最最最喜欢鲜花噢(⊙o⊙)！]]></lang>
+		<lang><![CDATA[O(∩_∩)O嘻嘻，我飞咯……]]></lang>
+	</moves>
+		<moves id="155">
+		<lang>只有善良才会受到精灵们的爱戴。</lang>
+		<lang>主人我会永远伴随你左右……</lang>
+	</moves>
+		<moves id="156">
+		<lang>……</lang>
+		<lang>哼哼！！</lang>
+	</moves>
+		<moves id="157">
+		<lang>交出雪球能源来，不然……哼哼！！</lang>
+		<lang>我是老大，快把雪球能源给我！</lang>
+	</moves>
+		<moves id="158">
+		<lang>托尼是最最勇敢的孩子！</lang>
+		<lang>托尼想去好多好多地方探险……</lang>
+	</moves>
+		<moves id="159">
+		<lang>托尼亚……</lang>
+		<lang>冲啊……</lang>
+	</moves>
+		<moves id="160">
+		<lang>智慧！勇敢！我们是永不退缩的雪原勇士！</lang>
+		<lang>团结一致！斯托利亚英勇奋战！！！</lang>
+	</moves>
+		<moves id="161">
+		<lang>不许偷我们的能源！！</lang>
+		<lang>赛尔永远是我们的伙伴！</lang>
+	</moves>
+		<moves id="162">
+		<lang>大个子，能和你一起去冒险！我真的很开心！</lang>
+		<lang>嘿嘿，大个子我会永远对你好的！</lang>
+	</moves>
+		<moves id="163">
+		<lang>呀呀呀！大呀么大个子~~~</lang>
+		<lang>大个子，我有点想家了！你能陪陪我吗？</lang>
+	</moves>
+		<moves id="164">
+		<lang>闪光……闪光……皮皮飞呀！！</lang>
+		<lang>我是克洛斯星最闪耀的精灵哟！</lang>
+	</moves>
+		<moves id="165">
+		<lang>一闪一闪亮晶晶……</lang>
+		<lang>比波比波比……</lang>
+	</moves>
+		<moves id="166">
+		<lang>我愿伴随你左右！</lang>
+		<lang>很高兴能够认识你！</lang>
+	</moves>
+		<moves id="167">
+		<lang>站住别动！</lang>
+		<lang>都和你说别动了，没听见嘛！！！</lang>
+	</moves>
+		<moves id="168">
+		<lang>这里就是我的地盘，其他精灵走开！</lang>
+		<lang>再不走开，我可就要攻击了！</lang>
+	</moves>
+		<moves id="169">
+		<lang>不要惹我生气！</lang>
+		<lang>在我没生气之前，你给我离开！</lang>
+	</moves>
+		<moves id="170">
+		<lang>我是不会手下留情的！</lang>
+		<lang>怎么样！不服气？</lang>
+	</moves>
+		<moves id="171">
+		<lang>打开反物质世界大门……</lang>
+		<lang>真正的挑战才刚刚开始！</lang>
+	</moves>
+		<moves id="172">
+		<lang>我肩负着神圣的守护使命！</lang>
+		<lang>反物质世界……</lang>
+	</moves>
+		<moves id="173">
+		<lang>走开！不要阻挡我的去路！</lang>
+		<lang>喷射……喷射……</lang>
+	</moves>
+		<moves id="174">
+		<lang>无论多么危险，我都不会退缩！</lang>
+		<lang>战斗靠的是技巧！！！</lang>
+	</moves>
+		<moves id="175">
+		<lang>你可不要看我小哟！</lang>
+		<lang>嘿嘿！看我不把你打个措手不及！</lang>
+	</moves>
+		<moves id="176">
+		<lang>哆来咪……</lang>
+		<lang>音乐是我的梦想~啦啦啦！</lang>
+	</moves>
+		<moves id="177">
+		<lang>弹奏出更美妙的音乐吧！</lang>
+		<lang>叮叮叮……你有听到音乐吗？</lang>
+	</moves>
+		<moves id="178">
+		<lang>你够聪明吗？</lang>
+		<lang>喂！来抓我呀！</lang>
+	</moves>
+		<moves id="179">
+		<lang>让开让开！我怕撞到你！！</lang>
+		<lang>啊呜……啊呜……</lang>
+	</moves>
+		<moves id="180">
+		<lang>我将成为地面系的一代勇士！</lang>
+		<lang>我会是最强的！</lang>
+	</moves>
+		<moves id="181">
+		<lang>我才是真正的暗黑战士！</lang>
+		<lang>暗黑世界，挑战才刚刚开始！</lang>
+	</moves>
+		<moves id="182">
+		<lang>没有最强，只有更强！我要变得更强大……</lang>
+		<lang>拉杰特万岁！</lang>
+	</moves>
+		<moves id="183">
+		<lang>嘿咻嘿咻……努力努力……</lang>
+		<lang>大地之子！！！奇拉塔顿！</lang>
+	</moves>
+		<moves id="184">
+		<lang>咕噜咕噜……咕噜……</lang>
+		<lang>咕噜噜(+﹏+)~</lang>
+	</moves>
+		<moves id="185">
+		<lang>如果这儿的环境能好些那该多好！</lang>
+		<lang>爱护环境，从我做起！</lang>
+	</moves>
+		<moves id="186">
+		<lang>lulu……希望所有的精灵都能快乐！</lang>
+		<lang>咿呀！Lulu……</lang>
+	</moves>
+		<moves id="187">
+		<lang>只有善良的精灵才会受到我的祝福！</lang>
+		<lang>请爱戴身边的精灵伙伴……</lang>
+	</moves>
+		<moves id="188">
+		<lang>哟哒哒哒……</lang>
+		<lang>吃我一拳！</lang>
+	</moves>
+		<moves id="189">
+		<lang>我要成为独一无二而的拳击手！</lang>
+		<lang>快带我出去锻炼锻炼吧！</lang>
+	</moves>
+		<moves id="190">
+		<lang>(～ o ～)~zZ</lang>
+		<lang>……</lang>
+	</moves>
+		<moves id="191">
+		<lang>我要凝聚所有的寒冰冻气！</lang>
+		<lang>我无所畏惧！</lang>
+	</moves>
+		<moves id="192">
+		<lang>我需要不断磨练自己！</lang>
+		<lang>忍……</lang>
+	</moves>
+		<moves id="193">
+		<lang>我将成为新一代的电系王者！</lang>
+		<lang>雷伊？呵呵我一定会超越你！</lang>
+	</moves>
+		<moves id="194">
+		<lang>我是可以驾驭雷电的精灵！！！！</lang>
+		<lang>让电力来的更猛一些吧！</lang>
+	</moves>
+		<moves id="195">
+		<lang>哈哈！！！</lang>
+		<lang>我是最强的！我一定要变得更加强大！！！哈哈~</lang>
+	</moves>
+		<moves id="196">
+		<lang>不许动……不许动……</lang>
+		<lang>咦？⊙﹏⊙</lang>
+	</moves>
+		<moves id="197">
+		<lang>赛尔历40年，我是赛尔历史的见证！</lang>
+		<lang>能否找到真正的对手？</lang>
+	</moves>
+		<moves id="198">
+		<lang>小家伙，如果你不爱护环境！我可就要离家出走咯^_^</lang>
+		<lang>不爱护环境的就是坏蛋o(︶︿︶)o</lang>
+	</moves>
+		<moves id="199">
+		<lang>不能乱扔垃圾，听到没有？</lang>
+		<lang>嘿嘿，我最最最喜欢伊优了！是它改变了海洋星海底的环境！</lang>
+	</moves>
+		<moves id="200">
+		<lang>我会成为海洋中新一代的霸主！</lang>
+		<lang>伊优名言：爱护环境，从我做起！</lang>
+	</moves>
+		<moves id="201">
+		<lang>战斗要有节奏感╮(╯_╰)╭</lang>
+		<lang>嘀嘀吧吧……嘣恰恰……</lang>
+	</moves>
+		<moves id="202">
+		<lang>伙计！来张CD放放如何？(⊙o⊙)？</lang>
+		<lang>哟呼……叱咤风云的SRT驾到</lang>
+	</moves>
+		<moves id="203">
+		<lang>逆境中成长的我一定会变得更强大！</lang>
+		<lang>我要不断磨练自己……</lang>
+	</moves>
+		<moves id="204">
+		<lang>塔姆拉出击！！！！</lang>
+		<lang>我是地面霸主，谁与争锋？</lang>
+	</moves>
+		<moves id="205">
+		<lang>咦？⊙﹏⊙</lang>
+		<lang>金灿灿的我哟O(∩_∩)O</lang>
+	</moves>
+		<moves id="206">
+		<lang>o(≧v≦)o~~好棒！</lang>
+		<lang>叮~~~灵石变大咯！</lang>
+	</moves>
+		<moves id="207">
+		<lang>科利进化咯~~~</lang>
+		<lang>凝聚灵石的最大力量吧+_+</lang>
+	</moves>
+	    <moves id="208">
+		<lang>艺术家是不需要说话的……</lang>
+		<lang>我就是不说话……</lang>
+	</moves>
+	    <moves id="209">
+		<lang>哇！好多能源！我要筑巢！！！！</lang>
+		<lang>我要把五颜六色的能源都藏起来~~~</lang>
+	</moves>
+	    <moves id="210">
+		<lang>继续不说话……</lang>
+		<lang>不说话！不说话！我就是不说话！！</lang>
+	</moves>
+	    <moves id="211">
+		<lang>呱呱……不要过来！(+﹏+)</lang>
+		<lang>我好怕！！</lang>
+	</moves>
+	    <moves id="212">
+		<lang>哦HOHO！！！我是毒王之王(╰_╯)#</lang>
+		<lang>你再欺负我！我可就反击咯！~~</lang>
+	</moves>
+	    <moves id="213">
+		<lang>嘿咻嘿咻！劳动最光荣~~</lang>
+		<lang>咦？⊙﹏⊙</lang>
+	</moves>
+	    <moves id="214">
+		<lang>要注意细节！细节……</lang>
+		<lang>我要成为最出色的机械维修工！哟呼~~</lang>
+	</moves>
+	    <moves id="215">
+		<lang>喂……你别欺负我嘛！</lang>
+		<lang>等哈莫长大了，哈莫一定会保护你!</lang>
+	</moves>
+	    <moves id="216">
+		<lang>小个子！你看我块头大不大……</lang>
+		<lang>吼吼！我会一直保护你的！</lang>
+	</moves>
+	    <moves id="217">
+		<lang>嗖嗖……</lang>
+		<lang>……哒哒哒</lang>
+		<lang>祝福将在黑暗中到来，哈~~。</lang>
+	</moves>
+	    <moves id="218">
+		<lang>我有预感！新年你会有好运哦……</lang>
+		<lang>我说真的！</lang>
+	</moves>
+	    <moves id="219">
+		<lang>光芒万丈！</lang>
+		<lang>(*^◎^*)</lang>
+	</moves>
+	    <moves id="220">
+		<lang>……</lang>
+		<lang>别在靠近我！</lang>
+	</moves>
+	<moves id="228">
+		<lang>叽叽…叽叽叽…</lang>
+		<lang>我可以变得更强！</lang>
+	</moves>
+	<moves id="229">
+		<lang>我要占领这里！</lang>
+		<lang>实力能决定一切！</lang>
+	</moves>
+	<moves id="232">
+		<lang>哇~好动听的音乐啊~~！</lang>
+		<lang>唱歌~唱歌~啦啦啦~</lang>
+	</moves>
+	<moves id="234">
+		<lang>好大的风呀！身上弄脏了~！</lang>
+		<lang>我的梦想是成为一名歌手~！</lang>
+	</moves>
+	<moves id="235">
+		<lang>我好孤单……</lang>
+		<lang>谁能陪陪我！</lang>
+	</moves>
+	<moves id="236">
+		<lang>咕咕…咕咕……</lang>
+		<lang>这里是我的领地！</lang>
+	</moves>
+	<moves id="237">
+		<lang>我要化身为阳光~~</lang>
+		<lang>好暖和呀~~~！</lang>
+	</moves>
+	<moves id="239">
+		<lang>光是我的力量源泉！</lang>
+		<lang>我要拥有穿透一切的力量！</lang>
+	</moves>
+	<moves id="240">
+		<lang>嘶……嘶嘶……</lang>
+		<lang>慢慢等吧~我有的是时间~！</lang>
+	</moves>
+	<moves id="242">
+		<lang>今天谁会赢呢？是你？还是我？</lang>
+		<lang>我喜欢阴暗的世界！</lang>
+	</moves>
+	<moves id="249">
+		<lang>我喜欢晒太阳！</lang>
+		<lang>这里的空气真好！</lang>
+	</moves>
+	<moves id="251">
+		<lang>呼呼……我可以飞的更高！</lang>
+		<lang>啊…这里的风好大呀！</lang>
+	</moves>
+	<moves id="265">
+		<lang>睡觉睡觉~</lang>
+		<lang>谁也不许打扰我~！</lang>
+	</moves>
+	<moves id="266">
+		<lang>我创作的音乐是最精彩的！</lang>
+		<lang>哟…哟哟~！</lang>
+	</moves>
+	<moves id="291">
+		<lang>我要和朋友们在一起~~</lang>
+		<lang>你能找到我吗？哼哼</lang>
+	</moves>
+	<moves id="292">
+		<lang>轰…轰……</lang>
+		<lang>走开……别来打扰我……</lang>
+	</moves>
+	<moves id="293">
+		<lang>啊~还是躲起来吧……</lang>
+		<lang>我是一棵小树苗……</lang>
+	</moves>
+	<moves id="295">
+		<lang>阳光~赐予我力量~！</lang>
+		<lang>我的花粉可是非常厉害的哟~！</lang>
+	</moves>
+	    <moves id="301">
+		<lang>步步华丽诞生咯……</lang>
+		<lang>你说我会强吗？</lang>
+	</moves>
+	    <moves id="302">
+		<lang>你愿意磨练我吗？</lang>
+		<lang>我相信，我会是最强的精灵！</lang>
+	</moves>
+	    <moves id="303">
+		<lang>飞花摘叶!</lang>
+		<lang>是你把我带来这个世界！我的伙伴……</lang>
+	</moves>
+	    <moves id="304">
+		<lang>呵呵……</lang>
+		<lang>我对于速度的掌控，我相信无人能比！</lang>
+	</moves>
+	    <moves id="305">
+		<lang>就算是战斗也要注重动作！</lang>
+		<lang>嘿~出招！！！</lang>
+	</moves>
+	    <moves id="306">
+		<lang>……</lang>
+		<lang>我一定能够驾驭起惊涛骇浪！</lang>
+	</moves>
+	    <moves id="307">
+		<lang>修行！修行！</lang>
+		<lang>炎热的地方可以磨练出最强大的我！</lang>
+	</moves>
+	    <moves id="308">
+		<lang>拳头?飞腿？</lang>
+		<lang>如果拳头+飞腿，这样是不是更厉害？</lang>
+	</moves>
+	    <moves id="309">
+		<lang>来吧！真正的战斗开始了！</lang>
+		<lang>我无所畏惧╭(╯^╰)╮</lang>
+	</moves>
+	    <moves id="310">
+		<lang>荣耀、辉煌，这是我的象征！</lang>
+		<lang>我相信，我能够净化这个世界……</lang>
+	</moves>
+	    <moves id="311">
+		<lang>穿梭在宇宙……</lang>
+		<lang>我还是那个我！</lang>
+	</moves>
+	    <moves id="312">
+		<lang>无招胜有招！</lang>
+		<lang>没有人可以阻挡我的去路</lang>
+	</moves>
+	    <moves id="313">
+		<lang>忽闪忽闪……</lang>
+		<lang>我是来自异界的生命吧？</lang>
+	</moves>
+	    <moves id="314">
+		<lang>我不开心了！</lang>
+		<lang>不管！我不开心了！</lang>
+	</moves>
+	    <moves id="315">
+		<lang>你说我狡猾？我这可是战术!</lang>
+		<lang>嘿嘿~！~！</lang>
+	</moves>
+	    <moves id="316">
+		<lang>我们是无敌的地核战士！</lang>
+		<lang>o(︶︿︶)o唉</lang>
+	</moves>
+	    <moves id="317">
+		<lang>嘘！别出声……</lang>
+		<lang>前方有敌人！快趴下……</lang>
+	</moves>
+	    <moves id="318">
+		<lang>攻击固然重要！但是我们也要注意防守……</lang>
+		<lang>利爪是我最好的武器！</lang>
+	</moves>
+	    <moves id="319">
+		<lang>咦？⊙﹏⊙</lang>
+		<lang>你会保护我吗？</lang>
+	</moves>
+	    <moves id="320">
+		<lang>哇哦！云朵飘飘的美丽世界哦！</lang>
+		<lang>好像好像能够自由自在的飞翔呢！</lang>
+	</moves>
+	    <moves id="321">
+		<lang>……</lang>
+		<lang>战场上没有任何感情可言！</lang>
+	</moves>
+	    <moves id="322">
+		<lang></lang>
+		<lang></lang>
+	</moves>
+	    <moves id="323">
+		<lang></lang>
+		<lang></lang>
+	</moves>
+	    <moves id="324">
+		<lang></lang>
+		<lang></lang>
+	</moves>
+	    <moves id="325">
+		<lang>咕叽咕叽~~</lang>
+		<lang>哑谜哑谜哟呼~！~</lang>
+	</moves>
+	    <moves id="326">
+		<lang>叽叽喳喳……</lang>
+		<lang>（¯﹃¯）</lang>
+	</moves>
+	    <moves id="327">
+		<lang>哼！哼！</lang>
+		<lang>(╰_╯)#</lang>
+	</moves>
+	    <moves id="328">
+		<lang>偶的到来，可是会给你带来好运哟！</lang>
+		<lang>嘻嘻，我预感你今天一定会很幸运！</lang>
+	</moves>
+	    <moves id="329">
+		<lang>我喜欢飞舞、跳跃、唱歌……</lang>
+		<lang>你有说明兴趣爱好吗？</lang>
+	</moves>
+	    <moves id="330">
+		<lang>你不要看我小嘛！</lang>
+		<lang>我就是要和你在一起~</lang>
+	</moves>
+	    <moves id="331">
+		<lang>飞翔吧~哈伊卡……</lang>
+		<lang>(⊙v⊙)嗯</lang>
+	</moves>
+	<moves id="335">
+		<lang>我喜欢这个地方！</lang>
+		<lang>呼~呼~！</lang>
+	</moves>
+	<moves id="337">
+		<lang>跳舞~我要跳舞~！</lang>
+		<lang>我最喜欢热的地方！</lang>
+	</moves>
+	<moves id="344">
+		<lang>哼~我是一名出色的猎手~</lang>
+		<lang>不要小看我哟~！</lang>
+	</moves>
+	<moves id="345">
+		<lang>我要自由地翱翔~！</lang>
+		<lang>没有谁可以逃出我的控制范围！</lang>
+	</moves>
+	<moves id="399">
+		<lang>我喜欢优美的音乐！</lang>
+		<lang>啦啦啦……</lang>
+	</moves>
+	<moves id="400">
+		<lang>我要为龙族付出一切！</lang>
+		<lang>咕咕……</lang>
+	</moves>
+	<moves id="491">
+		<lang>我就喜欢吃沃尔夫青苔~！</lang>
+		<lang>山洞里有个怪物，好可怕！！</lang>
+	</moves>
+	<moves id="493">
+		<lang>我漂亮吗？</lang>
+		<lang>不准碰我的尾巴！</lang>
+	</moves>
+	<moves id="494">
+		<lang>哒哒……哒……</lang>
+		<lang>速度才是王道！</lang>
+	</moves>
+	<moves id="496">
+		<lang>我对我的速度非常有自信！</lang>
+		<lang>守护这里是我的职责！</lang>
+	</moves>
+	<moves id="523">
+		<lang>这里好热呀……</lang>
+		<lang>我是一棵小树苗~啦啦啦~~</lang>
+	</moves>
+	<moves id="525">
+		<lang>这里有什么好吃的呢？</lang>
+		<lang>呼呼~~</lang>
+	</moves>
+	<moves id="553">
+		<lang>吖吖~吖吖~~</lang>
+		<lang>怎么地面又在震动了……</lang>
+	</moves>
+	<moves id="554">
+		<lang>终于呼吸到新鲜空气了！</lang>
+		<lang>我沉睡了多久了？</lang>
+	</moves>
+	<moves id="557">
+		<lang>不要烦我，我要睡觉……</lang>
+		<lang>嘻嘻，晒太阳真舒服！</lang>
+	</moves>
+	<moves id="559">
+		<lang>看到我脚下的利刃了吗！</lang>
+		<lang>我是战斗天才！</lang>
+	</moves>
+	<moves id="574">
+		<lang>好想游泳呀……</lang>
+		<lang>我的视力是最棒的！</lang>
+	</moves>
+	<moves id="690">
+		<lang>3+8等于多少呢？</lang>
+		<lang>我最喜欢做算术题咯！</lang>
+	</moves>
+	<moves id="691">
+		<lang>我要当个数学家！</lang>
+		<lang>我的攻击都是经过精确计算的哟！</lang>
+	</moves>	
+	
+	<moves id="699">
+		<lang>我们一定要让露希欧恢复生机</lang>
+		<lang>黑色正在褪去，加油</lang>
+	</moves>
+	<moves id="700">
+		<lang>好象还有黑色的气息</lang>
+		<lang>我感觉有点虚弱...</lang>
+	</moves>
+	<moves id="716">
+		<lang>打工好累啊！</lang>
+		<lang>终于自由啦！</lang>
+	</moves>
+	<moves id="717">
+		<lang>我要逃出这个鬼地方</lang>
+		<lang>德拉萨是个大坏蛋</lang>
+	</moves>
+	
+	<moves id="726">
+		<lang>净化心灵。</lang>
+		<lang>别想轻易就找到我</lang>
+	</moves>
+	
+	<moves id="728">
+		<lang>我有超能力，不信来试试。</lang>
+		<lang>你在害怕！哼哼</lang>
+	</moves>
+</root>
