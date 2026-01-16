@@ -337,24 +337,57 @@ end
 -- CMD_CREATE_ROLE (创建角色)
 lpp.handler[108] = function(socket, userId, buf, length)
     -- 创建角色请求
-    -- body 结构: session(16字节) + color(4字节)
+    -- 数据包结构: header(17字节) + body
+    -- body 结构: userID(4字节) + nickname(16字节) + color(4字节) = 24字节
+    -- 注意: 客户端 send(CMD, userID, niBy, color) 会把 userID 也写入 body
     
-    tprint(string.format("\27[33m[CREATE_ROLE] 创建角色请求: userId=%d\27[0m", userId))
+    tprint(string.format("\27[33m[CREATE_ROLE] 创建角色请求: userId=%d, length=%d, bodyLen=%d\27[0m", userId, length, length - offset))
     
-    -- 解析 color (在 session 之后)
-    local color = 1  -- 默认颜色
-    if length >= 20 then
-        -- session(16) + color(4)
-        color = buf:readUInt32BE(17)
+    -- 打印原始数据用于调试
+    local hexDump = ""
+    for i = 1, math.min(length, 50) do
+        hexDump = hexDump .. string.format("%02X ", buf:readUInt8(i))
+    end
+    tprint(string.format("\27[36m[CREATE_ROLE] 原始数据: %s\27[0m", hexDump))
+    
+    -- body 从索引 18 开始 (header 是 1-17)
+    -- body[1-4] = userID (跳过)
+    -- body[5-20] = nickname (16字节)
+    -- body[21-24] = color (4字节)
+    
+    -- 解析昵称 (从 body 第5字节开始，即索引 offset+5)
+    local nickname = ""
+    if length >= offset + 20 then
+        local chars = {}
+        for i = 5, 20 do  -- body 的第5-20字节
+            local byte = buf:readUInt8(offset + i)
+            if byte == 0 then break end
+            table.insert(chars, string.char(byte))
+        end
+        nickname = table.concat(chars)
+        tprint(string.format("\27[36m[CREATE_ROLE] 解析昵称: '%s'\27[0m", nickname))
+    end
+    
+    -- 解析 color (body 第21-24字节，即索引 offset+21)
+    local color = 1
+    if length >= offset + 24 then
+        color = buf:readUInt32BE(offset + 21)
         tprint(string.format("\27[36m[CREATE_ROLE] 玩家选择颜色: %d\27[0m", color))
+    end
+    
+    -- 如果昵称为空，使用米米号
+    if nickname == "" then
+        nickname = tostring(userId)
     end
     
     -- 查找用户
     local user = userDB:findByUserId(userId)
     
     if user then
-        -- 标记角色已创建，保存颜色
+        -- 标记角色已创建，保存昵称和颜色
         user.roleCreated = true
+        user.nickname = nickname
+        user.username = nickname  -- 同时保存到 username 字段，供 gameserver 读取
         user.color = color
         userDB:saveUser(user)
         
@@ -382,7 +415,8 @@ lpp.handler[108] = function(socket, userId, buf, length)
         socket:write(tostring(body))
         
         tprint(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
-        tprint(string.format("\27[32m║ ✅ 角色创建成功！米米号: %d, 颜色: %d\27[0m", userId, color))
+        tprint(string.format("\27[32m║ ✅ 角色创建成功！米米号: %d\27[0m", userId))
+        tprint(string.format("\27[32m║ 👤 昵称: %s, 颜色: %d\27[0m", nickname, color))
         tprint(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
     else
         -- 用户不存在
