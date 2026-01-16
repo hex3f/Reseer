@@ -1,0 +1,6 @@
+# Logs
+luvit_version/logs/
+luvit_version/sessionlog/
+
+# User data
+luvit_version/users.json

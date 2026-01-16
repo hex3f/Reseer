@@ -19,6 +19,12 @@ local SeerCommands = require('../seer_commands')
 -- 加载精灵数据
 local SeerMonsters = require('../seer_monsters')
 
+-- 加载技能数据
+local SeerSkills = require('../seer_skills')
+
+-- 加载战斗系统
+local SeerBattle = require('../seer_battle')
+
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
 end
@@ -1033,8 +1039,8 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(stats.maxHp or 100)  -- maxHp
     responseBody = responseBody .. writeUInt32BE(stats.attack or 39)  -- attack
     responseBody = responseBody .. writeUInt32BE(stats.defence or 35) -- defence
-    responseBody = responseBody .. writeUInt32BE(stats.sa or 78)      -- s_a (特攻)
-    responseBody = responseBody .. writeUInt32BE(stats.sd or 36)      -- s_d (特防)
+    responseBody = responseBody .. writeUInt32BE(stats.spAtk or 78)   -- s_a (特攻)
+    responseBody = responseBody .. writeUInt32BE(stats.spDef or 36)   -- s_d (特防)
     responseBody = responseBody .. writeUInt32BE(stats.speed or 39)   -- speed
     responseBody = responseBody .. writeUInt32BE(0)          -- addMaxHP
     responseBody = responseBody .. writeUInt32BE(0)          -- addMoreMaxHP
@@ -1092,8 +1098,11 @@ function LocalGameServer:handleGetPetList(clientData, cmdId, userId, seqId, body
             local petId = pet.id or 0
             local catchTime = pet.catchTime or 0
             local level = pet.level or 5
-            local hp = pet.hp or 100
-            local maxHp = pet.maxHp or 100
+            
+            -- 计算精灵属性（如果数据库没有保存）
+            local stats = SeerMonsters.calculateStats(petId, level, pet.dv or 31) or {hp = 100, maxHp = 100}
+            local hp = pet.hp or stats.hp or 100
+            local maxHp = pet.maxHp or stats.maxHp or 100
             
             -- 获取精灵技能
             local skills = SeerMonsters.getBattleSkills(petId, level) or {}
@@ -1483,6 +1492,60 @@ function LocalGameServer:handleChallengeBoss(clientData, cmdId, userId, seqId, b
     self:sendNoteReadyToFight(clientData, userId, bossId, userData)
 end
 
+-- 初始化战斗实例
+function LocalGameServer:initBattle(userId, userData, enemyPetId)
+    local petId = userData.currentPetId or 7
+    local petLevel = 5
+    local enemyLevel = 5
+    
+    -- 获取玩家精灵数据
+    local playerStats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 21, maxHp = 21}
+    local playerSkills = SeerMonsters.getBattleSkills(petId, petLevel)
+    local playerMonster = SeerMonsters.get(petId)
+    
+    -- 获取敌方精灵数据
+    local enemyStats = SeerMonsters.calculateStats(enemyPetId, enemyLevel, 15) or {hp = 21, maxHp = 21}
+    local enemySkills = SeerMonsters.getBattleSkills(enemyPetId, enemyLevel)
+    local enemyMonster = SeerMonsters.get(enemyPetId)
+    
+    -- 创建战斗实例
+    local battle = SeerBattle.createBattle(userId, {
+        id = petId,
+        level = petLevel,
+        hp = playerStats.hp,
+        maxHp = playerStats.maxHp,
+        attack = playerStats.attack,
+        defence = playerStats.defence,
+        spAtk = playerStats.spAtk,
+        spDef = playerStats.spDef,
+        speed = playerStats.speed,
+        type = playerMonster and playerMonster.type or 8,
+        skills = playerSkills,
+        catchTime = userData.catchId or 0
+    }, {
+        id = enemyPetId,
+        level = enemyLevel,
+        hp = enemyStats.hp,
+        maxHp = enemyStats.maxHp,
+        attack = enemyStats.attack,
+        defence = enemyStats.defence,
+        spAtk = enemyStats.spAtk,
+        spDef = enemyStats.spDef,
+        speed = enemyStats.speed,
+        type = enemyMonster and enemyMonster.type or 8,
+        skills = enemySkills,
+        catchTime = userData.enemyCatchTime or 0
+    })
+    
+    -- 保存战斗实例
+    userData.battle = battle
+    
+    tprint(string.format("\27[33m[LocalGame] 战斗初始化: 玩家精灵 %d (HP=%d) vs 敌方精灵 %d (HP=%d)\27[0m",
+        petId, playerStats.hp, enemyPetId, enemyStats.hp))
+    
+    return battle
+end
+
 -- 发送战斗准备通知
 -- NoteReadyToFightInfo 结构 (基于 AS3 代码分析):
 -- fightType (4字节) - 战斗类型 (官服新手教程=3)
@@ -1512,7 +1575,7 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     -- 计算精灵属性
     local stats = SeerMonsters.calculateStats(petId, petLevel, 15) or {hp = 21, maxHp = 21}
     
-    tprint(string.format("\27[36m[LocalGame] 精灵 %d (%s) Lv%d, HP=%d, 技能=%d个\27[0m", 
+    tprint(string.format("\27[36m[LocalGame] 精灵 %d (%s) Lv%d, HP=%d, 实际技能=%d个, 发送skillNum=4\27[0m", 
         petId, SeerMonsters.getName(petId), petLevel, stats.hp, skillCount))
     tprint(string.format("\27[33m[LocalGame] 玩家 catchTime=0x%08X, 敌人 catchTime=0x%08X\27[0m", 
         catchTime, enemyCatchTime))
@@ -1535,7 +1598,8 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     responseBody = responseBody .. writeUInt32BE(petLevel)
     responseBody = responseBody .. writeUInt32BE(stats.hp)
     responseBody = responseBody .. writeUInt32BE(stats.maxHp)
-    responseBody = responseBody .. writeUInt32BE(skillCount)
+    -- 官服始终发送 skillNum=4，即使精灵只有2个技能
+    responseBody = responseBody .. writeUInt32BE(4)
     -- 4个技能槽 (id + pp)
     responseBody = responseBody .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(35)
     responseBody = responseBody .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(25)
@@ -1568,7 +1632,8 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     responseBody = responseBody .. writeUInt32BE(enemyLevel)
     responseBody = responseBody .. writeUInt32BE(enemyStats.hp)
     responseBody = responseBody .. writeUInt32BE(enemyStats.maxHp)
-    responseBody = responseBody .. writeUInt32BE(enemySkillCount)
+    -- 官服始终发送 skillNum=4
+    responseBody = responseBody .. writeUInt32BE(4)
     responseBody = responseBody .. writeUInt32BE(enemySkills[1] or 0) .. writeUInt32BE(30)
     responseBody = responseBody .. writeUInt32BE(enemySkills[2] or 0) .. writeUInt32BE(35)
     responseBody = responseBody .. writeUInt32BE(enemySkills[3] or 0) .. writeUInt32BE(0)
@@ -1585,6 +1650,9 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     userData.inFight = true
     userData.myPetStats = stats
     userData.enemyPetStats = enemyStats
+    
+    -- 初始化战斗实例
+    self:initBattle(userId, userData, enemyPetId)
     
     tprint(string.format("\27[33m[LocalGame] 2503 包体大小: %d bytes\27[0m", #responseBody))
     
@@ -1753,19 +1821,142 @@ function LocalGameServer:handleUseSkillEnhanced(clientData, cmdId, userId, seqId
         skillId = readUInt32BE(body, 1)
     end
     
-    tprint(string.format("\27[36m[LocalGame] 用户 %d 使用技能 %d\27[0m", userId, skillId))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 使用技能 %d (%s)\27[0m", 
+        userId, skillId, SeerSkills.getName(skillId)))
+    
+    local userData = self:getOrCreateUser(userId)
+    local battle = userData.battle
     
     -- 先发送技能确认
     self:sendResponse(clientData, cmdId, userId, 0, "")
     
-    -- 然后发送 NOTE_USE_SKILL (2505)
-    self:sendNoteUseSkill(clientData, userId, skillId)
-    
-    -- 最后发送 FIGHT_OVER (2506) - 新手教程一击必杀
-    self:sendFightOver(clientData, userId)
+    if battle then
+        -- 执行战斗回合
+        local result = SeerBattle.executeTurn(battle, skillId)
+        
+        tprint(string.format("\27[33m[LocalGame] 回合 %d: 玩家技能=%d, AI技能=%d\27[0m",
+            result.turn, result.playerSkillId, result.enemySkillId or 0))
+        
+        -- 发送 NOTE_USE_SKILL (2505)
+        self:sendNoteUseSkillWithResult(clientData, userId, result)
+        
+        -- 检查战斗是否结束
+        if result.isOver then
+            tprint(string.format("\27[32m[LocalGame] 战斗结束! 胜利者: %s\27[0m",
+                result.winner == userId and "玩家" or "敌方"))
+            self:sendFightOver(clientData, userId, result.winner)
+        end
+    else
+        -- 没有战斗实例，使用旧逻辑
+        self:sendNoteUseSkill(clientData, userId, skillId)
+        self:sendFightOver(clientData, userId, userId)
+    end
 end
 
--- 发送技能使用通知
+-- 发送技能使用通知 (使用战斗结果)
+function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
+    tprint("\27[36m[LocalGame] 发送 CMD 2505: 技能使用通知 (战斗系统)\27[0m")
+    
+    local userData = self:getOrCreateUser(userId)
+    local battle = userData.battle
+    local playerSkills = battle and battle.player.skills or {}
+    
+    local responseBody = ""
+    
+    -- 构建 AttackValue 结构
+    local function buildAttackValue(attack, isPlayer, skills)
+        local data = ""
+        data = data .. writeUInt32BE(attack.userId)           -- userID
+        data = data .. writeUInt32BE(attack.skillId)          -- skillID
+        data = data .. writeUInt32BE(1)                       -- atkTimes
+        
+        -- 计算损失HP (对方造成的伤害)
+        local lostHp = 0
+        if isPlayer and result.secondAttack then
+            lostHp = result.secondAttack.damage or 0
+        elseif not isPlayer and result.firstAttack then
+            lostHp = result.firstAttack.damage or 0
+        end
+        
+        data = data .. writeUInt32BE(lostHp)                  -- lostHP
+        data = data .. writeUInt32BE(0)                       -- gainHP
+        data = data .. writeUInt32BE(attack.attackerRemainHp) -- remainHp
+        data = data .. writeUInt32BE(attack.attackerMaxHp)    -- maxHp
+        data = data .. writeUInt32BE(0)                       -- state
+        
+        -- 技能列表
+        local skillCount = 0
+        for _, s in ipairs(skills or {}) do
+            if s and s > 0 then skillCount = skillCount + 1 end
+        end
+        data = data .. writeUInt32BE(math.min(skillCount, 4)) -- skillListCount
+        
+        for i = 1, 4 do
+            local sid = skills[i] or 0
+            data = data .. writeUInt32BE(sid) .. writeUInt32BE(30)  -- id + pp
+        end
+        
+        data = data .. writeUInt32BE(attack.isCrit and 1 or 0) -- isCrit
+        data = data .. string.rep("\0", 20)                    -- status (20字节)
+        data = data .. string.rep("\0", 6)                     -- battleLv (6字节)
+        data = data .. writeUInt32BE(0)                        -- maxShield
+        data = data .. writeUInt32BE(0)                        -- curShield
+        data = data .. writeUInt32BE(0)                        -- petType
+        
+        return data
+    end
+    
+    -- 根据先后攻顺序构建响应
+    local first = result.firstAttack
+    local second = result.secondAttack
+    
+    if first then
+        local isPlayerFirst = first.userId == userId
+        responseBody = responseBody .. buildAttackValue(first, isPlayerFirst, 
+            isPlayerFirst and playerSkills or (battle and battle.enemy.skills or {}))
+    end
+    
+    if second then
+        local isPlayerSecond = second.userId == userId
+        responseBody = responseBody .. buildAttackValue(second, isPlayerSecond,
+            isPlayerSecond and playerSkills or (battle and battle.enemy.skills or {}))
+    else
+        -- 如果没有第二次攻击（对方已死），发送空的攻击信息
+        responseBody = responseBody .. writeUInt32BE(0)       -- userID
+        responseBody = responseBody .. writeUInt32BE(0)       -- skillID
+        responseBody = responseBody .. writeUInt32BE(0)       -- atkTimes
+        responseBody = responseBody .. writeUInt32BE(0)       -- lostHP
+        responseBody = responseBody .. writeUInt32BE(0)       -- gainHP
+        responseBody = responseBody .. writeUInt32BE(0)       -- remainHp
+        responseBody = responseBody .. writeUInt32BE(0)       -- maxHp
+        responseBody = responseBody .. writeUInt32BE(0)       -- state
+        responseBody = responseBody .. writeUInt32BE(0)       -- skillListCount
+        responseBody = responseBody .. writeUInt32BE(0)       -- isCrit
+        responseBody = responseBody .. string.rep("\0", 20)   -- status
+        responseBody = responseBody .. string.rep("\0", 6)    -- battleLv
+        responseBody = responseBody .. writeUInt32BE(0)       -- maxShield
+        responseBody = responseBody .. writeUInt32BE(0)       -- curShield
+        responseBody = responseBody .. writeUInt32BE(0)       -- petType
+    end
+    
+    -- 打印战斗日志
+    if first then
+        local attacker = first.userId == userId and "玩家" or "敌方"
+        tprint(string.format("\27[33m[LocalGame] %s使用 %s, 造成 %d 伤害%s\27[0m",
+            attacker, SeerSkills.getName(first.skillId), first.damage or 0,
+            first.isCrit and " (暴击!)" or ""))
+    end
+    if second then
+        local attacker = second.userId == userId and "玩家" or "敌方"
+        tprint(string.format("\27[33m[LocalGame] %s使用 %s, 造成 %d 伤害%s\27[0m",
+            attacker, SeerSkills.getName(second.skillId), second.damage or 0,
+            second.isCrit and " (暴击!)" or ""))
+    end
+    
+    self:sendResponse(clientData, 2505, userId, 0, responseBody)
+end
+
+-- 发送技能使用通知 (旧版本，兼容)
 -- UseSkillInfo 结构 (基于 AS3 代码分析):
 -- firstAttackInfo (AttackValue) - 先攻方攻击信息
 -- secondAttackInfo (AttackValue) - 后攻方攻击信息
@@ -1788,7 +1979,7 @@ end
 -- curShield (4字节) - 当前护盾
 -- petType (4字节) - 精灵类型
 function LocalGameServer:sendNoteUseSkill(clientData, userId, skillId)
-    tprint("\27[36m[LocalGame] 发送 CMD 2505: 技能使用通知\27[0m")
+    tprint("\27[36m[LocalGame] 发送 CMD 2505: 技能使用通知 (旧版)\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     local petId = userData.currentPetId or 4
@@ -1797,39 +1988,37 @@ function LocalGameServer:sendNoteUseSkill(clientData, userId, skillId)
     local responseBody = ""
     
     -- === firstAttackInfo (玩家攻击) ===
-    -- 官服: 00 07 E3 75 00 00 4E 22 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 11 00 00 00 15 00 00 00 00 00 00 00 02 00 00 4E 22 00 00 00 27 00 00 27 14 ...
     responseBody = responseBody .. writeUInt32BE(userId)     -- userID
     responseBody = responseBody .. writeUInt32BE(skillId)    -- skillID
     responseBody = responseBody .. writeUInt32BE(1)          -- atkTimes
     responseBody = responseBody .. writeUInt32BE(0)          -- lostHP (玩家未受伤)
     responseBody = responseBody .. writeUInt32BE(0)          -- gainHP
-    responseBody = responseBody .. writeUInt32BE(17)         -- remainHp (官服=0x11=17)
-    responseBody = responseBody .. writeUInt32BE(21)         -- maxHp (官服=0x15=21)
+    responseBody = responseBody .. writeUInt32BE(17)         -- remainHp
+    responseBody = responseBody .. writeUInt32BE(21)         -- maxHp
     responseBody = responseBody .. writeUInt32BE(0)          -- state
-    responseBody = responseBody .. writeUInt32BE(2)          -- skillListCount (官服=2)
-    -- 技能列表 (id + pp)
-    responseBody = responseBody .. writeUInt32BE(skillId) .. writeUInt32BE(39)   -- 技能1
-    responseBody = responseBody .. writeUInt32BE(10020) .. writeUInt32BE(10020)  -- 技能2
-    responseBody = responseBody .. writeUInt32BE(0)          -- isCrit (非暴击)
-    responseBody = responseBody .. string.rep("\0", 20)      -- status (20字节)
-    responseBody = responseBody .. string.rep("\0", 6)       -- battleLv (6字节)
+    responseBody = responseBody .. writeUInt32BE(2)          -- skillListCount
+    responseBody = responseBody .. writeUInt32BE(skillId) .. writeUInt32BE(39)
+    responseBody = responseBody .. writeUInt32BE(10020) .. writeUInt32BE(10020)
+    responseBody = responseBody .. writeUInt32BE(0)          -- isCrit
+    responseBody = responseBody .. string.rep("\0", 20)      -- status
+    responseBody = responseBody .. string.rep("\0", 6)       -- battleLv
     responseBody = responseBody .. writeUInt32BE(0)          -- maxShield
     responseBody = responseBody .. writeUInt32BE(0)          -- curShield
     responseBody = responseBody .. writeUInt32BE(0)          -- petType
     
     -- === secondAttackInfo (敌方/BOSS) ===
     responseBody = responseBody .. writeUInt32BE(0)          -- userID (敌人=0)
-    responseBody = responseBody .. writeUInt32BE(skillId)    -- skillID (敌人使用相同技能)
+    responseBody = responseBody .. writeUInt32BE(skillId)    -- skillID
     responseBody = responseBody .. writeUInt32BE(0)          -- atkTimes
-    responseBody = responseBody .. writeUInt32BE(17)         -- lostHP (敌人受到17伤害)
+    responseBody = responseBody .. writeUInt32BE(17)         -- lostHP
     responseBody = responseBody .. writeUInt32BE(0)          -- gainHP
-    responseBody = responseBody .. writeUInt32BE(4)          -- remainHp (敌人剩余4HP)
+    responseBody = responseBody .. writeUInt32BE(0)          -- remainHp (敌人死亡)
     responseBody = responseBody .. writeUInt32BE(21)         -- maxHp
     responseBody = responseBody .. writeUInt32BE(0)          -- state
     responseBody = responseBody .. writeUInt32BE(0)          -- skillListCount
     responseBody = responseBody .. writeUInt32BE(0)          -- isCrit
-    responseBody = responseBody .. string.rep("\0", 20)      -- status (20字节)
-    responseBody = responseBody .. string.rep("\0", 6)       -- battleLv (6字节)
+    responseBody = responseBody .. string.rep("\0", 20)      -- status
+    responseBody = responseBody .. string.rep("\0", 6)       -- battleLv
     responseBody = responseBody .. writeUInt32BE(0)          -- maxShield
     responseBody = responseBody .. writeUInt32BE(0)          -- curShield
     responseBody = responseBody .. writeUInt32BE(0)          -- petType
@@ -1846,10 +2035,14 @@ end
 -- autoFightTimes (4字节) - 自动战斗次数
 -- energyTimes (4字节) - 体力次数
 -- learnTimes (4字节) - 学习次数
-function LocalGameServer:sendFightOver(clientData, userId)
+function LocalGameServer:sendFightOver(clientData, userId, winnerId)
     tprint("\27[36m[LocalGame] 发送战斗结束序列\27[0m")
     
     local userData = self:getOrCreateUser(userId)
+    
+    -- 清理战斗状态
+    userData.battle = nil
+    userData.inFight = false
     
     -- 1. 发送 GET_BOSS_MONSTER (8004) - BOSS战斗奖励
     self:sendGetBossMonster(clientData, userId, userData)
