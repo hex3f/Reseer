@@ -309,6 +309,64 @@ function LocalRoomServer:getOrCreateUser(userId)
             end
         end
         
+        -- 调试: 打印服装数据
+        local clothesCount = 0
+        if userData.clothes then
+            if type(userData.clothes) == "table" then
+                for _ in pairs(userData.clothes) do clothesCount = clothesCount + 1 end
+            end
+        end
+        tprint(string.format("\27[35m[RoomServer] 用户 %d 服装数量: %d\27[0m", userId, clothesCount))
+        
+        -- 从 items 中提取服装 (100xxx) - 只在 clothes 为空时
+        if gameData.items and (not userData.clothes or clothesCount == 0) then
+            userData.clothes = {}
+            for itemIdStr, itemData in pairs(gameData.items) do
+                local itemId = tonumber(itemIdStr)
+                if itemId and itemId >= 100000 and itemId < 200000 then
+                    table.insert(userData.clothes, {id = itemId, level = 1})
+                    tprint(string.format("\27[35m[RoomServer] 从 items 提取服装: %d\27[0m", itemId))
+                end
+            end
+        end
+        
+        -- 从 items 中提取家具到 allFitments (500xxx)
+        if gameData.items then
+            local fitmentMap = {}
+            -- 先加载已有的 allFitments
+            if userData.allFitments then
+                for _, f in ipairs(userData.allFitments) do
+                    fitmentMap[f.id] = f
+                end
+            end
+            -- 从 items 中添加家具
+            for itemIdStr, itemData in pairs(gameData.items) do
+                local itemId = tonumber(itemIdStr)
+                if itemId and itemId >= 500000 and itemId < 600000 then
+                    if not fitmentMap[itemId] then
+                        fitmentMap[itemId] = {id = itemId, usedCount = 0, allCount = itemData.count or 1}
+                    end
+                end
+            end
+            -- 转换回数组
+            userData.allFitments = {}
+            for _, f in pairs(fitmentMap) do
+                table.insert(userData.allFitments, f)
+            end
+        end
+        
+        -- 初始化 NONO 数据
+        if not userData.nono then
+            userData.nono = {
+                flag = 1,
+                state = 1,
+                nick = "NONO",
+                color = 0xFFFFFF,
+                hp = 10000,
+                maxHp = 10000
+            }
+        end
+        
         userData.id = userId
         self.users[userId] = userData
         return userData
@@ -319,7 +377,9 @@ function LocalRoomServer:getOrCreateUser(userId)
         id = userId,
         nick = "赛尔" .. userId,
         fitments = {{id = 500001, x = 0, y = 0, dir = 0, status = 0}},
-        allFitments = {{id = 500001, usedCount = 1, allCount = 1}}
+        allFitments = {{id = 500001, usedCount = 1, allCount = 1}},
+        clothes = {},
+        nono = {flag = 1, state = 1, nick = "NONO", color = 0xFFFFFF, hp = 10000, maxHp = 10000}
     }
     return self.users[userId]
 end
@@ -791,6 +851,11 @@ function LocalRoomServer:handlePetRoomList(clientData, cmdId, userId, seqId, bod
 end
 
 -- CMD 9003: NONO信息 (NONO_INFO)
+-- 响应格式 (根据 NonoInfo.as):
+-- userID(4) + flag(4) + state(4) + nick(16) + superNono(4) + color(4) + 
+-- power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + func(20) + 
+-- superEnergy(4) + superLevel(4) + superStage(4)
+-- 总计: 90 bytes
 function LocalRoomServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     tprint("\27[35m[RoomServer] 处理 CMD 9003: NONO信息\27[0m")
     
@@ -798,22 +863,23 @@ function LocalRoomServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     local nono = userData.nono or {}
     
     local responseBody = ""
-    responseBody = responseBody .. writeUInt32BE(userId)                    -- userId
-    responseBody = responseBody .. writeUInt32BE(nono.flag or 1)            -- hasNono
-    responseBody = responseBody .. writeUInt32BE(nono.state or 1)           -- state
-    responseBody = responseBody .. writeFixedString(nono.nick or "NONO", 16) -- nick
-    responseBody = responseBody .. writeUInt32BE(nono.color or 0xFFFFFF)    -- color
-    responseBody = responseBody .. writeUInt32BE(nono.power or 10000)       -- power
-    responseBody = responseBody .. writeUInt32BE(nono.mate or 10000)        -- mate
-    responseBody = responseBody .. writeUInt32BE(nono.iq or 0)              -- iq
-    responseBody = responseBody .. writeUInt32BE(nono.ai or 0)              -- ai
-    responseBody = responseBody .. writeUInt32BE(nono.birth or os.time())   -- birth
-    responseBody = responseBody .. writeUInt32BE(nono.chargeTime or 500)    -- chargeTime
-    -- 20 bytes reserved
-    responseBody = responseBody .. string.rep("\xFF", 20)
-    responseBody = responseBody .. writeUInt32BE(0)                         -- reserved
-    responseBody = responseBody .. writeUInt32BE(0)                         -- reserved
-    responseBody = responseBody .. writeUInt32BE(0)                         -- reserved
+    responseBody = responseBody .. writeUInt32BE(userId)                    -- userID (4)
+    responseBody = responseBody .. writeUInt32BE(nono.flag or 1)            -- flag (4) - bit flags
+    responseBody = responseBody .. writeUInt32BE(nono.state or 1)           -- state (4) - bit flags
+    responseBody = responseBody .. writeFixedString(nono.nick or "NONO", 16) -- nick (16)
+    responseBody = responseBody .. writeUInt32BE(nono.superNono or 0)       -- superNono (4)
+    responseBody = responseBody .. writeUInt32BE(nono.color or 0xFFFFFF)    -- color (4)
+    responseBody = responseBody .. writeUInt32BE((nono.power or 10000))     -- power (4) - 客户端会除以1000
+    responseBody = responseBody .. writeUInt32BE((nono.mate or 10000))      -- mate (4) - 客户端会除以1000
+    responseBody = responseBody .. writeUInt32BE(nono.iq or 0)              -- iq (4)
+    responseBody = responseBody .. writeUInt16BE(nono.ai or 0)              -- ai (2)
+    responseBody = responseBody .. writeUInt32BE(nono.birth or os.time())   -- birth (4)
+    responseBody = responseBody .. writeUInt32BE(nono.chargeTime or 500)    -- chargeTime (4)
+    -- func: 20 bytes (160 bits for function flags)
+    responseBody = responseBody .. string.rep("\xFF", 20)                   -- func (20) - 全部启用
+    responseBody = responseBody .. writeUInt32BE(nono.superEnergy or 0)     -- superEnergy (4)
+    responseBody = responseBody .. writeUInt32BE(nono.superLevel or 0)      -- superLevel (4)
+    responseBody = responseBody .. writeUInt32BE(nono.superStage or 1)      -- superStage (4)
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end

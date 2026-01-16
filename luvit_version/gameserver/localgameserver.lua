@@ -2579,6 +2579,23 @@ function LocalGameServer:getOrCreateUser(userId)
                 end
             end
             
+            -- 检查服装数量
+            local clothesCount = 0
+            if self.users[userId].clothes and type(self.users[userId].clothes) == "table" then
+                for _ in pairs(self.users[userId].clothes) do clothesCount = clothesCount + 1 end
+            end
+            
+            -- 从 items 中提取服装 (100xxx) - 只在 clothes 为空时
+            if gameData.items and clothesCount == 0 then
+                self.users[userId].clothes = {}
+                for itemIdStr, itemData in pairs(gameData.items) do
+                    local itemId = tonumber(itemIdStr)
+                    if itemId and itemId >= 100000 and itemId < 200000 then
+                        table.insert(self.users[userId].clothes, {id = itemId, level = 1})
+                    end
+                end
+            end
+            
             self.users[userId].id = userId
             return self.users[userId]
         end
