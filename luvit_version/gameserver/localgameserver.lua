@@ -1869,34 +1869,60 @@ function LocalGameServer:handleUseSkillEnhanced(clientData, cmdId, userId, seqId
 end
 
 -- 发送技能使用通知 (使用战斗结果)
+-- UseSkillInfo 结构 (基于 AS3 UseSkillInfo.as):
+--   firstAttackInfo (AttackValue)
+--   secondAttackInfo (AttackValue)
+--
+-- AttackValue 结构 (基于 AS3 AttackValue.as):
+--   userID (4字节) - 使用技能的用户ID
+--   skillID (4字节) - 技能ID
+--   atkTimes (4字节) - 攻击次数 (0=MISS, 1=命中)
+--   lostHP (4字节) - 该用户损失的HP (被对方攻击造成的伤害)
+--   gainHP (4字节, signed) - 该用户获得的HP (吸血等)
+--   remainHp (4字节, signed) - 该用户剩余HP
+--   maxHp (4字节) - 该用户最大HP
+--   state (4字节) - 状态 (1=麻痹滤镜, 2=中毒滤镜, 12=山神守护, 13=易燃)
+--   skillListCount (4字节) - 技能列表数量
+--   [PetSkillInfo]... - 技能列表 (id(4) + pp(4)) * skillListCount
+--   isCrit (4字节) - 是否暴击 (1=是, 0=否)
+--   status (20字节) - 状态数组 (每个状态的剩余回合数)
+--   battleLv (6字节) - 能力等级变化数组 (攻击/防御/特攻/特防/速度/命中)
+--   maxShield (4字节) - 最大护盾
+--   curShield (4字节) - 当前护盾
+--   petType (4字节) - 精灵类型
 function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
     tprint("\27[36m[LocalGame] 发送 CMD 2505: 技能使用通知 (战斗系统)\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     local battle = userData.battle
     local playerSkills = battle and battle.player.skills or {}
+    local enemySkills = battle and battle.enemy.skills or {}
     
     local responseBody = ""
     
     -- 构建 AttackValue 结构
-    local function buildAttackValue(attack, isPlayer, skills)
+    -- 注意: lostHP 是该用户被对方攻击造成的伤害，不是该用户造成的伤害
+    local function buildAttackValue(attackerUserId, skillId, atkTimes, lostHp, gainHp, remainHp, maxHp, isCrit, skills, battleLv, status)
         local data = ""
-        data = data .. writeUInt32BE(attack.userId)           -- userID
-        data = data .. writeUInt32BE(attack.skillId)          -- skillID
-        data = data .. writeUInt32BE(1)                       -- atkTimes
+        data = data .. writeUInt32BE(attackerUserId)          -- userID
+        data = data .. writeUInt32BE(skillId or 0)            -- skillID
+        data = data .. writeUInt32BE(atkTimes or 1)           -- atkTimes (0=MISS)
+        data = data .. writeUInt32BE(lostHp or 0)             -- lostHP (被对方攻击的伤害)
         
-        -- 计算损失HP (对方造成的伤害)
-        local lostHp = 0
-        if isPlayer and result.secondAttack then
-            lostHp = result.secondAttack.damage or 0
-        elseif not isPlayer and result.firstAttack then
-            lostHp = result.firstAttack.damage or 0
+        -- gainHP 是有符号整数
+        local gainHpValue = gainHp or 0
+        if gainHpValue < 0 then
+            gainHpValue = 0x100000000 + gainHpValue  -- 转换为无符号表示
         end
+        data = data .. writeUInt32BE(gainHpValue)             -- gainHP (signed)
         
-        data = data .. writeUInt32BE(lostHp)                  -- lostHP
-        data = data .. writeUInt32BE(0)                       -- gainHP
-        data = data .. writeUInt32BE(attack.attackerRemainHp) -- remainHp
-        data = data .. writeUInt32BE(attack.attackerMaxHp)    -- maxHp
+        -- remainHp 是有符号整数
+        local remainHpValue = remainHp or 0
+        if remainHpValue < 0 then
+            remainHpValue = 0
+        end
+        data = data .. writeUInt32BE(remainHpValue)           -- remainHp (signed)
+        data = data .. writeUInt32BE(maxHp or 100)            -- maxHp
         data = data .. writeUInt32BE(0)                       -- state
         
         -- 技能列表
@@ -1904,68 +1930,131 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
         for _, s in ipairs(skills or {}) do
             if s and s > 0 then skillCount = skillCount + 1 end
         end
-        data = data .. writeUInt32BE(math.min(skillCount, 4)) -- skillListCount
+        data = data .. writeUInt32BE(skillCount)              -- skillListCount
         
-        for i = 1, 4 do
+        -- 写入技能信息 (id + pp)
+        for i = 1, skillCount do
             local sid = skills[i] or 0
-            data = data .. writeUInt32BE(sid) .. writeUInt32BE(30)  -- id + pp
+            local pp = 30  -- 默认PP
+            data = data .. writeUInt32BE(sid)
+            data = data .. writeUInt32BE(pp)
         end
         
-        data = data .. writeUInt32BE(attack.isCrit and 1 or 0) -- isCrit
-        data = data .. string.rep("\0", 20)                    -- status (20字节)
-        data = data .. string.rep("\0", 6)                     -- battleLv (6字节)
-        data = data .. writeUInt32BE(0)                        -- maxShield
-        data = data .. writeUInt32BE(0)                        -- curShield
-        data = data .. writeUInt32BE(0)                        -- petType
+        data = data .. writeUInt32BE(isCrit and 1 or 0)       -- isCrit
+        
+        -- status (20字节) - 状态数组
+        if status then
+            for i = 0, 19 do
+                data = data .. string.char(status[i] or 0)
+            end
+        else
+            data = data .. string.rep("\0", 20)
+        end
+        
+        -- battleLv (6字节) - 能力等级变化
+        if battleLv then
+            for i = 1, 6 do
+                local lv = battleLv[i] or 0
+                if lv < 0 then lv = 256 + lv end  -- 转换为无符号
+                data = data .. string.char(lv)
+            end
+        else
+            data = data .. string.rep("\0", 6)
+        end
+        
+        data = data .. writeUInt32BE(0)                       -- maxShield
+        data = data .. writeUInt32BE(0)                       -- curShield
+        data = data .. writeUInt32BE(0)                       -- petType
         
         return data
     end
     
-    -- 根据先后攻顺序构建响应
+    -- 获取先攻和后攻信息
     local first = result.firstAttack
     local second = result.secondAttack
     
+    -- 构建先攻方的 AttackValue
     if first then
         local isPlayerFirst = first.userId == userId
-        responseBody = responseBody .. buildAttackValue(first, isPlayerFirst, 
-            isPlayerFirst and playerSkills or (battle and battle.enemy.skills or {}))
+        local attackerSkills = isPlayerFirst and playerSkills or enemySkills
+        local attackerBattleLv = isPlayerFirst and (battle and battle.player.battleLv) or (battle and battle.enemy.battleLv)
+        
+        -- 先攻方的 lostHP = 后攻方对先攻方造成的伤害
+        local firstLostHp = 0
+        if second and not result.isOver then
+            firstLostHp = second.damage or 0
+        end
+        
+        responseBody = responseBody .. buildAttackValue(
+            first.userId,
+            first.skillId,
+            first.atkTimes or 1,
+            firstLostHp,
+            first.gainHp or 0,
+            first.attackerRemainHp,
+            first.attackerMaxHp,
+            first.isCrit,
+            attackerSkills,
+            attackerBattleLv,
+            nil
+        )
+        
+        tprint(string.format("\27[33m[LocalGame] 先攻: %s 使用 %s, 造成 %d 伤害%s, 剩余HP=%d\27[0m",
+            first.userId == userId and "玩家" or "敌方",
+            SeerSkills.getName(first.skillId),
+            first.damage or 0,
+            first.isCrit and " (暴击!)" or "",
+            first.attackerRemainHp or 0))
     end
     
+    -- 构建后攻方的 AttackValue
     if second then
         local isPlayerSecond = second.userId == userId
-        responseBody = responseBody .. buildAttackValue(second, isPlayerSecond,
-            isPlayerSecond and playerSkills or (battle and battle.enemy.skills or {}))
+        local attackerSkills = isPlayerSecond and playerSkills or enemySkills
+        local attackerBattleLv = isPlayerSecond and (battle and battle.player.battleLv) or (battle and battle.enemy.battleLv)
+        
+        -- 后攻方的 lostHP = 先攻方对后攻方造成的伤害
+        local secondLostHp = first and first.damage or 0
+        
+        responseBody = responseBody .. buildAttackValue(
+            second.userId,
+            second.skillId,
+            second.atkTimes or 1,
+            secondLostHp,
+            second.gainHp or 0,
+            second.attackerRemainHp,
+            second.attackerMaxHp,
+            second.isCrit,
+            attackerSkills,
+            attackerBattleLv,
+            nil
+        )
+        
+        tprint(string.format("\27[33m[LocalGame] 后攻: %s 使用 %s, 造成 %d 伤害%s, 剩余HP=%d\27[0m",
+            second.userId == userId and "玩家" or "敌方",
+            SeerSkills.getName(second.skillId),
+            second.damage or 0,
+            second.isCrit and " (暴击!)" or "",
+            second.attackerRemainHp or 0))
     else
         -- 如果没有第二次攻击（对方已死），发送空的攻击信息
-        responseBody = responseBody .. writeUInt32BE(0)       -- userID
-        responseBody = responseBody .. writeUInt32BE(0)       -- skillID
-        responseBody = responseBody .. writeUInt32BE(0)       -- atkTimes
-        responseBody = responseBody .. writeUInt32BE(0)       -- lostHP
-        responseBody = responseBody .. writeUInt32BE(0)       -- gainHP
-        responseBody = responseBody .. writeUInt32BE(0)       -- remainHp
-        responseBody = responseBody .. writeUInt32BE(0)       -- maxHp
-        responseBody = responseBody .. writeUInt32BE(0)       -- state
-        responseBody = responseBody .. writeUInt32BE(0)       -- skillListCount
-        responseBody = responseBody .. writeUInt32BE(0)       -- isCrit
-        responseBody = responseBody .. string.rep("\0", 20)   -- status
-        responseBody = responseBody .. string.rep("\0", 6)    -- battleLv
-        responseBody = responseBody .. writeUInt32BE(0)       -- maxShield
-        responseBody = responseBody .. writeUInt32BE(0)       -- curShield
-        responseBody = responseBody .. writeUInt32BE(0)       -- petType
-    end
-    
-    -- 打印战斗日志
-    if first then
-        local attacker = first.userId == userId and "玩家" or "敌方"
-        tprint(string.format("\27[33m[LocalGame] %s使用 %s, 造成 %d 伤害%s\27[0m",
-            attacker, SeerSkills.getName(first.skillId), first.damage or 0,
-            first.isCrit and " (暴击!)" or ""))
-    end
-    if second then
-        local attacker = second.userId == userId and "玩家" or "敌方"
-        tprint(string.format("\27[33m[LocalGame] %s使用 %s, 造成 %d 伤害%s\27[0m",
-            attacker, SeerSkills.getName(second.skillId), second.damage or 0,
-            second.isCrit and " (暴击!)" or ""))
+        -- 但仍需要保持正确的结构
+        local deadUserId = first.userId == userId and 0 or userId
+        local deadSkills = deadUserId == userId and playerSkills or enemySkills
+        
+        responseBody = responseBody .. buildAttackValue(
+            deadUserId,
+            0,  -- 无技能
+            0,  -- atkTimes=0 表示无法行动
+            first.damage or 0,  -- 被先攻方造成的伤害
+            0,
+            0,  -- 剩余HP=0 (已死亡)
+            100,
+            false,
+            deadSkills,
+            nil,
+            nil
+        )
     end
     
     self:sendResponse(clientData, 2505, userId, 0, responseBody)
