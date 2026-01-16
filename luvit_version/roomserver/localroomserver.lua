@@ -115,6 +115,16 @@ function LocalRoomServer:handleData(clientData, data)
     end
 end
 
+-- 检查是否应该隐藏该命令的日志
+local function shouldHideCmd(cmdId)
+    if not conf.hide_frequent_cmds then return false end
+    if not conf.hide_cmd_list then return false end
+    for _, hideCmdId in ipairs(conf.hide_cmd_list) do
+        if cmdId == hideCmdId then return true end
+    end
+    return false
+end
+
 function LocalRoomServer:processPacket(clientData, packet)
     if #packet < 17 then return end
     
@@ -133,18 +143,20 @@ function LocalRoomServer:processPacket(clientData, packet)
     clientData.userId = userId
     clientData.seqId = seqId
     
-    -- 打印日志
-    tprint(string.format("\27[35m[RoomServer] 收到 CMD=%d (%s) UID=%d LEN=%d\27[0m", 
-        cmdId, getCmdName(cmdId), userId, length))
-    
-    -- 打印 HEX 数据
-    if #body > 0 then
-        local hexStr = ""
-        for i = 1, math.min(#body, 100) do
-            hexStr = hexStr .. string.format("%02X ", body:byte(i))
+    -- 根据配置决定是否打印日志
+    if not shouldHideCmd(cmdId) then
+        tprint(string.format("\27[35m[RoomServer] 收到 CMD=%d (%s) UID=%d LEN=%d\27[0m", 
+            cmdId, getCmdName(cmdId), userId, length))
+        
+        -- 打印 HEX 数据
+        if #body > 0 then
+            local hexStr = ""
+            for i = 1, math.min(#body, 100) do
+                hexStr = hexStr .. string.format("%02X ", body:byte(i))
+            end
+            if #body > 100 then hexStr = hexStr .. "..." end
+            tprint(string.format("\27[35m[RoomServer]   HEX: %s\27[0m", hexStr))
         end
-        if #body > 100 then hexStr = hexStr .. "..." end
-        tprint(string.format("\27[35m[RoomServer]   HEX: %s\27[0m", hexStr))
     end
     
     self:handleCommand(clientData, cmdId, userId, seqId, body)
@@ -212,17 +224,20 @@ function LocalRoomServer:sendResponse(clientData, cmdId, userId, result, body)
         clientData.socket:write(packet)
     end)
     
-    tprint(string.format("\27[32m[RoomServer] 发送 CMD=%d (%s) RESULT=%d LEN=%d\27[0m", 
-        cmdId, getCmdName(cmdId), result, length))
-    
-    -- 打印响应 HEX
-    if #body > 0 then
-        local hexStr = ""
-        for i = 1, math.min(#body, 100) do
-            hexStr = hexStr .. string.format("%02X ", body:byte(i))
+    -- 根据配置决定是否打印日志
+    if not shouldHideCmd(cmdId) then
+        tprint(string.format("\27[32m[RoomServer] 发送 CMD=%d (%s) RESULT=%d LEN=%d\27[0m", 
+            cmdId, getCmdName(cmdId), result, length))
+        
+        -- 打印响应 HEX
+        if #body > 0 then
+            local hexStr = ""
+            for i = 1, math.min(#body, 100) do
+                hexStr = hexStr .. string.format("%02X ", body:byte(i))
+            end
+            if #body > 100 then hexStr = hexStr .. "..." end
+            tprint(string.format("\27[32m[RoomServer]   HEX: %s\27[0m", hexStr))
         end
-        if #body > 100 then hexStr = hexStr .. "..." end
-        tprint(string.format("\27[32m[RoomServer]   HEX: %s\27[0m", hexStr))
     end
 end
 
@@ -807,6 +822,7 @@ end
 function LocalRoomServer:handleHeartbeat(clientData, cmdId, userId, seqId, body)
     -- 客户端回复的心跳包，不需要再回复
     -- 服务器主动发送心跳，客户端收到后回复
+    -- 不打印日志，避免刷屏
 end
 
 -- 启动心跳定时器 (每6秒发送一次)
@@ -818,7 +834,7 @@ function LocalRoomServer:startHeartbeat(clientData, userId)
         timer.clearInterval(clientData.heartbeatTimer)
     end
     
-    -- 每6秒发送一次心跳包
+    -- 每6秒发送一次心跳包 (官服间隔约6秒)
     clientData.heartbeatTimer = timer.setInterval(6000, function()
         if clientData.socket and clientData.loggedIn then
             self:sendHeartbeat(clientData, userId)
