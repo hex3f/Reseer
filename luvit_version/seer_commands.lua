@@ -10,6 +10,8 @@ local SeerCommands = {
     [105] = "COMMEND_ONLINE",
     [106] = "RANGE_ONLINE",
     [108] = "CREATE_ROLE",
+    [109] = "SYS_ROLE",
+    [111] = "FENGHAO_TIME",
     
     -- 系统命令 (1001-1112)
     [1001] = "LOGIN_IN",

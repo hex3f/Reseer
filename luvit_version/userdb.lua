@@ -84,6 +84,15 @@ function UserDB:findByUserId(userId)
     return nil
 end
 
+-- 保存单个用户
+function UserDB:saveUser(user)
+    if user and user.userId then
+        local key = tostring(user.userId)
+        self.users[key] = user
+        self:save()
+    end
+end
+
 -- 创建用户
 function UserDB:createUser(email, password, username)
     -- 检查邮箱是否已存在

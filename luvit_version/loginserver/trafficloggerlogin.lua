@@ -277,6 +277,35 @@ local server = net.createServer(function(client)
                             print(string.format("\27[31m╚══════════════════════════════════════════════════════════════╝\27[0m"))
                         end
                     end
+                    
+                    -- 解析 CMD 104 响应（邮箱登录结果）
+                    if header.cmdId == 104 then
+                        if header.result == 0 then
+                            -- 解析 session (16字节) 和 roleCreate (4字节)
+                            local sessionHex = ""
+                            for i = 18, math.min(33, #packet) do
+                                sessionHex = sessionHex .. string.format("%02X", packet:byte(i) or 0)
+                            end
+                            local roleCreate = 0
+                            if #packet >= 37 then
+                                roleCreate = (packet:byte(34) or 0) * 16777216 + (packet:byte(35) or 0) * 65536 + 
+                                            (packet:byte(36) or 0) * 256 + (packet:byte(37) or 0)
+                            end
+                            print(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
+                            print(string.format("\27[32m║ ✅ 登录成功！米米号: %d\27[0m", header.userId))
+                            print(string.format("\27[32m║ 🔑 Session: %s\27[0m", sessionHex))
+                            print(string.format("\27[32m║ 👤 角色状态: %s\27[0m", roleCreate == 1 and "已创建" or "未创建"))
+                            print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+                        else
+                            local errorMsg = "未知错误"
+                            if header.result == 5003 then errorMsg = "账号或密码错误"
+                            elseif header.result == 5002 then errorMsg = "账号不存在"
+                            end
+                            print(string.format("\27[31m╔══════════════════════════════════════════════════════════════╗\27[0m"))
+                            print(string.format("\27[31m║ ❌ 登录失败！错误码: %d (%s)\27[0m", header.result, errorMsg))
+                            print(string.format("\27[31m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+                        end
+                    end
                 end
                 
                 -- 发送给客户端

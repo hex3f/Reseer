@@ -219,6 +219,7 @@ lpp.handler[104] = function(socket, userId, buf, length)
     local user = userDB:findByEmail(email)
     local loginUserId = 0
     local errorCode = 0
+    local isNewUser = false
     
     if user then
         -- 验证密码 (客户端发送的是MD5后的密码)
@@ -229,7 +230,7 @@ lpp.handler[104] = function(socket, userId, buf, length)
             print(string.format("\27[32m[LOGIN-104] 登录成功: userId=%d, email=%s\27[0m", loginUserId, email))
         else
             -- 密码错误
-            errorCode = 2
+            errorCode = 5003
             print(string.format("\27[31m[LOGIN-104] 密码错误: email=%s\27[0m", email))
         end
     else
@@ -238,6 +239,7 @@ lpp.handler[104] = function(socket, userId, buf, length)
         user = userDB:createUser(email, passwordMD5)
         if user then
             loginUserId = user.userId
+            isNewUser = true
             print(string.format("\27[32m[LOGIN-104] 自动注册成功: userId=%d\27[0m", loginUserId))
         else
             errorCode = 1
@@ -245,13 +247,103 @@ lpp.handler[104] = function(socket, userId, buf, length)
         end
     end
     
-    -- 生成session
-    local session = string.format("%016d", loginUserId)
-    local roleCreate = 1  -- 1=已创建角色
+    -- 生成session (16字节随机数据，类似官服格式)
+    local session = ""
+    for i = 1, 16 do
+        session = session .. string.char(math.random(0, 255))
+    end
+    
+    -- 保存session到用户数据
+    if user then
+        user.session = session
+        user.sessionHex = ""
+        for i = 1, #session do
+            user.sessionHex = user.sessionHex .. string.format("%02X", session:byte(i))
+        end
+        userDB:saveUser(user)
+    end
+    
+    -- roleCreate: 0=未创建角色(新用户), 1=已创建角色
+    local roleCreate = 0
+    if user and user.roleCreated then
+        roleCreate = 1
+    end
     
     local body = lpp.makeLoginBody(session, roleCreate)
     socket:write(lpp.makeHead(104, loginUserId, errorCode, #body))
     socket:write(body)
+    
+    if errorCode == 0 then
+        print(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
+        print(string.format("\27[32m║ ✅ 登录成功！米米号: %d\27[0m", loginUserId))
+        print(string.format("\27[32m║ 👤 角色状态: %s\27[0m", roleCreate == 1 and "已创建" or "未创建"))
+        print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+    end
+end
+
+-- CMD_CREATE_ROLE (创建角色)
+lpp.handler[108] = function(socket, userId, buf, length)
+    -- 创建角色请求
+    -- session: 16字节
+    -- nickname: 后面的数据
+    
+    print(string.format("\27[33m[CREATE_ROLE] 创建角色请求: userId=%d\27[0m", userId))
+    
+    -- 查找用户
+    local user = userDB:findByUserId(userId)
+    
+    if user then
+        -- 标记角色已创建
+        user.roleCreated = true
+        userDB:saveUser(user)
+        
+        -- 生成新的session
+        local newSession = ""
+        for i = 1, 16 do
+            newSession = newSession .. string.char(math.random(0, 255))
+        end
+        
+        -- 保存新session
+        user.session = newSession
+        user.sessionHex = ""
+        for i = 1, #newSession do
+            user.sessionHex = user.sessionHex .. string.format("%02X", newSession:byte(i))
+        end
+        userDB:saveUser(user)
+        
+        -- 返回新session (16字节)
+        local body = buffer.Buffer:new(16)
+        for i = 1, 16 do
+            body:writeUInt8(i, newSession:byte(i))
+        end
+        
+        socket:write(lpp.makeHead(108, userId, 0, 16))
+        socket:write(tostring(body))
+        
+        print(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
+        print(string.format("\27[32m║ ✅ 角色创建成功！米米号: %d\27[0m", userId))
+        print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+    else
+        -- 用户不存在
+        socket:write(lpp.makeHead(108, userId, 1, 0))
+        print(string.format("\27[31m[CREATE_ROLE] 用户不存在: userId=%d\27[0m", userId))
+    end
+end
+
+-- CMD_SYS_ROLE (109) - 角色验证
+lpp.handler[109] = function(socket, userId, buf, length)
+    print(string.format("\27[33m[SYS_ROLE] 角色验证: userId=%d\27[0m", userId))
+    socket:write(lpp.makeHead(109, userId, 0, 0))
+end
+
+-- CMD_FENGHAO_TIME (111) - 封号时间查询
+lpp.handler[111] = function(socket, userId, buf, length)
+    print(string.format("\27[33m[FENGHAO_TIME] 封号时间查询: userId=%d\27[0m", userId))
+    -- 返回0表示没有被封号
+    local body = buffer.Buffer:new(4)
+    body:writeUInt32BE(1, 0)
+    socket:write(lpp.makeHead(111, userId, 0, 4))
+    socket:write(tostring(body))
 end
 
 -- CMD_GET_GOOD_SERVER_LIST
