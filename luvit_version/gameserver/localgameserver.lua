@@ -548,11 +548,81 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     
     -- 17. petNum + PetInfo[]
     responseBody = responseBody .. writeUInt32BE(#pets)                               -- petNum
-    -- TODO: 如果有精灵，需要写入 PetInfo 数据
+    
+    -- 写入每个精灵的 PetInfo 数据
+    for _, pet in ipairs(pets) do
+        local petId = pet.id or 7
+        local petLevel = pet.level or 1
+        local petDv = pet.dv or 31
+        local petNature = pet.nature or 1
+        local petExp = pet.exp or 0
+        local catchTime = pet.catchTime or os.time()
+        
+        -- 计算精灵属性
+        local stats = SeerMonsters.calculateStats(petId, petLevel, petDv) or {
+            hp = 20, maxHp = 20, attack = 12, defence = 12, spAtk = 11, spDef = 10, speed = 12
+        }
+        
+        -- 获取经验信息
+        local expInfo = SeerMonsters.getExpInfo(petId, petLevel, petExp)
+        
+        -- 获取精灵技能
+        local skills = SeerMonsters.getSkillsForLevel(petId, petLevel) or {}
+        
+        -- PetInfo 结构
+        responseBody = responseBody .. writeUInt32BE(petId)                           -- id
+        responseBody = responseBody .. writeFixedString(pet.name or "", 16)           -- name (16字节)
+        responseBody = responseBody .. writeUInt32BE(petDv)                           -- dv
+        responseBody = responseBody .. writeUInt32BE(petNature)                       -- nature
+        responseBody = responseBody .. writeUInt32BE(petLevel)                        -- level
+        responseBody = responseBody .. writeUInt32BE(petExp)                          -- exp
+        responseBody = responseBody .. writeUInt32BE(expInfo.lvExp or 0)              -- lvExp
+        responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp or 100)        -- nextLvExp
+        responseBody = responseBody .. writeUInt32BE(stats.hp or stats.maxHp)         -- hp
+        responseBody = responseBody .. writeUInt32BE(stats.maxHp)                     -- maxHp
+        responseBody = responseBody .. writeUInt32BE(stats.attack)                    -- attack
+        responseBody = responseBody .. writeUInt32BE(stats.defence)                   -- defence
+        responseBody = responseBody .. writeUInt32BE(stats.spAtk)                     -- s_a
+        responseBody = responseBody .. writeUInt32BE(stats.spDef)                     -- s_d
+        responseBody = responseBody .. writeUInt32BE(stats.speed)                     -- speed
+        responseBody = responseBody .. writeUInt32BE(pet.ev_hp or 0)                  -- ev_hp
+        responseBody = responseBody .. writeUInt32BE(pet.ev_attack or 0)              -- ev_attack
+        responseBody = responseBody .. writeUInt32BE(pet.ev_defence or 0)             -- ev_defence
+        responseBody = responseBody .. writeUInt32BE(pet.ev_sa or 0)                  -- ev_sa
+        responseBody = responseBody .. writeUInt32BE(pet.ev_sd or 0)                  -- ev_sd
+        responseBody = responseBody .. writeUInt32BE(pet.ev_sp or 0)                  -- ev_sp
+        
+        -- 技能数量和技能列表 (固定4个槽位)
+        local skillCount = math.min(#skills, 4)
+        responseBody = responseBody .. writeUInt32BE(skillCount)                      -- skillNum
+        
+        for i = 1, 4 do
+            local skillId = skills[#skills - 4 + i]  -- 取最后学会的4个技能
+            if skillId and skillId > 0 then
+                responseBody = responseBody .. writeUInt32BE(skillId)                 -- skill id
+                responseBody = responseBody .. writeUInt32BE(30)                      -- skill pp (默认30)
+            else
+                responseBody = responseBody .. writeUInt32BE(0)                       -- skill id = 0
+                responseBody = responseBody .. writeUInt32BE(0)                       -- skill pp = 0
+            end
+        end
+        
+        responseBody = responseBody .. writeUInt32BE(catchTime)                       -- catchTime
+        responseBody = responseBody .. writeUInt32BE(pet.catchMap or 515)             -- catchMap
+        responseBody = responseBody .. writeUInt32BE(pet.catchRect or 0)              -- catchRect
+        responseBody = responseBody .. writeUInt32BE(pet.catchLevel or petLevel)      -- catchLevel
+        responseBody = responseBody .. writeUInt16BE(0)                               -- effectCount
+        responseBody = responseBody .. writeUInt32BE(pet.skinID or 0)                 -- skinID
+    end
     
     -- 18. clothCount + clothes[]
     responseBody = responseBody .. writeUInt32BE(#clothes)                            -- clothCount
-    -- TODO: 如果有服装，需要写入 clothes 数据
+    
+    -- 写入每个服装的数据
+    for _, cloth in ipairs(clothes) do
+        responseBody = responseBody .. writeUInt32BE(cloth.id or cloth[1] or 0)       -- cloth id
+        responseBody = responseBody .. writeUInt32BE(cloth.level or cloth[2] or 0)    -- cloth level
+    end
     
     -- 19. curTitle
     responseBody = responseBody .. writeUInt32BE(userData.curTitle or 0)              -- curTitle
