@@ -48,7 +48,8 @@ function LocalRoomServer:start()
             userId = 0,
             session = "",
             roomId = 0,
-            loggedIn = false
+            loggedIn = false,
+            heartbeatTimer = nil  -- 心跳定时器
         }
         table.insert(self.clients, clientData)
         
@@ -73,6 +74,13 @@ function LocalRoomServer:start()
 end
 
 function LocalRoomServer:removeClient(clientData)
+    -- 清理心跳定时器
+    if clientData.heartbeatTimer then
+        local timer = require('timer')
+        timer.clearInterval(clientData.heartbeatTimer)
+        clientData.heartbeatTimer = nil
+    end
+    
     -- 从在线追踪移除
     if clientData.userId and clientData.userId > 0 then
         -- 不完全移除，只是标记离开房间
@@ -401,6 +409,9 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     -- 然后发送 ROOM_LOGIN 空响应
     self:sendResponse(clientData, cmdId, userId, 0, "")
     tprint(string.format("\27[32m[RoomServer] → ROOM_LOGIN 成功\27[0m"))
+    
+    -- 启动心跳定时器
+    self:startHeartbeat(clientData, userId)
 end
 
 -- CMD 10003: 离开房间 (LEAVE_ROOM)
@@ -794,8 +805,52 @@ end
 
 -- CMD 80008: 心跳包
 function LocalRoomServer:handleHeartbeat(clientData, cmdId, userId, seqId, body)
-    -- 返回空响应
-    self:sendResponse(clientData, cmdId, userId, 0, "")
+    -- 客户端回复的心跳包，不需要再回复
+    -- 服务器主动发送心跳，客户端收到后回复
+end
+
+-- 启动心跳定时器 (每6秒发送一次)
+function LocalRoomServer:startHeartbeat(clientData, userId)
+    local timer = require('timer')
+    
+    -- 如果已有定时器，先清理
+    if clientData.heartbeatTimer then
+        timer.clearInterval(clientData.heartbeatTimer)
+    end
+    
+    -- 每6秒发送一次心跳包
+    clientData.heartbeatTimer = timer.setInterval(6000, function()
+        if clientData.socket and clientData.loggedIn then
+            self:sendHeartbeat(clientData, userId)
+        else
+            -- 连接已断开，清理定时器
+            if clientData.heartbeatTimer then
+                timer.clearInterval(clientData.heartbeatTimer)
+                clientData.heartbeatTimer = nil
+            end
+        end
+    end)
+end
+
+-- 发送心跳包
+function LocalRoomServer:sendHeartbeat(clientData, userId)
+    local cmdId = 80008  -- NIEO_HEART
+    local length = 17    -- 只有包头，没有数据体
+    
+    local header = string.char(
+        0, 0, 0, 17,  -- length = 17
+        0x37,         -- version
+        0, 1, 56, 136, -- cmdId = 80008 (0x00013888)
+        math.floor(userId / 16777216) % 256,
+        math.floor(userId / 65536) % 256,
+        math.floor(userId / 256) % 256,
+        userId % 256,
+        0, 0, 0, 0    -- result = 0
+    )
+    
+    pcall(function()
+        clientData.socket:write(header)
+    end)
 end
 
 return {LocalRoomServer = LocalRoomServer}
