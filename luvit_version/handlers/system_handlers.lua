@@ -6,6 +6,7 @@ local writeUInt32BE = Utils.writeUInt32BE
 local readUInt32BE = Utils.readUInt32BE
 local writeFixedString = Utils.writeFixedString
 local buildResponse = Utils.buildResponse
+local OnlineTracker = require('./online_tracker')
 
 local SystemHandlers = {}
 
@@ -19,12 +20,48 @@ local function handleSystemTime(ctx)
     return true
 end
 
--- CMD 1004: MAP_HOT (地图热度)
+-- CMD 1004: MAP_HOT (地图热度/热门地图列表)
 -- MapHotInfo: count(4) + [mapId(4) + hotValue(4)]...
+-- 返回实时在线人数统计
 local function handleMapHot(ctx)
-    local body = writeUInt32BE(0)  -- count = 0
+    -- 获取所有有人的地图
+    local mapCounts = OnlineTracker.getAllMapCounts()
+    
+    -- 预设的常用地图列表 (即使没人也显示)
+    local defaultMaps = {
+        1, 3, 4, 5, 6, 7, 8, 9, 10, 15, 17, 19, 20, 25, 30,
+        40, 47, 51, 54, 57, 60,  -- 家园
+        101, 102, 103, 107,      -- 克洛斯星系列
+        314, 325, 328, 333, 338  -- 其他地图
+    }
+    
+    -- 合并实时数据和预设地图
+    local mapData = {}
+    local seenMaps = {}
+    
+    -- 先添加有人的地图
+    for _, data in ipairs(mapCounts) do
+        table.insert(mapData, {data.mapId, data.count})
+        seenMaps[data.mapId] = true
+    end
+    
+    -- 再添加预设地图 (人数为0)
+    for _, mapId in ipairs(defaultMaps) do
+        if not seenMaps[mapId] then
+            table.insert(mapData, {mapId, 0})
+        end
+    end
+    
+    -- 构建响应
+    local body = writeUInt32BE(#mapData)  -- count
+    for _, map in ipairs(mapData) do
+        body = body .. writeUInt32BE(map[1])  -- mapId
+        body = body .. writeUInt32BE(map[2])  -- hotValue (在线人数)
+    end
+    
     ctx.sendResponse(buildResponse(1004, ctx.userId, 0, body))
-    print("\27[32m[Handler] → MAP_HOT response\27[0m")
+    print(string.format("\27[32m[Handler] → MAP_HOT response (%d maps, %d online)\27[0m", 
+        #mapData, OnlineTracker.getOnlineCount()))
     return true
 end
 

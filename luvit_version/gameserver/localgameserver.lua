@@ -25,6 +25,9 @@ local SeerSkills = require('../seer_skills')
 -- 加载战斗系统
 local SeerBattle = require('../seer_battle')
 
+-- 加载在线追踪模块
+local OnlineTracker = require('../handlers/online_tracker')
+
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
 end
@@ -119,6 +122,11 @@ function LocalGameServer:removeClient(clientData)
         local timer = require('timer')
         timer.clearInterval(clientData.heartbeatTimer)
         clientData.heartbeatTimer = nil
+    end
+    
+    -- 从在线追踪系统移除玩家
+    if clientData.userId then
+        OnlineTracker.playerLogout(clientData.userId)
     end
     
     -- 设置用户离线状态 (用于好友系统)
@@ -687,6 +695,9 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     -- 登录成功后启动心跳定时器 (官服每6秒发送一次心跳)
     clientData.loggedIn = true
     self:startHeartbeat(clientData, userId)
+    
+    -- 注册玩家到在线追踪系统
+    OnlineTracker.playerLogin(userId, clientData)
 end
 
 -- CMD 1002: 获取系统时间

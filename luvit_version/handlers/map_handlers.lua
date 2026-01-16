@@ -7,6 +7,7 @@ local writeUInt16BE = Utils.writeUInt16BE
 local readUInt32BE = Utils.readUInt32BE
 local writeFixedString = Utils.writeFixedString
 local buildResponse = Utils.buildResponse
+local OnlineTracker = require('./online_tracker')
 
 local MapHandlers = {}
 
@@ -55,6 +56,9 @@ local function handleEnterMap(ctx)
     user.x = x
     user.y = y
     ctx.saveUserDB()
+    
+    -- 更新在线追踪
+    OnlineTracker.updatePlayerMap(ctx.userId, mapId, mapType)
     
     print(string.format("\27[36m[Handler] ENTER_MAP: mapType=%d, mapId=%d, pos=(%d,%d)\27[0m", mapType, mapId, x, y))
     
@@ -173,11 +177,20 @@ end
 -- MapPlayerListInfo: playerCount(4) + [UserInfo]...
 local function handleListMapPlayer(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
-    local playerInfo = buildUserInfo(ctx.userId, user)
-    local body = writeUInt32BE(1) .. playerInfo         -- 1个玩家
+    local currentMapId = OnlineTracker.getPlayerMap(ctx.userId)
+    
+    -- 获取同地图的所有玩家
+    local playersInMap = OnlineTracker.getPlayersInMap(currentMapId)
+    
+    local body = writeUInt32BE(#playersInMap)
+    for _, playerId in ipairs(playersInMap) do
+        local playerUser = ctx.getOrCreateUser(playerId)
+        body = body .. buildUserInfo(playerId, playerUser)
+    end
     
     ctx.sendResponse(buildResponse(2003, ctx.userId, 0, body))
-    print("\27[32m[Handler] → LIST_MAP_PLAYER response\27[0m")
+    print(string.format("\27[32m[Handler] → LIST_MAP_PLAYER response (%d players in map %d)\27[0m", 
+        #playersInMap, currentMapId))
     return true
 end
 
@@ -323,12 +336,15 @@ local function handleChangeNickName(ctx)
 end
 
 -- CMD 2101: PEOPLE_WALK (人物移动)
--- 请求格式: walkType(4) + x(4) + y(4) + [direction(4) + AMF数据...]
--- 响应格式 (根据WalkCmdListener.as): unknown(4) + userId(4) + x(4) + y(4)
+-- 请求格式: walkType(4) + x(4) + y(4) + amfLen(4) + amfData...
+-- 响应格式: walkType(4) + userId(4) + x(4) + y(4) + amfLen(4) + amfData...
+-- 需要广播给同地图其他玩家
 local function handlePeopleWalk(ctx)
     local walkType = 0
     local x = 0
     local y = 0
+    local amfLen = 0
+    local amfData = ""
     
     if #ctx.body >= 4 then
         walkType = readUInt32BE(ctx.body, 1)
@@ -339,19 +355,44 @@ local function handlePeopleWalk(ctx)
     if #ctx.body >= 12 then
         y = readUInt32BE(ctx.body, 9)
     end
+    if #ctx.body >= 16 then
+        amfLen = readUInt32BE(ctx.body, 13)
+        if #ctx.body >= 16 + amfLen then
+            amfData = ctx.body:sub(17, 16 + amfLen)
+        end
+    end
     
     -- 更新用户位置
     local user = ctx.getOrCreateUser(ctx.userId)
     user.x = x
     user.y = y
     
-    -- 构建响应 (匹配 WalkCmdListener.as 解析格式)
-    local body = writeUInt32BE(0) ..              -- unknown (未使用)
+    -- 更新活跃时间
+    OnlineTracker.updateActivity(ctx.userId)
+    
+    -- 构建响应 (包含完整的 AMF 数据)
+    local body = writeUInt32BE(walkType) ..       -- walkType
                 writeUInt32BE(ctx.userId) ..      -- userId
                 writeUInt32BE(x) ..               -- x
-                writeUInt32BE(y)                  -- y
+                writeUInt32BE(y) ..               -- y
+                writeUInt32BE(amfLen) ..          -- amfLen
+                amfData                           -- amfData (透传)
     
-    ctx.sendResponse(buildResponse(2101, ctx.userId, 0, body))
+    local response = buildResponse(2101, ctx.userId, 0, body)
+    
+    -- 获取当前地图并广播给同地图所有玩家
+    local currentMapId = OnlineTracker.getPlayerMap(ctx.userId)
+    if currentMapId > 0 then
+        -- 广播给同地图所有玩家 (包括自己)
+        local playersInMap = OnlineTracker.getPlayersInMap(currentMapId)
+        for _, playerId in ipairs(playersInMap) do
+            OnlineTracker.sendToPlayer(playerId, response)
+        end
+    else
+        -- 如果没有地图信息，只回复给自己
+        ctx.sendResponse(response)
+    end
+    
     return true
 end
 
@@ -382,9 +423,22 @@ local function handleChat(ctx)
                 writeUInt32BE(#message) ..
                 message
     
-    ctx.sendResponse(buildResponse(2102, ctx.userId, 0, body))
+    local response = buildResponse(2102, ctx.userId, 0, body)
+    
+    -- 广播给同地图所有玩家
+    local currentMapId = OnlineTracker.getPlayerMap(ctx.userId)
+    if currentMapId > 0 then
+        local playersInMap = OnlineTracker.getPlayersInMap(currentMapId)
+        for _, playerId in ipairs(playersInMap) do
+            OnlineTracker.sendToPlayer(playerId, response)
+        end
+    else
+        ctx.sendResponse(response)
+    end
+    
     print(string.format("\27[32m[Handler] → CHAT: %s\27[0m", message:sub(1, 20)))
     return true
+end
 end
 
 -- CMD 2103: DANCE_ACTION (舞蹈动作)
