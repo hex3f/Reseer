@@ -452,6 +452,30 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             end
         end
         
+        -- 生成 HEX 字符串
+        local function toHexString(data, maxLen)
+            maxLen = maxLen or 64
+            local hexStr = ""
+            local len = math.min(#data, maxLen)
+            for i = 1, len do
+                hexStr = hexStr .. string.format("%02X ", data:byte(i))
+            end
+            if #data > maxLen then
+                hexStr = hexStr .. "..."
+            end
+            return hexStr
+        end
+        
+        -- 检查是否应该隐藏该命令
+        local function shouldHideCmd(cmdId)
+            if not conf.hide_frequent_cmds then return false end
+            if not conf.hide_cmd_list then return false end
+            for _, hiddenCmd in ipairs(conf.hide_cmd_list) do
+                if cmdId == hiddenCmd then return true end
+            end
+            return false
+        end
+        
         -- 处理单个数据包
         local function processSinglePacket(direction, data)
             local decryptedData = nil
@@ -484,28 +508,34 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             end
             
             -- 打印信息
-            local arrow = direction == "CLI" and "->" or "<-"
             if header and header.cmdId > 0 and header.cmdId < 100000 and header.length < 1000000 then
                 local cmdName = getCmdName(header.cmdId)
                 local isEncrypted = not isValidPlaintext and decryptedData ~= data
-                local encryptTag = isEncrypted and " [加密]" or " [明文]"
                 
-                -- 使用醒目的框架显示
-                if direction == "CLI" then
-                    print("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m")
-                    print(string.format("\27[32m║ [Flash→官服游戏] CMD=%d (%s)%s\27[0m", header.cmdId, cmdName, encryptTag))
-                    print("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m")
-                    print(string.format("\27[32m[Flash→官服] 端口=%d, UID=%d, 长度=%d bytes\27[0m",
-                        localPort, header.userId, header.length))
-                else
-                    print("\27[33m╔══════════════════════════════════════════════════════════════╗\27[0m")
-                    print(string.format("\27[33m║ [官服游戏→Flash] CMD=%d (%s)%s\27[0m", header.cmdId, cmdName, encryptTag))
-                    print("\27[33m╚══════════════════════════════════════════════════════════════╝\27[0m")
-                    print(string.format("\27[33m[官服→Flash] 端口=%d, UID=%d, 长度=%d bytes\27[0m",
-                        localPort, header.userId, header.length))
+                -- 检查是否隐藏该命令
+                if not shouldHideCmd(header.cmdId) then
+                    -- 简洁的单行格式
+                    local dirStr, color
+                    if direction == "CLI" then
+                        dirStr = "→官服"
+                        color = "\27[32m"  -- 绿色
+                    else
+                        dirStr = "←官服"
+                        color = "\27[33m"  -- 黄色
+                    end
+                    
+                    -- 主日志行
+                    print(string.format("%s[%s] CMD %d (%s) UID=%d LEN=%d\27[0m", 
+                        color, dirStr, header.cmdId, cmdName, header.userId, header.length))
+                    
+                    -- 显示 HEX 数据 (body 部分)
+                    if #decryptedData > 17 then
+                        local bodyData = decryptedData:sub(18)
+                        print(string.format("\27[90m  HEX: %s\27[0m", toHexString(bodyData, 48)))
+                    end
                 end
                 
-                -- 记录到日志文件（包含完整数据）
+                -- 记录到日志文件（包含完整数据，不管是否隐藏）
                 local Logger = require("../logger")
                 Logger.logCommand(
                     direction == "CLI" and "SEND" or "RECV",
@@ -531,15 +561,12 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                 end
             else
                 -- 无法解析的数据
-                local hexStr = ""
-                for i = 1, math.min(32, #data) do
-                    hexStr = hexStr .. string.format("%02X ", data:byte(i))
-                end
-                print(string.format("\27[31m[GAME:%d] %s (无法解析) %d bytes: %s\27[0m", localPort, arrow, #data, hexStr))
+                print(string.format("\27[31m[GAME:%d] 无法解析 %d bytes: %s\27[0m", 
+                    localPort, #data, toHexString(data, 32)))
                 decryptedData = data  -- 记录原始数据
             end
             
-            -- 记录
+            -- 记录到文件
             logPacket(direction, data, decryptedData)
             
             return decryptedData, header

@@ -1823,8 +1823,11 @@ function LocalGameServer:handleGetRelationList(clientData, cmdId, userId, seqId,
 end
 
 -- CMD 70001: 获取兑换信息 (GET_EXCHANGE_INFO)
+-- 用于荣誉兑换手册，记录玩家已兑换的物品数量
 -- 响应结构: count(4) + [exchangeID(4) + exchangeNum(4)]...
+-- 官服老用户返回约 41 条记录 (349 bytes)，新用户返回 count=0
 function LocalGameServer:handleCmd70001(clientData, cmdId, userId, seqId, body)
+    print("\27[36m[LocalGame] 处理 CMD 70001: 获取兑换信息 (荣誉兑换手册)\27[0m")
     -- 新用户没有兑换记录，返回空列表
     local responseBody = writeUInt32BE(0)  -- count = 0
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)

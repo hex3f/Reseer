@@ -19,229 +19,152 @@ function Logger.init()
     if Logger.logFile then
         Logger.logFile:setvbuf("line") -- 行缓冲，立即写入
         Logger.write("")
-        Logger.write("========================================")
-        Logger.write("Server Started")
-        Logger.write("Time: " .. os.date("%Y-%m-%d %H:%M:%S"))
-        Logger.write("========================================")
+        Logger.write("================================================================================")
+        Logger.write("Server Started - " .. os.date("%Y-%m-%d %H:%M:%S"))
+        Logger.write("================================================================================")
         Logger.write("")
-        print(string.format("\27[36m[LOGGER] Logging to: %s\27[0m", Logger.logPath))
+        print(string.format("\27[36m[LOGGER] 日志文件: %s\27[0m", Logger.logPath))
         return true
     else
-        print(string.format("\27[31m[LOGGER] Failed to open log file: %s\27[0m", Logger.logPath))
+        print(string.format("\27[31m[LOGGER] 无法打开日志文件: %s\27[0m", Logger.logPath))
         return false
     end
 end
 
--- 写入日志
+-- 写入日志（不带时间戳）
+function Logger.writeRaw(message)
+    if Logger.logFile then
+        Logger.logFile:write(message .. "\n")
+    end
+end
+
+-- 写入日志（带时间戳）
 function Logger.write(message)
     if Logger.logFile then
-        local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+        local timestamp = os.date("%H:%M:%S")
         Logger.logFile:write(string.format("[%s] %s\n", timestamp, message))
     end
 end
 
 -- 记录资源请求
 function Logger.logResource(method, path, status, size)
-    local message = string.format("RESOURCE | %s %s -> %d (%s bytes)", 
+    local message = string.format("RES  | %s %s -> %d (%s bytes)", 
         method, path, status, size or "?")
     Logger.write(message)
+end
+
+-- 将 buffer 转换为 HEX 字符串（每行16字节）
+local function bufferToHexFormatted(data, indent)
+    indent = indent or "     "
+    if type(data) ~= "string" or #data == 0 then return "" end
     
-    -- 对 SWF 文件特别标记
-    if path:lower():match("%.swf$") then
-        Logger.write("         SWF LOADED: " .. path)
+    local lines = {}
+    local line = ""
+    local ascii = ""
+    
+    for i = 1, #data do
+        local byte = string.byte(data, i)
+        line = line .. string.format("%02X ", byte)
+        
+        -- ASCII 可打印字符
+        if byte >= 32 and byte <= 126 then
+            ascii = ascii .. string.char(byte)
+        else
+            ascii = ascii .. "."
+        end
+        
+        if i % 16 == 0 then
+            table.insert(lines, indent .. line .. " | " .. ascii)
+            line = ""
+            ascii = ""
+        elseif i % 8 == 0 then
+            line = line .. " "
+        end
     end
-end
-
--- 记录 HTTP 请求
-function Logger.logHttp(method, path, status)
-    local message = string.format("HTTP | %s %s -> %d", method, path, status)
-    Logger.write(message)
-end
-
--- 记录 TCP 连接
-function Logger.logTcp(event, port, info)
-    local message = string.format("TCP | %s on port %d | %s", event, port, info or "")
-    Logger.write(message)
-end
-
--- 将 buffer 转换为 HEX 字符串（完整版，不截断）
-local function bufferToHex(data)
-    if type(data) == "string" then
-        local hex = ""
-        for i = 1, #data do
-            hex = hex .. string.format("%02X ", string.byte(data, i))
-            if i % 16 == 0 and i < #data then
-                hex = hex .. "\n                    "
+    
+    -- 处理最后一行
+    if #line > 0 then
+        -- 补齐空格
+        local remaining = 16 - (#data % 16)
+        if remaining < 16 then
+            for i = 1, remaining do
+                line = line .. "   "
+                if (#data % 16) + i == 8 then
+                    line = line .. " "
+                end
             end
         end
-        return hex
+        table.insert(lines, indent .. line .. " | " .. ascii)
     end
-    return "N/A"
+    
+    return table.concat(lines, "\n")
 end
 
--- 解析为 INT32 数组（大端序）
-local function parseAsInt32Array(data)
+-- 简短的 HEX 字符串（单行）
+local function bufferToHexShort(data, maxLen)
+    maxLen = maxLen or 32
     if type(data) ~= "string" or #data == 0 then return "" end
     
-    local ints = {}
-    local i = 1
-    while i <= #data - 3 do
-        local val = (string.byte(data, i) * 16777216) + 
-                    (string.byte(data, i+1) * 65536) + 
-                    (string.byte(data, i+2) * 256) + 
-                    string.byte(data, i+3)
-        
-        -- 处理有符号整数
-        if val >= 2147483648 then
-            val = val - 4294967296
-        end
-        
-        table.insert(ints, val)
-        i = i + 4
+    local hex = ""
+    local len = math.min(#data, maxLen)
+    for i = 1, len do
+        hex = hex .. string.format("%02X ", string.byte(data, i))
     end
-    
-    -- 处理剩余字节
-    local remaining = ""
-    if i <= #data then
-        remaining = " + " .. (#data - i + 1) .. " bytes"
+    if #data > maxLen then
+        hex = hex .. "... (" .. #data .. " bytes total)"
     end
-    
-    if #ints > 0 then
-        return table.concat(ints, ", ") .. remaining
-    end
-    return ""
-end
-
--- 智能解析：尝试识别数据类型
-local function smartParse(data)
-    if type(data) ~= "string" or #data == 0 then return "" end
-    
-    local result = {}
-    
-    -- 1. 总是尝试解析 INT32 数组（如果数据足够）
-    if #data >= 4 then
-        local int32s = parseAsInt32Array(data)
-        if int32s ~= "" then
-            table.insert(result, "INT32[]: " .. int32s)
-        end
-    end
-    
-    -- 2. 显示所有字节值（不截断）
-    local bytes = {}
-    for i = 1, #data do
-        table.insert(bytes, string.byte(data, i))
-    end
-    table.insert(result, "BYTES: " .. table.concat(bytes, ","))
-    
-    return table.concat(result, " | ")
+    return hex
 end
 
 -- 记录游戏命令（完整数据）
 function Logger.logCommand(direction, cmdId, cmdName, uid, length, data)
-    local arrow = direction == "SEND" and "->" or "<-"
-    local message = string.format("GAME | %s CMD=%d (%s), UID=%d, LEN=%d", 
-        arrow, cmdId, cmdName or "Unknown", uid or 0, length or 0)
-    Logger.write(message)
+    local arrow = direction == "SEND" and ">>>" or "<<<"
+    local dirLabel = direction == "SEND" and "CLIENT->SERVER" or "SERVER->CLIENT"
     
-    -- 记录完整的 HEX 数据（不截断）
+    Logger.writeRaw("")
+    Logger.writeRaw(string.format("---- %s CMD %d (%s) ----", dirLabel, cmdId, cmdName or "Unknown"))
+    Logger.write(string.format("GAME | %s CMD=%d (%s) UID=%d LEN=%d", 
+        arrow, cmdId, cmdName or "Unknown", uid or 0, length or 0))
+    
+    -- 记录完整的 HEX 数据
     if data and #data > 0 then
-        local hexData = bufferToHex(data)
-        Logger.write("       HEX: " .. hexData)
+        Logger.writeRaw("     HEADER (17 bytes):")
+        if #data >= 17 then
+            Logger.writeRaw(bufferToHexFormatted(data:sub(1, 17), "       "))
+        end
         
-        -- 智能解析（INT32数组等）
-        local parsed = smartParse(data)
-        if parsed ~= "" then
-            Logger.write("       PARSE: " .. parsed)
+        if #data > 17 then
+            Logger.writeRaw("     BODY (" .. (#data - 17) .. " bytes):")
+            Logger.writeRaw(bufferToHexFormatted(data:sub(18), "       "))
         end
     end
-end
-
--- 记录游戏命令（带解析数据）
-function Logger.logCommandWithParsed(direction, cmdId, cmdName, uid, length, data, parsed)
-    local arrow = direction == "SEND" and "->" or "<-"
-    local message = string.format("GAME | %s CMD=%d (%s), UID=%d, LEN=%d", 
-        arrow, cmdId, cmdName or "Unknown", uid or 0, length or 0)
-    Logger.write(message)
-    
-    -- 记录完整 HEX 数据（不截断）
-    if data and #data > 0 then
-        local hexData = bufferToHex(data)
-        Logger.write("       HEX: " .. hexData)
-        
-        -- 智能解析（INT32数组等）
-        local smartParsed = smartParse(data)
-        if smartParsed ~= "" then
-            Logger.write("       PARSE: " .. smartParsed)
-        end
-    end
-    
-    -- 记录解析后的数据
-    if parsed then
-        Logger.write("       PARSED: " .. parsed)
-    end
+    Logger.writeRaw("")
 end
 
 -- 记录登录事件
 function Logger.logLogin(event, uid, info)
-    local message = string.format("LOGIN | %s | UID=%d | %s", event, uid or 0, info or "")
-    Logger.write(message)
+    Logger.write(string.format("AUTH | %s | UID=%d | %s", event, uid or 0, info or ""))
 end
 
 -- 记录错误
 function Logger.logError(module, error)
-    local message = string.format("ERROR | [%s] %s", module, error)
-    Logger.write(message)
-end
-
--- 记录官服交互（客户端→官服）
-function Logger.logOfficialSend(cmdId, cmdName, uid, length, data)
-    local message = string.format("OFFICIAL | -> CMD=%d (%s), UID=%d, LEN=%d", 
-        cmdId, cmdName or "Unknown", uid or 0, length or 0)
-    Logger.write(message)
-    
-    -- 记录完整的 HEX 数据
-    if data and #data > 0 then
-        local hexData = bufferToHex(data)
-        Logger.write("           HEX: " .. hexData)
-    end
-end
-
--- 记录官服交互（官服→客户端）
-function Logger.logOfficialRecv(cmdId, cmdName, uid, result, length, data)
-    local message = string.format("OFFICIAL | <- CMD=%d (%s), UID=%d, RESULT=%d, LEN=%d", 
-        cmdId, cmdName or "Unknown", uid or 0, result or 0, length or 0)
-    Logger.write(message)
-    
-    -- 记录完整的 HEX 数据
-    if data and #data > 0 then
-        local hexData = bufferToHex(data)
-        Logger.write("           HEX: " .. hexData)
-        
-        -- 智能解析
-        local parsed = smartParse(data)
-        if parsed ~= "" then
-            Logger.write("           PARSE: " .. parsed)
-        end
-    end
+    Logger.write(string.format("ERR  | [%s] %s", module, error))
 end
 
 -- 记录分隔线
 function Logger.separator()
-    Logger.write("----------------------------------------")
+    Logger.writeRaw("--------------------------------------------------------------------------------")
 end
 
 -- 关闭日志文件
 function Logger.close()
     if Logger.logFile then
-        Logger.write("")
-        Logger.write("========================================")
+        Logger.writeRaw("")
+        Logger.writeRaw("================================================================================")
         Logger.write("Server Stopped")
-        Logger.write("Time: " .. os.date("%Y-%m-%d %H:%M:%S"))
-        Logger.write("========================================")
-        Logger.write("")
+        Logger.writeRaw("================================================================================")
         Logger.logFile:close()
         Logger.logFile = nil
-        print(string.format("\27[36m[LOGGER] Log file closed: %s\27[0m", Logger.logPath))
     end
 end
 
