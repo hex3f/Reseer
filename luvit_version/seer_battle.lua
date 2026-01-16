@@ -4,6 +4,7 @@
 
 local SeerMonsters = require('./seer_monsters')
 local SeerSkills = require('./seer_skills')
+local SkillEffects = require('./seer_skill_effects')
 
 local SeerBattle = {}
 
@@ -119,9 +120,36 @@ end
 -- 计算伤害
 -- 公式: ((2*Lv/5+2)*Power*Atk/Def/50+2)*STAB*TypeMod*Crit*Random
 -- 参考前端 UseSkillController.as 的伤害显示逻辑
+-- move_flag: DmgBindLv(伤害=等级), PwrBindDv(威力=个体值*5), PwrDouble(异常时威力翻倍)
 function SeerBattle.calculateDamage(attacker, defender, skill, isCrit)
     local level = attacker.level or 5
     local power = skill.power or 40
+    
+    -- DmgBindLv: 伤害等于自身等级
+    if skill.dmgBindLv then
+        return level, 1.0, isCrit
+    end
+    
+    -- PwrBindDv: 威力=个体值*5 (值可能是1或2，2表示更强的倍率)
+    if skill.pwrBindDv then
+        local dv = attacker.dv or 15
+        local multiplier = skill.pwrBindDv == 2 and 10 or 5  -- 2时倍率更高
+        power = dv * multiplier
+    end
+    
+    -- PwrDouble: 对方处于异常状态时威力翻倍
+    if skill.pwrDouble and defender.status then
+        local hasStatus = false
+        for k, v in pairs(defender.status) do
+            if v and v > 0 then
+                hasStatus = true
+                break
+            end
+        end
+        if hasStatus then
+            power = power * 2
+        end
+    end
     
     -- 物理/特殊攻击 (category: 1=物理, 2=特殊, 4=变化)
     local atk, def
@@ -171,7 +199,32 @@ function SeerBattle.calculateDamage(attacker, defender, skill, isCrit)
 end
 
 -- 判断是否暴击
-function SeerBattle.checkCrit(attacker, skill)
+-- 考虑 move_flag: CritAtkFirst, CritAtkSecond, CritSelfHalfHp, CritFoeHalfHp
+function SeerBattle.checkCrit(attacker, defender, skill, isFirst)
+    -- CritAtkFirst: 先出手必暴击
+    if skill.critAtkFirst and isFirst then
+        return true
+    end
+    
+    -- CritAtkSecond: 后出手必暴击
+    if skill.critAtkSecond and not isFirst then
+        return true
+    end
+    
+    -- CritSelfHalfHp: 自身HP低于一半必暴击
+    if skill.critSelfHalfHp and attacker.hp and attacker.maxHp then
+        if attacker.hp < attacker.maxHp / 2 then
+            return true
+        end
+    end
+    
+    -- CritFoeHalfHp: 对方HP低于一半必暴击
+    if skill.critFoeHalfHp and defender.hp and defender.maxHp then
+        if defender.hp < defender.maxHp / 2 then
+            return true
+        end
+    end
+    
     local critRate = skill.critRate or 1
     -- 基础暴击率 = critRate / 16
     -- 速度等级加成
@@ -204,7 +257,7 @@ end
 
 -- 处理回合开始时的状态效果
 function SeerBattle.processStatusEffects(pet)
-    if not pet.status then return 0 end
+    if not pet.status then pet.status = {} end
     
     local statusDamage = 0
     
@@ -213,11 +266,19 @@ function SeerBattle.processStatusEffects(pet)
         statusDamage = statusDamage + math.floor(pet.maxHp / 8)
         pet.status[SeerBattle.STATUS.POISON] = pet.status[SeerBattle.STATUS.POISON] - 1
     end
+    if pet.status.poison and pet.status.poison > 0 then
+        statusDamage = statusDamage + math.floor(pet.maxHp / 8)
+        pet.status.poison = pet.status.poison - 1
+    end
     
     -- 烧伤伤害 (每回合损失1/16最大HP)
     if pet.status[SeerBattle.STATUS.BURN] and pet.status[SeerBattle.STATUS.BURN] > 0 then
         statusDamage = statusDamage + math.floor(pet.maxHp / 16)
         pet.status[SeerBattle.STATUS.BURN] = pet.status[SeerBattle.STATUS.BURN] - 1
+    end
+    if pet.status.burn and pet.status.burn > 0 then
+        statusDamage = statusDamage + math.floor(pet.maxHp / 16)
+        pet.status.burn = pet.status.burn - 1
     end
     
     -- 冻伤伤害 (每回合损失1/16最大HP)
@@ -232,34 +293,70 @@ function SeerBattle.processStatusEffects(pet)
         pet.status[SeerBattle.STATUS.BLEED] = pet.status[SeerBattle.STATUS.BLEED] - 1
     end
     
+    -- 紧勒伤害
+    if pet.bound and pet.boundTurns and pet.boundTurns > 0 then
+        statusDamage = statusDamage + math.floor(pet.maxHp / 16)
+        pet.boundTurns = pet.boundTurns - 1
+        if pet.boundTurns <= 0 then
+            pet.bound = false
+        end
+    end
+    
     return statusDamage
 end
 
 -- 检查是否可以行动
 function SeerBattle.canAct(pet)
-    if not pet.status then return true end
+    if not pet.status then pet.status = {} end
+    
+    -- 疲惫状态无法行动
+    if pet.fatigue and pet.fatigue > 0 then
+        pet.fatigue = pet.fatigue - 1
+        return false, "fatigue"
+    end
     
     -- 睡眠状态无法行动
     if pet.status[SeerBattle.STATUS.SLEEP] and pet.status[SeerBattle.STATUS.SLEEP] > 0 then
         pet.status[SeerBattle.STATUS.SLEEP] = pet.status[SeerBattle.STATUS.SLEEP] - 1
-        return false
+        return false, "sleep"
+    end
+    
+    -- 也检查新格式的睡眠状态
+    if pet.status.sleep and pet.status.sleep > 0 then
+        pet.status.sleep = pet.status.sleep - 1
+        return false, "sleep"
     end
     
     -- 石化状态无法行动
     if pet.status[SeerBattle.STATUS.PETRIFY] and pet.status[SeerBattle.STATUS.PETRIFY] > 0 then
-        return false
+        return false, "petrify"
+    end
+    if pet.status.petrify and pet.status.petrify > 0 then
+        pet.status.petrify = pet.status.petrify - 1
+        return false, "petrify"
     end
     
     -- 冰封状态无法行动
     if pet.status[SeerBattle.STATUS.ICE_SEAL] and pet.status[SeerBattle.STATUS.ICE_SEAL] > 0 then
         pet.status[SeerBattle.STATUS.ICE_SEAL] = pet.status[SeerBattle.STATUS.ICE_SEAL] - 1
-        return false
+        return false, "ice_seal"
+    end
+    
+    -- 冰冻状态无法行动
+    if pet.status.freeze and pet.status.freeze > 0 then
+        pet.status.freeze = pet.status.freeze - 1
+        return false, "freeze"
     end
     
     -- 麻痹有25%几率无法行动
     if pet.status[SeerBattle.STATUS.PARALYSIS] and pet.status[SeerBattle.STATUS.PARALYSIS] > 0 then
         if math.random(1, 4) == 1 then
-            return false
+            return false, "paralysis"
+        end
+    end
+    if pet.status.paralysis and pet.status.paralysis > 0 then
+        if math.random(1, 4) == 1 then
+            return false, "paralysis"
         end
     end
     
@@ -267,7 +364,13 @@ function SeerBattle.canAct(pet)
     if pet.status[SeerBattle.STATUS.FEAR] and pet.status[SeerBattle.STATUS.FEAR] > 0 then
         pet.status[SeerBattle.STATUS.FEAR] = pet.status[SeerBattle.STATUS.FEAR] - 1
         if math.random(1, 2) == 1 then
-            return false
+            return false, "fear"
+        end
+    end
+    if pet.status.fear and pet.status.fear > 0 then
+        pet.status.fear = pet.status.fear - 1
+        if math.random(1, 2) == 1 then
+            return false, "fear"
         end
     end
     
@@ -275,8 +378,20 @@ function SeerBattle.canAct(pet)
     if pet.status[SeerBattle.STATUS.CONFUSION] and pet.status[SeerBattle.STATUS.CONFUSION] > 0 then
         pet.status[SeerBattle.STATUS.CONFUSION] = pet.status[SeerBattle.STATUS.CONFUSION] - 1
         if math.random(1, 3) == 1 then
-            return false, "confusion"  -- 返回混乱标记
+            return false, "confusion"
         end
+    end
+    if pet.status.confusion and pet.status.confusion > 0 then
+        pet.status.confusion = pet.status.confusion - 1
+        if math.random(1, 3) == 1 then
+            return false, "confusion"
+        end
+    end
+    
+    -- 畏缩状态无法行动 (只持续一回合)
+    if pet.flinched then
+        pet.flinched = false
+        return false, "flinch"
     end
     
     return true
@@ -541,7 +656,7 @@ function SeerBattle.executeTurn(battle, playerSkillId)
     if playerFirst then
         -- 玩家先攻
         if playerCanAct then
-            result.firstAttack = SeerBattle.executeAttack(battle.player, battle.enemy, playerSkill, battle.userId)
+            result.firstAttack = SeerBattle.executeAttack(battle.player, battle.enemy, playerSkill, battle.userId, true)
             battle.enemy.hp = result.firstAttack.targetRemainHp
         else
             -- 玩家无法行动
@@ -568,7 +683,7 @@ function SeerBattle.executeTurn(battle, playerSkillId)
         else
             -- 敌方反击
             if enemyCanAct then
-                result.secondAttack = SeerBattle.executeAttack(battle.enemy, battle.player, enemySkill, 0)
+                result.secondAttack = SeerBattle.executeAttack(battle.enemy, battle.player, enemySkill, 0, false)
                 battle.player.hp = result.secondAttack.targetRemainHp
             else
                 result.secondAttack = {
@@ -596,7 +711,7 @@ function SeerBattle.executeTurn(battle, playerSkillId)
     else
         -- 敌方先攻
         if enemyCanAct then
-            result.firstAttack = SeerBattle.executeAttack(battle.enemy, battle.player, enemySkill, 0)
+            result.firstAttack = SeerBattle.executeAttack(battle.enemy, battle.player, enemySkill, 0, true)
             battle.player.hp = result.firstAttack.targetRemainHp
         else
             result.firstAttack = {
@@ -622,7 +737,7 @@ function SeerBattle.executeTurn(battle, playerSkillId)
         else
             -- 玩家反击
             if playerCanAct then
-                result.secondAttack = SeerBattle.executeAttack(battle.player, battle.enemy, playerSkill, battle.userId)
+                result.secondAttack = SeerBattle.executeAttack(battle.player, battle.enemy, playerSkill, battle.userId, false)
                 battle.enemy.hp = result.secondAttack.targetRemainHp
             else
                 result.secondAttack = {
@@ -656,9 +771,33 @@ function SeerBattle.executeTurn(battle, playerSkillId)
 end
 
 -- 执行单次攻击
-function SeerBattle.executeAttack(attacker, defender, skill, attackerUserId)
-    -- 检查命中
-    local hit = SeerBattle.checkHit(attacker, defender, skill)
+-- isFirst: 是否先手攻击 (用于 CritAtkFirst/CritAtkSecond 判断)
+function SeerBattle.executeAttack(attacker, defender, skill, attackerUserId, isFirst)
+    local effectId = skill.sideEffect
+    local effectArg = skill.sideEffectArg
+    local effectResults = {}
+    
+    -- 检查保护状态
+    if defender.protected then
+        defender.protected = false
+        return {
+            userId = attackerUserId,
+            skillId = skill.id or 10001,
+            damage = 0,
+            isCrit = false,
+            typeMod = 1,
+            attackerRemainHp = attacker.hp,
+            attackerMaxHp = attacker.maxHp,
+            targetRemainHp = defender.hp,
+            targetMaxHp = defender.maxHp,
+            blocked = true,
+            atkTimes = 0,
+            effects = {}
+        }
+    end
+    
+    -- 检查命中 (必中技能跳过)
+    local hit = skill.mustHit or SeerBattle.checkHit(attacker, defender, skill)
     
     if not hit then
         return {
@@ -672,33 +811,107 @@ function SeerBattle.executeAttack(attacker, defender, skill, attackerUserId)
             targetRemainHp = defender.hp,
             targetMaxHp = defender.maxHp,
             missed = true,
-            atkTimes = 0  -- 0表示MISS
+            atkTimes = 0,
+            effects = {}
         }
     end
     
-    local isCrit = SeerBattle.checkCrit(attacker, skill)
-    local damage, typeMod, _ = SeerBattle.calculateDamage(attacker, defender, skill, isCrit)
-    
-    local targetRemainHp = math.max(0, defender.hp - damage)
-    
-    -- 处理吸血效果
-    local gainHp = 0
-    if skill.drain then
-        gainHp = math.floor(damage * (skill.drain / 100))
-        attacker.hp = math.min(attacker.maxHp, attacker.hp + gainHp)
+    -- 处理连续攻击 (SideEffect=31)
+    local hitCount = 1
+    if effectId == 31 then
+        hitCount = SkillEffects.getMultiHitCount(SkillEffects.parseArgs(effectArg))
     end
     
-    -- 处理反伤效果
+    local totalDamage = 0
+    local isCrit = false
+    local typeMod = 1
+    local gainHp = 0
     local recoilDamage = 0
-    if skill.recoil then
-        recoilDamage = math.floor(damage * (skill.recoil / 100))
-        attacker.hp = math.max(0, attacker.hp - recoilDamage)
+    
+    for i = 1, hitCount do
+        -- 暴击判断，传入 defender 和 isFirst 用于特殊暴击条件
+        local thisCrit = SeerBattle.checkCrit(attacker, defender, skill, isFirst)
+        if thisCrit then isCrit = true end
+        
+        local damage
+        
+        -- 处理特殊伤害计算
+        if effectId == 34 then
+            -- 克制: 伤害=对方剩余HP的一定比例
+            damage = SkillEffects.getSpecialDamage(effectId, skill.power or 0, attacker, defender, effectArg)
+            typeMod = 1
+        elseif effectId == 35 then
+            -- 惩罚: 根据对方强化等级增加威力
+            local adjustedPower = SkillEffects.getSpecialDamage(effectId, skill.power or 60, attacker, defender, effectArg)
+            local tempSkill = {
+                power = adjustedPower,
+                type = skill.type,
+                category = skill.category,
+                accuracy = skill.accuracy
+            }
+            damage, typeMod, _ = SeerBattle.calculateDamage(attacker, defender, tempSkill, thisCrit)
+        elseif effectId == 8 then
+            -- 手下留情: 不会使对方HP降到0以下
+            damage, typeMod, _ = SeerBattle.calculateDamage(attacker, defender, skill, thisCrit)
+            if defender.hp - damage < 1 then
+                damage = defender.hp - 1
+            end
+        else
+            -- 普通伤害计算
+            damage, typeMod, _ = SeerBattle.calculateDamage(attacker, defender, skill, thisCrit)
+        end
+        
+        totalDamage = totalDamage + damage
+    end
+    
+    -- 应用伤害
+    local targetRemainHp = math.max(0, defender.hp - totalDamage)
+    defender.hp = targetRemainHp
+    
+    -- 处理技能附加效果
+    if effectId and effectId > 0 then
+        -- 吸取效果 (SideEffect=1)
+        if effectId == 1 then
+            local drainAmount = math.floor(totalDamage / 2)
+            local oldHp = attacker.hp
+            attacker.hp = math.min(attacker.maxHp, attacker.hp + drainAmount)
+            gainHp = attacker.hp - oldHp
+            table.insert(effectResults, {type = "drain", healAmount = gainHp})
+        end
+        
+        -- 反伤效果 (SideEffect=6)
+        if effectId == 6 then
+            local args = SkillEffects.parseArgs(effectArg)
+            local divisor = args[1] or 4
+            recoilDamage = math.floor(totalDamage / divisor)
+            attacker.hp = math.max(0, attacker.hp - recoilDamage)
+            table.insert(effectResults, {type = "recoil", damage = recoilDamage})
+        end
+        
+        -- 其他效果通过 SkillEffects.processEffect 处理
+        if effectId ~= 1 and effectId ~= 6 and effectId ~= 8 and effectId ~= 31 and effectId ~= 34 and effectId ~= 35 then
+            local results = SkillEffects.processEffect(effectId, attacker, defender, totalDamage, effectArg)
+            for _, r in ipairs(results) do
+                table.insert(effectResults, r)
+            end
+        end
+    end
+    
+    -- 疲惫效果 (SideEffect=20) - 使用后下回合无法行动
+    if effectId == 20 then
+        local args = SkillEffects.parseArgs(effectArg)
+        local chance = args[1] or 100
+        local turns = args[2] or 1
+        if math.random(100) <= chance then
+            attacker.fatigue = turns
+            table.insert(effectResults, {type = "fatigue", turns = turns})
+        end
     end
     
     return {
         userId = attackerUserId,
         skillId = skill.id or 10001,
-        damage = damage,
+        damage = totalDamage,
         isCrit = isCrit,
         typeMod = typeMod,
         attackerRemainHp = attacker.hp,
@@ -707,7 +920,8 @@ function SeerBattle.executeAttack(attacker, defender, skill, attackerUserId)
         targetMaxHp = defender.maxHp,
         gainHp = gainHp,
         recoilDamage = recoilDamage,
-        atkTimes = 1  -- 1表示命中
+        atkTimes = hitCount,
+        effects = effectResults
     }
 end
 
