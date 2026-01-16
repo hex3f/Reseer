@@ -1053,11 +1053,11 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     
     -- 4个技能槽 (id + pp)
     for i = 1, 4 do
-        if skills[i] then
-            responseBody = responseBody .. writeUInt32BE(skills[i].id or 0) .. writeUInt32BE(skills[i].pp or 30)
-        else
-            responseBody = responseBody .. writeUInt32BE(0) .. writeUInt32BE(0)
+        local skillId = skills[i] or 0
+        if type(skillId) == "table" then
+            skillId = skillId.id or 0
         end
+        responseBody = responseBody .. writeUInt32BE(skillId) .. writeUInt32BE(30)  -- pp 默认30
     end
     
     responseBody = responseBody .. writeUInt32BE(catchId)    -- catchTime
@@ -1110,11 +1110,11 @@ function LocalGameServer:handleGetPetList(clientData, cmdId, userId, seqId, body
             
             -- 写入技能 (最多4个)
             for i = 1, 4 do
-                if skills[i] then
-                    petData = petData .. writeUInt32BE(skills[i].id or 0) .. writeUInt32BE(skills[i].pp or 30)
-                else
-                    petData = petData .. writeUInt32BE(0) .. writeUInt32BE(0)
+                local skillId = skills[i] or 0
+                if type(skillId) == "table" then
+                    skillId = skillId.id or 0
                 end
+                petData = petData .. writeUInt32BE(skillId) .. writeUInt32BE(30)  -- pp 默认30
             end
             
             tprint(string.format("\27[36m[LocalGame] 返回精灵: id=%d, catchTime=0x%08X, level=%d\27[0m", petId, catchTime, level))

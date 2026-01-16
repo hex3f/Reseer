@@ -343,32 +343,42 @@ lpp.handler[108] = function(socket, userId, buf, length)
     
     tprint(string.format("\27[33m[CREATE_ROLE] 创建角色请求: userId=%d, length=%d, bodyLen=%d\27[0m", userId, length, length - offset))
     
-    -- 打印原始数据用于调试
+    -- 打印原始数据用于调试 (字节 1-50)
     local hexDump = ""
     for i = 1, math.min(length, 50) do
         hexDump = hexDump .. string.format("%02X ", buf:readUInt8(i))
     end
-    tprint(string.format("\27[36m[CREATE_ROLE] 原始数据: %s\27[0m", hexDump))
+    tprint(string.format("\27[36m[CREATE_ROLE] 原始数据 (1-50): %s\27[0m", hexDump))
+    
+    -- 打印 body 部分 (从字节 18 开始)
+    local bodyHex = ""
+    for i = offset + 1, math.min(length, offset + 30) do
+        bodyHex = bodyHex .. string.format("%02X ", buf:readUInt8(i))
+    end
+    tprint(string.format("\27[36m[CREATE_ROLE] Body 数据 (18-47): %s\27[0m", bodyHex))
     
     -- body 从索引 18 开始 (header 是 1-17)
-    -- body[1-4] = userID (跳过)
-    -- body[5-20] = nickname (16字节)
-    -- body[21-24] = color (4字节)
+    -- body[1-4] = userID (跳过) → 索引 18-21
+    -- body[5-20] = nickname (16字节) → 索引 22-37
+    -- body[21-24] = color (4字节) → 索引 38-41
     
-    -- 解析昵称 (从 body 第5字节开始，即索引 offset+5)
+    -- 解析昵称 (从 body 第5字节开始，即索引 offset+5 = 22)
     local nickname = ""
     if length >= offset + 20 then
         local chars = {}
-        for i = 5, 20 do  -- body 的第5-20字节
+        local nicknameHex = ""
+        for i = 5, 20 do  -- body 的第5-20字节 → 索引 22-37
             local byte = buf:readUInt8(offset + i)
+            nicknameHex = nicknameHex .. string.format("%02X ", byte)
             if byte == 0 then break end
             table.insert(chars, string.char(byte))
         end
         nickname = table.concat(chars)
+        tprint(string.format("\27[36m[CREATE_ROLE] 昵称字节 (22-37): %s\27[0m", nicknameHex))
         tprint(string.format("\27[36m[CREATE_ROLE] 解析昵称: '%s'\27[0m", nickname))
     end
     
-    -- 解析 color (body 第21-24字节，即索引 offset+21)
+    -- 解析 color (body 第21-24字节，即索引 offset+21 = 38)
     local color = 1
     if length >= offset + 24 then
         color = buf:readUInt32BE(offset + 21)
