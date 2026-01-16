@@ -79,8 +79,6 @@ local conf = {
     hide_frequent_cmds = true,
     
     -- [隐藏命令列表] 要隐藏的命令ID列表
-    -- 2101 = PEOPLE_WALK (移动)
-    -- 1002 = SYSTEM_TIME (系统时间)
     hide_cmd_list = {
 		80008,
     },

@@ -170,6 +170,34 @@ function Logger.logLogin(event, uid, info)
     Logger.write(string.format("AUTH | %s | UID=%d | %s", event, uid or 0, info or ""))
 end
 
+-- 记录官服发送 (用于 trafficlogger)
+function Logger.logOfficialSend(cmdId, cmdName, userId, length, data)
+    Logger.logCommand("SEND", cmdId, cmdName, userId, length, data)
+end
+
+-- 记录官服接收 (用于 trafficlogger)
+function Logger.logOfficialRecv(cmdId, cmdName, userId, result, length, data)
+    local arrow = "<<<"
+    Logger.writeRaw("")
+    Logger.writeRaw(string.format("---- SERVER->CLIENT CMD %d (%s) ----", cmdId, cmdName or "Unknown"))
+    Logger.write(string.format("GAME | %s CMD=%d (%s) UID=%d RES=%d LEN=%d", 
+        arrow, cmdId, cmdName or "Unknown", userId or 0, result or 0, length or 0))
+    
+    -- 记录完整的 HEX 数据
+    if data and #data > 0 then
+        Logger.writeRaw("     HEADER (17 bytes):")
+        if #data >= 17 then
+            Logger.writeRaw(bufferToHexFormatted(data:sub(1, 17), "       "))
+        end
+        
+        if #data > 17 then
+            Logger.writeRaw("     BODY (" .. (#data - 17) .. " bytes):")
+            Logger.writeRaw(bufferToHexFormatted(data:sub(18), "       "))
+        end
+    end
+    Logger.writeRaw("")
+end
+
 -- 记录错误
 function Logger.logError(module, error)
     Logger.write(string.format("ERR  | [%s] %s", module, error))
