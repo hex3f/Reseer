@@ -1017,12 +1017,15 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     
     -- 计算精灵属性
     local stats = SeerMonsters.calculateStats(petId, petLevel, petDv) or {
-        hp = 100, maxHp = 100, attack = 39, defence = 35, sa = 78, sd = 36, speed = 39
+        hp = 100, maxHp = 100, attack = 39, defence = 35, spAtk = 78, spDef = 36, speed = 39
     }
     
     -- 获取精灵技能
     local skills = SeerMonsters.getBattleSkills(petId, petLevel) or {}
     local skillCount = math.min(#skills, 4)
+    
+    -- 计算经验信息
+    local expInfo = SeerMonsters.getExpInfo(petId, petLevel, petExp)
     
     local responseBody = ""
     
@@ -1032,9 +1035,9 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(petDv)      -- dv (个体值)
     responseBody = responseBody .. writeUInt32BE(petNature)  -- nature (性格)
     responseBody = responseBody .. writeUInt32BE(petLevel)   -- level
-    responseBody = responseBody .. writeUInt32BE(petExp)     -- exp
-    responseBody = responseBody .. writeUInt32BE(0)          -- lvExp
-    responseBody = responseBody .. writeUInt32BE(1000)       -- nextLvExp
+    responseBody = responseBody .. writeUInt32BE(petExp)     -- exp (总经验)
+    responseBody = responseBody .. writeUInt32BE(expInfo.lvExp)      -- lvExp (当前等级已获经验)
+    responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp (升级所需经验)
     responseBody = responseBody .. writeUInt32BE(stats.hp or 100)     -- hp
     responseBody = responseBody .. writeUInt32BE(stats.maxHp or 100)  -- maxHp
     responseBody = responseBody .. writeUInt32BE(stats.attack or 39)  -- attack

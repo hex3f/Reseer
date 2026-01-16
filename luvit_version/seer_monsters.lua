@@ -187,4 +187,42 @@ function SeerMonsters.getByType(typeId)
     return result
 end
 
+-- 经验曲线类型 (GrowthType)
+-- 1: 快速, 2: 较快, 3: 中等, 4: 较慢, 5: 慢速, 6: 极慢
+local expCurves = {
+    [1] = function(lv) return math.floor(0.8 * lv * lv * lv) end,           -- 快速
+    [2] = function(lv) return math.floor(lv * lv * lv) end,                  -- 较快
+    [3] = function(lv) return math.floor(1.25 * lv * lv * lv) end,          -- 中等 (小火猴)
+    [4] = function(lv) return math.floor(1.5 * lv * lv * lv) end,           -- 较慢
+    [5] = function(lv) return math.floor(2 * lv * lv * lv) end,             -- 慢速
+    [6] = function(lv) return math.floor(2.5 * lv * lv * lv) end,           -- 极慢
+}
+
+-- 计算升到指定等级所需的总经验
+function SeerMonsters.getTotalExpForLevel(petId, level)
+    local monster = SeerMonsters.get(petId)
+    local growthType = monster and monster.growthType or 3
+    local curve = expCurves[growthType] or expCurves[3]
+    return curve(level)
+end
+
+-- 计算当前等级所需经验和下一级所需经验
+-- exp: 当前等级内已获得的经验 (不是总经验)
+function SeerMonsters.getExpInfo(petId, level, exp)
+    local totalExpCurrent = SeerMonsters.getTotalExpForLevel(petId, level)
+    local totalExpNext = SeerMonsters.getTotalExpForLevel(petId, level + 1)
+    
+    -- nextLvExp: 当前等级升到下一级需要的总经验
+    local nextLvExp = totalExpNext - totalExpCurrent
+    
+    -- lvExp: 当前等级已获得的经验 (直接使用传入的 exp)
+    local lvExp = exp or 0
+    
+    return {
+        lvExp = lvExp,
+        nextLvExp = nextLvExp,
+        totalExp = totalExpCurrent + lvExp
+    }
+end
+
 return SeerMonsters
