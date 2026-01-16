@@ -1050,10 +1050,9 @@ end
 -- PetInfo (完整版 param2=true) 结构:
 -- id(4) + name(16) + dv(4) + nature(4) + level(4) + exp(4) + lvExp(4) + nextLvExp(4)
 -- + hp(4) + maxHp(4) + attack(4) + defence(4) + s_a(4) + s_d(4) + speed(4)
--- + addMaxHP(4) + addMoreMaxHP(4) + addAttack(4) + addDefence(4) + addSA(4) + addSD(4) + addSpeed(4)
 -- + ev_hp(4) + ev_attack(4) + ev_defence(4) + ev_sa(4) + ev_sd(4) + ev_sp(4)
 -- + skillNum(4) + skills[4]*(id(4)+pp(4)) + catchTime(4) + catchMap(4) + catchRect(4) + catchLevel(4)
--- + effectCount(2) + [PetEffectInfo]... + peteffect(4) + skinID(4) + shiny(4) + freeForbidden(4) + boss(4)
+-- + effectCount(2) + [PetEffectInfo]... + skinID(4)
 function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2301: 获取精灵信息\27[0m")
     
@@ -1118,13 +1117,8 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(stats.spAtk or 78)   -- s_a (特攻)
     responseBody = responseBody .. writeUInt32BE(stats.spDef or 36)   -- s_d (特防)
     responseBody = responseBody .. writeUInt32BE(stats.speed or 39)   -- speed
-    responseBody = responseBody .. writeUInt32BE(0)          -- addMaxHP
-    responseBody = responseBody .. writeUInt32BE(0)          -- addMoreMaxHP
-    responseBody = responseBody .. writeUInt32BE(0)          -- addAttack
-    responseBody = responseBody .. writeUInt32BE(0)          -- addDefence
-    responseBody = responseBody .. writeUInt32BE(0)          -- addSA
-    responseBody = responseBody .. writeUInt32BE(0)          -- addSD
-    responseBody = responseBody .. writeUInt32BE(0)          -- addSpeed
+    -- 注意: 客户端 PetInfo.as 没有 addMaxHP/addMoreMaxHP/addAttack/addDefence/addSA/addSD/addSpeed 字段
+    -- 直接跳到 ev_* 字段
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_hp
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_attack
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_defence
@@ -1147,12 +1141,10 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- catchMap (官服=0)
     responseBody = responseBody .. writeUInt32BE(0)          -- catchRect
     responseBody = responseBody .. writeUInt32BE(0)          -- catchLevel (官服=0)
+    -- effectCount (2字节) + effectList (如果有)
     responseBody = responseBody .. writeUInt16BE(0)          -- effectCount
-    responseBody = responseBody .. writeUInt32BE(0)          -- peteffect
+    -- 注意: 客户端 PetInfo.as 在 effectCount 之后直接读取 skinID，没有 peteffect/shiny/freeForbidden/boss 字段
     responseBody = responseBody .. writeUInt32BE(0)          -- skinID
-    responseBody = responseBody .. writeUInt32BE(0)          -- shiny
-    responseBody = responseBody .. writeUInt32BE(0)          -- freeForbidden
-    responseBody = responseBody .. writeUInt32BE(0)          -- boss
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
     tprint(string.format("\27[32m[LocalGame] → GET_PET_INFO catchId=0x%08X petId=%d level=%d\27[0m", catchId, petId, petLevel))
@@ -1447,10 +1439,9 @@ end
 -- PetInfo (完整版 param2=true):
 -- id(4) + name(16) + dv(4) + nature(4) + level(4) + exp(4) + lvExp(4) + nextLvExp(4)
 -- + hp(4) + maxHp(4) + attack(4) + defence(4) + s_a(4) + s_d(4) + speed(4)
--- + addMaxHP(4) + addMoreMaxHP(4) + addAttack(4) + addDefence(4) + addSA(4) + addSD(4) + addSpeed(4)
 -- + ev_hp(4) + ev_attack(4) + ev_defence(4) + ev_sa(4) + ev_sd(4) + ev_sp(4)
 -- + skillNum(4) + skills[4]*(id(4)+pp(4)) + catchTime(4) + catchMap(4) + catchRect(4) + catchLevel(4)
--- + effectCount(2) + [PetEffectInfo]... + peteffect(4) + skinID(4) + shiny(4) + freeForbidden(4) + boss(4)
+-- + effectCount(2) + [PetEffectInfo]... + skinID(4)
 function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2304: 释放精灵\27[0m")
     
@@ -1515,13 +1506,8 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(stats.spAtk or 11)    -- s_a (特攻)
     responseBody = responseBody .. writeUInt32BE(stats.spDef or 10)    -- s_d (特防)
     responseBody = responseBody .. writeUInt32BE(stats.speed or 12)    -- speed
-    responseBody = responseBody .. writeUInt32BE(0)          -- addMaxHP
-    responseBody = responseBody .. writeUInt32BE(0)          -- addMoreMaxHP
-    responseBody = responseBody .. writeUInt32BE(0)          -- addAttack
-    responseBody = responseBody .. writeUInt32BE(0)          -- addDefence
-    responseBody = responseBody .. writeUInt32BE(0)          -- addSA
-    responseBody = responseBody .. writeUInt32BE(0)          -- addSD
-    responseBody = responseBody .. writeUInt32BE(0)          -- addSpeed
+    -- 注意: 客户端 PetInfo.as 没有 addMaxHP/addMoreMaxHP/addAttack/addDefence/addSA/addSD/addSpeed 字段
+    -- 直接跳到 ev_* 字段
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_hp
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_attack
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_defence
@@ -1538,12 +1524,10 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- catchMap (官服=0)
     responseBody = responseBody .. writeUInt32BE(0)          -- catchRect
     responseBody = responseBody .. writeUInt32BE(0)          -- catchLevel (官服=0)
+    -- effectCount (2字节) + effectList (如果有)
     responseBody = responseBody .. writeUInt16BE(0)          -- effectCount
-    responseBody = responseBody .. writeUInt32BE(0)          -- peteffect
+    -- 注意: 客户端 PetInfo.as 在 effectCount 之后直接读取 skinID，没有 peteffect/shiny/freeForbidden/boss 字段
     responseBody = responseBody .. writeUInt32BE(0)          -- skinID
-    responseBody = responseBody .. writeUInt32BE(0)          -- shiny
-    responseBody = responseBody .. writeUInt32BE(0)          -- freeForbidden
-    responseBody = responseBody .. writeUInt32BE(0)          -- boss
     
     -- 保存精灵到数据库
     if self.userdb and flag == 1 then  -- flag=1 表示从仓库释放到背包

@@ -41,13 +41,8 @@ local function buildFullPetInfo(petId, catchTime, level)
     body = body .. writeUInt32BE(pet.s_a)        -- s_a (特攻)
     body = body .. writeUInt32BE(pet.s_d)        -- s_d (特防)
     body = body .. writeUInt32BE(pet.speed)      -- speed
-    body = body .. writeUInt32BE(0)              -- addMaxHP
-    body = body .. writeUInt32BE(0)              -- addMoreMaxHP
-    body = body .. writeUInt32BE(0)              -- addAttack
-    body = body .. writeUInt32BE(0)              -- addDefence
-    body = body .. writeUInt32BE(0)              -- addSA
-    body = body .. writeUInt32BE(0)              -- addSD
-    body = body .. writeUInt32BE(0)              -- addSpeed
+    -- 注意: 客户端 PetInfo.as 没有 addMaxHP/addMoreMaxHP/addAttack/addDefence/addSA/addSD/addSpeed 字段
+    -- 直接跳到 ev_* 字段
     body = body .. writeUInt32BE(pet.ev.hp)      -- ev_hp
     body = body .. writeUInt32BE(pet.ev.atk)     -- ev_attack
     body = body .. writeUInt32BE(pet.ev.def)     -- ev_defence
@@ -65,12 +60,10 @@ local function buildFullPetInfo(petId, catchTime, level)
     body = body .. writeUInt32BE(pet.catchMap)   -- catchMap
     body = body .. writeUInt32BE(0)              -- catchRect
     body = body .. writeUInt32BE(pet.catchLevel) -- catchLevel
+    -- effectCount (2字节) + effectList (如果有)
     body = body .. writeUInt16BE(0)              -- effectCount (2字节)
-    body = body .. writeUInt32BE(0)              -- peteffect
+    -- 注意: 客户端 PetInfo.as 在 effectCount 之后直接读取 skinID，没有 peteffect/shiny/freeForbidden/boss 字段
     body = body .. writeUInt32BE(0)              -- skinID
-    body = body .. writeUInt32BE(0)              -- shiny
-    body = body .. writeUInt32BE(0)              -- freeForbidden
-    body = body .. writeUInt32BE(0)              -- boss
     
     return body
 end
@@ -102,10 +95,8 @@ local function buildSimplePetInfo(petId, level, hp, maxHp, catchTime)
     body = body .. writeUInt32BE(301)            -- catchMap (4)
     body = body .. writeUInt32BE(0)              -- catchRect (4)
     body = body .. writeUInt32BE(level)          -- catchLevel (4)
+    -- 注意: 简化版 PetInfo (param2=false) 没有 effectCount，直接读取 skinID
     body = body .. writeUInt32BE(0)              -- skinID (4)
-    body = body .. writeUInt32BE(0)              -- shiny (4)
-    body = body .. writeUInt32BE(0)              -- freeForbidden (4)
-    body = body .. writeUInt32BE(0)              -- boss (4)
     
     return body
 end
