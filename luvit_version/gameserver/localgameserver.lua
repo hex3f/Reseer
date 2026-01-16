@@ -540,7 +540,8 @@ end
 -- + teacherID(4) + studentID(4) + nonoState(4) + nonoColor(4) + superNono(4)
 -- + playerForm(4) + transTime(4)
 -- + TeamInfo: id(4) + coreCount(4) + isShow(4) + logoBg(2) + logoIcon(2) + logoColor(2) + txtColor(2) + logoWord(4)
--- + clothCount(4) + clothes[clothCount]*(id+level) + curTitle(4)
+-- + clothCount(4) + clothes[clothCount]*(id(4)+level(4)) + curTitle(4)
+-- 官服新用户: 161 bytes (body=144, clothCount=0)
 function LocalGameServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     print("\27[36m[LocalGame] 处理 CMD 2001: 进入地图\27[0m")
     
@@ -564,6 +565,8 @@ function LocalGameServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     
     local userData = self:getOrCreateUser(userId)
     local nickname = userData.nick or userData.nickname or userData.username or ("赛尔" .. userId)
+    local clothes = userData.clothes or {}
+    local teamInfo = userData.teamInfo or {}
     
     print(string.format("\27[36m[LocalGame] 用户 %d 进入地图 %d (type=%d) pos=(%d,%d)\27[0m", 
         userId, mapId, mapType, posX, posY))
@@ -574,44 +577,54 @@ function LocalGameServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(os.time())                 -- sysTime
     responseBody = responseBody .. writeUInt32BE(userId)                    -- userID
     responseBody = responseBody .. writeFixedString(nickname, 16)           -- nick (16字节)
-    responseBody = responseBody .. writeUInt32BE(1)                         -- color
-    responseBody = responseBody .. writeUInt32BE(1)                         -- texture
-    responseBody = responseBody .. writeUInt32BE(0)                         -- vipFlags
-    responseBody = responseBody .. writeUInt32BE(1)                         -- vipStage
+    responseBody = responseBody .. writeUInt32BE(userData.color or 1)       -- color
+    responseBody = responseBody .. writeUInt32BE(userData.texture or 1)     -- texture
+    
+    -- vipFlags: bit0=vip, bit1=viped
+    local vipFlags = 0
+    if userData.vip then vipFlags = vipFlags + 1 end
+    if userData.viped then vipFlags = vipFlags + 2 end
+    responseBody = responseBody .. writeUInt32BE(vipFlags)                  -- vipFlags
+    responseBody = responseBody .. writeUInt32BE(userData.vipStage or 1)    -- vipStage
+    
     responseBody = responseBody .. writeUInt32BE(0)                         -- actionType (0=走路)
     responseBody = responseBody .. writeUInt32BE(posX)                      -- posX
     responseBody = responseBody .. writeUInt32BE(posY)                      -- posY
     responseBody = responseBody .. writeUInt32BE(0)                         -- action
     responseBody = responseBody .. writeUInt32BE(1)                         -- direction
-    responseBody = responseBody .. writeUInt32BE(0)                         -- changeShape
-    responseBody = responseBody .. writeUInt32BE(0)                         -- spiritTime
-    responseBody = responseBody .. writeUInt32BE(0)                         -- spiritID
-    responseBody = responseBody .. writeUInt32BE(0)                         -- petDV
-    responseBody = responseBody .. writeUInt32BE(0)                         -- petSkin
-    responseBody = responseBody .. writeUInt32BE(0)                         -- fightFlag
-    responseBody = responseBody .. writeUInt32BE(0)                         -- teacherID
-    responseBody = responseBody .. writeUInt32BE(0)                         -- studentID
-    responseBody = responseBody .. writeUInt32BE(0)                         -- nonoState
-    responseBody = responseBody .. writeUInt32BE(0)                         -- nonoColor
-    responseBody = responseBody .. writeUInt32BE(0)                         -- superNono
-    responseBody = responseBody .. writeUInt32BE(0)                         -- playerForm
-    responseBody = responseBody .. writeUInt32BE(0)                         -- transTime
+    responseBody = responseBody .. writeUInt32BE(userData.changeShape or 0) -- changeShape
+    responseBody = responseBody .. writeUInt32BE(userData.spiritTime or 0)  -- spiritTime
+    responseBody = responseBody .. writeUInt32BE(userData.spiritID or 0)    -- spiritID
+    responseBody = responseBody .. writeUInt32BE(userData.petDV or 0)       -- petDV
+    responseBody = responseBody .. writeUInt32BE(userData.petSkin or 0)     -- petSkin
+    responseBody = responseBody .. writeUInt32BE(userData.fightFlag or 0)   -- fightFlag
+    responseBody = responseBody .. writeUInt32BE(userData.teacherID or 0)   -- teacherID
+    responseBody = responseBody .. writeUInt32BE(userData.studentID or 0)   -- studentID
+    responseBody = responseBody .. writeUInt32BE(userData.nonoState or 0)   -- nonoState
+    responseBody = responseBody .. writeUInt32BE(userData.nonoColor or 0)   -- nonoColor
+    responseBody = responseBody .. writeUInt32BE(userData.superNono or 0)   -- superNono
+    responseBody = responseBody .. writeUInt32BE(userData.playerForm or 0)  -- playerForm
+    responseBody = responseBody .. writeUInt32BE(userData.transTime or 0)   -- transTime
     
     -- TeamInfo
-    responseBody = responseBody .. writeUInt32BE(0)                         -- team.id
-    responseBody = responseBody .. writeUInt32BE(0)                         -- team.coreCount
-    responseBody = responseBody .. writeUInt32BE(0)                         -- team.isShow
-    responseBody = responseBody .. writeUInt16BE(0)                         -- team.logoBg
-    responseBody = responseBody .. writeUInt16BE(0)                         -- team.logoIcon
-    responseBody = responseBody .. writeUInt16BE(0)                         -- team.logoColor
-    responseBody = responseBody .. writeUInt16BE(0)                         -- team.txtColor
-    responseBody = responseBody .. writeFixedString("", 4)                  -- team.logoWord (4字节)
+    responseBody = responseBody .. writeUInt32BE(teamInfo.id or 0)          -- team.id
+    responseBody = responseBody .. writeUInt32BE(teamInfo.coreCount or 0)   -- team.coreCount
+    responseBody = responseBody .. writeUInt32BE(teamInfo.isShow or 0)      -- team.isShow
+    responseBody = responseBody .. writeUInt16BE(teamInfo.logoBg or 0)      -- team.logoBg
+    responseBody = responseBody .. writeUInt16BE(teamInfo.logoIcon or 0)    -- team.logoIcon
+    responseBody = responseBody .. writeUInt16BE(teamInfo.logoColor or 0)   -- team.logoColor
+    responseBody = responseBody .. writeUInt16BE(teamInfo.txtColor or 0)    -- team.txtColor
+    responseBody = responseBody .. writeFixedString(teamInfo.logoWord or "", 4)  -- team.logoWord (4字节)
     
     -- clothes
-    responseBody = responseBody .. writeUInt32BE(0)                         -- clothCount = 0
+    responseBody = responseBody .. writeUInt32BE(#clothes)                  -- clothCount
+    for _, cloth in ipairs(clothes) do
+        responseBody = responseBody .. writeUInt32BE(cloth.id or cloth[1] or 0)
+        responseBody = responseBody .. writeUInt32BE(cloth.level or cloth[2] or 0)
+    end
     
     -- curTitle
-    responseBody = responseBody .. writeUInt32BE(0)                         -- curTitle
+    responseBody = responseBody .. writeUInt32BE(userData.curTitle or 0)    -- curTitle
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -953,6 +966,8 @@ end
 -- userID(4) + flag(4) + [如果flag!=0: state(4) + nick(16) + superNono(4) + color(4)
 --   + power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + func(20)
 --   + superEnergy(4) + superLevel(4) + superStage(4)]
+-- 官服新用户: flag=0, 只返回 userID(4) + flag(4) = 8 bytes body
+-- 官服有NONO用户: 返回完整结构 90 bytes body
 function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     print("\27[36m[LocalGame] 处理 CMD 9003: 获取NONO信息\27[0m")
     
@@ -961,9 +976,35 @@ function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
         targetUserId = readUInt32BE(body, 1)
     end
     
-    -- 新用户没有NONO，flag=0
-    local responseBody = writeUInt32BE(targetUserId) ..
-        writeUInt32BE(0)  -- flag=0 表示没有NONO
+    local userData = self:getOrCreateUser(targetUserId)
+    local nonoData = userData.nono or {}
+    
+    local responseBody = writeUInt32BE(targetUserId)
+    
+    -- 检查用户是否有 NONO (从 CMD 1001 的 hasNono 字段)
+    local hasNono = userData.hasNono or nonoData.flag or 0
+    
+    if hasNono == 0 then
+        -- 没有 NONO，只返回 userID + flag=0
+        responseBody = responseBody .. writeUInt32BE(0)
+    else
+        -- 有 NONO，返回完整结构
+        responseBody = responseBody .. writeUInt32BE(hasNono)           -- flag (32位标志)
+        responseBody = responseBody .. writeUInt32BE(nonoData.state or userData.nonoState or 0)  -- state
+        responseBody = responseBody .. writeFixedString(nonoData.nick or userData.nonoNick or "", 16)  -- nick (16字节)
+        responseBody = responseBody .. writeUInt32BE(nonoData.superNono or userData.superNono or 0)    -- superNono
+        responseBody = responseBody .. writeUInt32BE(nonoData.color or userData.nonoColor or 0)        -- color
+        responseBody = responseBody .. writeUInt32BE((nonoData.power or 50) * 1000)   -- power (×1000)
+        responseBody = responseBody .. writeUInt32BE((nonoData.mate or 50) * 1000)    -- mate (×1000)
+        responseBody = responseBody .. writeUInt32BE(nonoData.iq or 100)              -- iq
+        responseBody = responseBody .. writeUInt16BE(nonoData.ai or 0)                -- ai (2字节)
+        responseBody = responseBody .. writeUInt32BE(nonoData.birth or os.time())     -- birth
+        responseBody = responseBody .. writeUInt32BE(nonoData.chargeTime or 0)        -- chargeTime
+        responseBody = responseBody .. string.rep("\0", 20)                           -- func (20字节)
+        responseBody = responseBody .. writeUInt32BE(nonoData.superEnergy or 0)       -- superEnergy
+        responseBody = responseBody .. writeUInt32BE(nonoData.superLevel or 0)        -- superLevel
+        responseBody = responseBody .. writeUInt32BE(nonoData.superStage or 1)        -- superStage
+    end
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -1540,12 +1581,32 @@ function LocalGameServer:getOrCreateUser(userId)
             level = 1,
             exp = 0,
             money = 10000,
-            coins = 999999,
+            coins = 1000,           -- 官服默认 1000
+            energy = 100,           -- 官服默认 100
+            color = 1,              -- 官服默认 1
+            texture = 1,            -- 官服默认 1
+            mapID = 515,            -- 官服默认新手地图
             vipLevel = 0,
+            vipStage = 1,           -- 官服默认 1
+            vip = false,
+            viped = false,
             petCount = 0,
+            petAllNum = 0,
             pets = {},
             tasks = {},
-            items = {}
+            items = {},
+            clothes = {},           -- 服装列表
+            friends = {},           -- 好友列表
+            blacklist = {},         -- 黑名单
+            exchangeList = {},      -- 兑换记录
+            hasNono = 0,            -- 是否有 NONO (0=无)
+            nonoState = 0,
+            nonoColor = 0,
+            superNono = 0,
+            teacherID = 0,
+            studentID = 0,
+            teamInfo = {},          -- 战队信息
+            curTitle = 0,           -- 当前称号
         }
     end
     return self.users[userId]
@@ -1812,12 +1873,29 @@ end
 
 -- CMD 2150: 获取好友/黑名单列表
 -- 响应结构: friendCount(4) + [userID(4) + timePoke(4)]... + blackCount(4) + [userID(4)]...
+-- 官服新用户: friendCount=0, blackCount=0, body = 8 bytes
+-- 官服有好友用户: 根据好友数量返回
 function LocalGameServer:handleGetRelationList(clientData, cmdId, userId, seqId, body)
     print("\27[36m[LocalGame] 处理 CMD 2150: 获取好友/黑名单列表\27[0m")
     
-    -- 新用户没有好友和黑名单
-    local responseBody = writeUInt32BE(0) ..  -- friendCount = 0
-                        writeUInt32BE(0)      -- blackCount = 0
+    local userData = self:getOrCreateUser(userId)
+    local friends = userData.friends or {}
+    local blacklist = userData.blacklist or {}
+    
+    local responseBody = ""
+    
+    -- 好友列表
+    responseBody = responseBody .. writeUInt32BE(#friends)
+    for _, friend in ipairs(friends) do
+        responseBody = responseBody .. writeUInt32BE(friend.userID or friend.id or 0)
+        responseBody = responseBody .. writeUInt32BE(friend.timePoke or 0)
+    end
+    
+    -- 黑名单
+    responseBody = responseBody .. writeUInt32BE(#blacklist)
+    for _, black in ipairs(blacklist) do
+        responseBody = responseBody .. writeUInt32BE(black.userID or black.id or black)
+    end
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -1825,11 +1903,21 @@ end
 -- CMD 70001: 获取兑换信息 (GET_EXCHANGE_INFO)
 -- 用于荣誉兑换手册，记录玩家已兑换的物品数量
 -- 响应结构: count(4) + [exchangeID(4) + exchangeNum(4)]...
--- 官服老用户返回约 41 条记录 (349 bytes)，新用户返回 count=0
+-- 官服新用户: count=0, body = 4 bytes
+-- 官服有记录用户: 根据兑换记录数量返回
 function LocalGameServer:handleCmd70001(clientData, cmdId, userId, seqId, body)
     print("\27[36m[LocalGame] 处理 CMD 70001: 获取兑换信息 (荣誉兑换手册)\27[0m")
-    -- 新用户没有兑换记录，返回空列表
-    local responseBody = writeUInt32BE(0)  -- count = 0
+    
+    local userData = self:getOrCreateUser(userId)
+    local exchangeList = userData.exchangeList or {}
+    
+    local responseBody = writeUInt32BE(#exchangeList)
+    
+    for _, exchange in ipairs(exchangeList) do
+        responseBody = responseBody .. writeUInt32BE(exchange.exchangeID or exchange.id or 0)
+        responseBody = responseBody .. writeUInt32BE(exchange.exchangeNum or exchange.num or 0)
+    end
+    
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
