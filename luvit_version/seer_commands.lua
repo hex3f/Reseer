@@ -395,6 +395,19 @@ local SeerCommands = {
     [50015] = "XIN_PETBAG",
     [52102] = "XIN_CHAT",
     
+    -- 70000+ 命令
+    [70001] = "UNKNOWN_70001",
+    
+    -- 80000+ 命令 (尼尔号特有)
+    [80001] = "NIEO_LOGIN",
+    [80002] = "NIEO_REGISTER",
+    [80003] = "NIEO_GET_USER_INFO",
+    [80004] = "NIEO_SET_USER_INFO",
+    [80005] = "NIEO_GET_ITEM_LIST",
+    [80006] = "NIEO_USE_ITEM",
+    [80007] = "GET_CURRENT_GOLD_NIEOBEAN",
+    [80008] = "NIEO_HEART",  -- 心跳包
+    
     -- 超大ID
     [500000] = "XINTEST",
 }

@@ -58,6 +58,8 @@ function LocalGameServer:initServerList()
 end
 
 function LocalGameServer:start()
+    local timer = require('timer')
+    
     local server = net.createServer(function(client)
         local addr = client:address()
         print(string.format("\27[32m[LocalGame] 新连接: %s:%d\27[0m", 
@@ -68,9 +70,17 @@ function LocalGameServer:start()
             buffer = "",
             userId = nil,
             session = nil,
-            seqId = 0
+            seqId = 0,
+            heartbeatTimer = nil
         }
         table.insert(self.clients, clientData)
+        
+        -- 启动心跳定时器 (每3秒发送一次)
+        clientData.heartbeatTimer = timer.setInterval(3000, function()
+            if clientData.userId and clientData.userId > 0 then
+                self:sendHeartbeat(clientData)
+            end
+        end)
         
         client:on('data', function(data)
             self:handleData(clientData, data)
@@ -96,7 +106,20 @@ function LocalGameServer:start()
     end)
 end
 
+-- 发送心跳包
+function LocalGameServer:sendHeartbeat(clientData)
+    if not clientData.userId then return end
+    -- CMD 80008 心跳包，只有包头，无body
+    self:sendResponse(clientData, 80008, clientData.userId, 0, "")
+end
+
 function LocalGameServer:removeClient(clientData)
+    -- 停止心跳定时器
+    if clientData.heartbeatTimer then
+        clientData.heartbeatTimer:close()
+        clientData.heartbeatTimer = nil
+    end
+    
     for i, c in ipairs(self.clients) do
         if c == clientData then
             table.remove(self.clients, i)
@@ -178,6 +201,7 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2103] = self.handleDanceAction,       -- 舞蹈动作
         [2104] = self.handleAimat,             -- 瞄准/交互
         [2111] = self.handlePeopleTransform,   -- 变身
+        [2150] = self.handleGetRelationList,   -- 获取好友/黑名单列表
         [2201] = self.handleAcceptTask,        -- 接受任务
         [2202] = self.handleCompleteTask,      -- 完成任务
         [2203] = self.handleGetTaskBuf,        -- 获取任务缓存
@@ -208,6 +232,8 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [9003] = self.handleNonoInfo,          -- 获取NONO信息
         [50004] = self.handleCmd50004,         -- 客户端信息上报
         [50008] = self.handleCmd50008,         -- 获取四倍经验时间
+        [70001] = self.handleCmd70001,         -- 未知命令70001
+        [80008] = self.handleNieoHeart,        -- 心跳包
     }
     
     local handler = handlers[cmdId]
@@ -1781,6 +1807,32 @@ end
 -- BossMonsterInfo: 简单响应
 function LocalGameServer:handleGetBossMonster(clientData, cmdId, userId, seqId, body)
     print("\27[36m[LocalGame] 处理 CMD 8004: 获取BOSS怪物\27[0m")
+    self:sendResponse(clientData, cmdId, userId, 0, "")
+end
+
+-- CMD 2150: 获取好友/黑名单列表
+-- 响应结构: friendCount(4) + [userID(4) + timePoke(4)]... + blackCount(4) + [userID(4)]...
+function LocalGameServer:handleGetRelationList(clientData, cmdId, userId, seqId, body)
+    print("\27[36m[LocalGame] 处理 CMD 2150: 获取好友/黑名单列表\27[0m")
+    
+    -- 新用户没有好友和黑名单
+    local responseBody = writeUInt32BE(0) ..  -- friendCount = 0
+                        writeUInt32BE(0)      -- blackCount = 0
+    
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 70001: 未知命令 (官服有返回)
+function LocalGameServer:handleCmd70001(clientData, cmdId, userId, seqId, body)
+    -- 官服返回了 349 bytes，暂时返回空响应
+    self:sendResponse(clientData, cmdId, userId, 0, "")
+end
+
+-- CMD 80008: 心跳包 (NIEO_HEART)
+-- 服务器定期发送，客户端收到后回复相同命令
+-- 用于保持连接活跃
+function LocalGameServer:handleNieoHeart(clientData, cmdId, userId, seqId, body)
+    -- 心跳包只需要返回空响应
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
