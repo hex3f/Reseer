@@ -35,7 +35,8 @@ local conf = {
     ressrv_port_80 = 80,      -- 备用资源服务器端口（用于 www.51seer.com 域名）
     loginip_port = 32401,     -- ip.txt 服务端口
     login_port = 1863,        -- 本地登录代理端口（WebSocket）
-    gameserver_port = 5000,   -- 本地游戏代理起始端口（5001, 5002, ...）
+    gameserver_port = 5000,   -- 本地游戏服务器端口
+    roomserver_port = 5100,   -- 本地房间服务器端口（家园系统，独立于游戏服务器）
     
     -- 返回给 Flash 的登录服务器地址（本地代理）
     login_server_address = "127.0.0.1:1863",
@@ -47,7 +48,7 @@ local conf = {
     -- [核心开关] 本地模式 vs 官服代理模式
     -- true  = 本地模式：使用本地数据库，不连接官服（开发/测试用）
     -- false = 官服代理模式：所有请求转发到官服，记录流量（抓包分析用）
-    local_server_mode = true,
+    local_server_mode = false,
     
     -- [资源模式] 是否从官服下载资源
     -- true  = 从官服下载资源并缓存到 res_dir
@@ -135,9 +136,17 @@ require "./apiserver"  -- API 服务器（提供配置管理和模式切换）
 if conf.local_server_mode then
     -- 本地模式：使用 TCP 登录服务器（Flash Socket 连接）
     print("\27[33m========== LOCAL SERVER MODE (TCP Socket) ==========\27[0m")
+    
+    -- 启动游戏服务器
     local lgs = require "./gameserver/localgameserver"
-    lgs.LocalGameServer:new()
-    require "./loginserver/login"  -- 启动 TCP 登录服务器在端口 1863
+    local gameServer = lgs.LocalGameServer:new()
+    
+    -- 启动房间服务器 (共享用户数据库)
+    local lrs = require "./roomserver/localroomserver"
+    local roomServer = lrs.LocalRoomServer:new(gameServer.userdb)
+    
+    -- 启动登录服务器
+    require "./loginserver/login"
 else
     -- 官服模式：使用流量记录代理
     print("\27[35m╔════════════════════════════════════════════════════════════╗\27[0m")
@@ -145,15 +154,24 @@ else
     print("\27[35m╠════════════════════════════════════════════════════════════╣\27[0m")
     print("\27[35m║  📡 登录服务器: " .. (conf.official_login_server or "101.43.19.60") .. ":" .. (conf.official_login_port or 1863) .. "                    ║\27[0m")
     print("\27[35m║  🎮 游戏服务器: 动态分配（根据服务器列表）                 ║\27[0m")
+    print("\27[35m║  🏠 房间服务器代理: 127.0.0.1:" .. (conf.roomserver_port or 5100) .. "                          ║\27[0m")
     print("\27[35m║  📝 流量记录: " .. (conf.trafficlogger and "已启用" or "已禁用") .. "                                       ║\27[0m")
     print("\27[35m╚════════════════════════════════════════════════════════════╝\27[0m")
     print("")
     print("\27[36m[提示] 所有 Flash ↔ 官服 的通信都会在控制台显示\27[0m")
     print("\27[36m[提示] 日志格式: [Flash→官服] 发送 / [官服→Flash] 接收\27[0m")
+    print("\27[36m[提示] 房间服务器数据会在进入家园时自动代理\27[0m")
     print("")
     
+    -- 启动游戏服务器代理
     local gs = conf.trafficlogger and require "./gameserver/trafficlogger" or require "./gameserver/gameserver"
     gs.GameServer:new()
+    
+    -- 启动房间服务器代理 (家园系统)
+    local rs = require "./roomserver/trafficloggerroom"
+    rs.RoomTrafficLogger:new()
+    
+    -- 启动登录服务器代理
     local _ = conf.trafficlogger and require "./loginserver/trafficloggerlogin" or require "./loginserver/login"
 end
 
@@ -185,4 +203,8 @@ print("\27[32m========== SERVER READY ==========\27[0m")
 print("")
 print("\27[36m访问地址: http://127.0.0.1:" .. conf.ressrv_port .. "/\27[0m")
 print("\27[36m当前模式: " .. (conf.local_server_mode and "本地服务器" or "官服代理") .. "\27[0m")
+if conf.local_server_mode then
+    print("\27[36m游戏服务器: 127.0.0.1:" .. conf.gameserver_port .. "\27[0m")
+    print("\27[36m房间服务器: 127.0.0.1:" .. conf.roomserver_port .. " (家园系统)\27[0m")
+end
 print("")

@@ -160,9 +160,20 @@ function UserDB:getOrCreateGameData(userId)
             -- 位置
             mapId = 515,
             posX = 300,
-            posY = 300
+            posY = 300,
+            
+            -- 家园系统 - 默认家具
+            -- fitments: 正在使用的家具 (摆放在房间里的)
+            fitments = {
+                {id = 500001, x = 0, y = 0, dir = 0, status = 0}  -- 默认房间风格
+            },
+            -- allFitments: 所有拥有的家具 (仓库)
+            allFitments = {
+                {id = 500001, usedCount = 1, allCount = 1}  -- 默认房间风格
+            }
         }
         self:save()
+        print(string.format("\27[32m[UserDB] 创建游戏数据: userId=%d (含默认家具)\27[0m", userId))
     end
     return self.gameData[key]
 end

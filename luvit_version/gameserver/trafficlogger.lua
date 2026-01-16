@@ -563,6 +563,54 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                         crypto:updateKeyFromLoginResponse(decryptedData, userId)
                     end
                 end
+                
+                -- 检测 GET_ROOM_ADDRES 响应 (CMD 10002)
+                -- 拦截官服房间服务器地址，替换为本地代理
+                if header.cmdId == 10002 and direction == "SRV" then
+                    local body = decryptedData:sub(18)
+                    if #body >= 30 then
+                        -- 响应格式: session(24) + ip(4) + port(2)
+                        local session = body:sub(1, 24)
+                        local ip1 = body:byte(25)
+                        local ip2 = body:byte(26)
+                        local ip3 = body:byte(27)
+                        local ip4 = body:byte(28)
+                        local port = body:byte(29) * 256 + body:byte(30)
+                        
+                        local officialIP = string.format("%d.%d.%d.%d", ip1, ip2, ip3, ip4)
+                        tprint(string.format("\27[35m[GAME:%d] 检测到官服房间服务器: %s:%d\27[0m", 
+                            localPort, officialIP, port))
+                        
+                        -- 保存官服房间服务器信息
+                        _G.officialRoomServer = _G.officialRoomServer or {}
+                        _G.officialRoomServer.ip = officialIP
+                        _G.officialRoomServer.port = port
+                        _G.officialRoomServer.targetUserId = header.userId
+                        
+                        tprint(string.format("\27[32m[GAME:%d] ✓ 已保存官服房间服务器地址，房间代理已就绪\27[0m", localPort))
+                        
+                        -- 修改响应，替换为本地代理地址
+                        local localRoomPort = conf.roomserver_port or 5100
+                        local modifiedBody = session ..
+                            string.char(127, 0, 0, 1) ..  -- 127.0.0.1
+                            string.char(math.floor(localRoomPort / 256), localRoomPort % 256)
+                        
+                        -- 重建数据包
+                        local newLen = 17 + #modifiedBody
+                        local modifiedPacket = string.char(
+                            math.floor(newLen / 16777216) % 256,
+                            math.floor(newLen / 65536) % 256,
+                            math.floor(newLen / 256) % 256,
+                            newLen % 256
+                        ) .. decryptedData:sub(5, 17) .. modifiedBody
+                        
+                        tprint(string.format("\27[35m[GAME:%d] 已修改响应: 127.0.0.1:%d\27[0m", 
+                            localPort, localRoomPort))
+                        
+                        -- 返回修改后的数据包
+                        return modifiedPacket, header, true  -- true 表示数据已修改
+                    end
+                end
             else
                 -- 无法解析的数据
                 tprint(string.format("\27[31m[GAME:%d] 无法解析 %d bytes: %s\27[0m", 
@@ -573,12 +621,15 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             -- 记录到文件
             logPacket(direction, data, decryptedData)
             
-            return decryptedData, header
+            return decryptedData, header, false  -- false 表示数据未修改
         end
         
         -- 处理缓冲区中的数据包（处理TCP分片/合并）
+        -- 返回: remaining, modifiedData (如果有修改的话)
         local function processBuffer(direction, buffer)
             local remaining = buffer
+            local modifiedPackets = {}
+            local hasModification = false
             
             while #remaining >= 4 do
                 -- 读取包长度
@@ -596,14 +647,25 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                     -- 有完整的包
                     local packet = remaining:sub(1, pktLen)
                     remaining = remaining:sub(pktLen + 1)
-                    processSinglePacket(direction, packet)
+                    local resultData, header, isModified = processSinglePacket(direction, packet)
+                    if isModified and resultData then
+                        table.insert(modifiedPackets, resultData)
+                        hasModification = true
+                    else
+                        table.insert(modifiedPackets, packet)
+                    end
                 else
                     -- 包不完整，等待更多数据
                     break
                 end
             end
             
-            return remaining
+            -- 返回剩余数据和修改后的数据包
+            if hasModification then
+                return remaining, table.concat(modifiedPackets)
+            else
+                return remaining, nil
+            end
         end
         
         ce = net.createConnection(targetPort, targetIP, function(err)
@@ -640,9 +702,15 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                 tprint(string.format("\27[32m[GAME:%d] 收到官服数据: %d bytes\27[0m", localPort, #data))
                 -- 添加到缓冲区并处理
                 serverBuffer = serverBuffer .. data
-                serverBuffer = processBuffer("SRV", serverBuffer)
-                -- 转发原始数据给客户端（自动处理 WebSocket）
-                sendToClient(data)
+                local remaining, modifiedData = processBuffer("SRV", serverBuffer)
+                serverBuffer = remaining
+                -- 转发数据给客户端（如果有修改则使用修改后的数据）
+                if modifiedData then
+                    tprint(string.format("\27[35m[GAME:%d] 转发修改后的数据: %d bytes\27[0m", localPort, #modifiedData))
+                    sendToClient(modifiedData)
+                else
+                    sendToClient(data)
+                end
             end)
             
             ce:on("error", function(err)
@@ -719,7 +787,8 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                     elseif opcode == 0x01 or opcode == 0x02 then
                         -- 文本/二进制帧，处理游戏数据
                         clientBuffer = clientBuffer .. payload
-                        clientBuffer = processBuffer("CLI", clientBuffer)
+                        local remaining, _ = processBuffer("CLI", clientBuffer)
+                        clientBuffer = remaining
                         
                         -- 转发原始数据给官服
                         if officialReady and not officialClosed then
@@ -735,7 +804,8 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             -- 原始 TCP Socket 处理
             -- 添加到缓冲区并处理
             clientBuffer = clientBuffer .. data
-            clientBuffer = processBuffer("CLI", clientBuffer)
+            local remaining, _ = processBuffer("CLI", clientBuffer)
+            clientBuffer = remaining
             
             -- 转发原始数据给官服
             if officialReady and not officialClosed then
