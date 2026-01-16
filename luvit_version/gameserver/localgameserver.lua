@@ -28,6 +28,9 @@ local SeerBattle = require('../seer_battle')
 -- 加载在线追踪模块
 local OnlineTracker = require('../handlers/online_tracker')
 
+-- 加载共享处理器
+local SharedHandlers = require('../handlers/shared_handlers')
+
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
 end
@@ -218,7 +221,7 @@ local function shouldHideCmd(cmdId)
 end
 
 function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
-    local handlers = {
+    local localHandlers = {
         [105] = self.handleCommendOnline,      -- 获取服务器列表
         [106] = self.handleRangeOnline,        -- 获取指定范围服务器
         [1001] = self.handleLoginIn,           -- 登录游戏服务器
@@ -254,7 +257,6 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2303] = self.handleGetPetList,        -- 获取精灵列表
         [2304] = self.handlePetRelease,        -- 释放精灵
         [2305] = self.handlePetShow,           -- 展示精灵
-        [2306] = self.handlePetCure,           -- 治疗精灵
         [2309] = self.handlePetBargeList,      -- 精灵图鉴列表
         [2354] = self.handleGetSoulBeadList,   -- 获取灵魂珠列表
         [2401] = self.handleInviteToFight,     -- 邀请战斗
@@ -273,7 +275,6 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2757] = self.handleMailGetUnread,     -- 获取未读邮件
         [8001] = self.handleInform,            -- 通知
         [8004] = self.handleGetBossMonster,    -- 获取BOSS怪物
-        [9003] = self.handleNonoInfo,          -- 获取NONO信息
         -- 家园系统
         [10001] = self.handleRoomLogin,        -- 家园登录
         [10002] = self.handleGetRoomAddress,   -- 获取房间地址
@@ -287,14 +288,56 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [80008] = self.handleNieoHeart,        -- 心跳包
     }
     
-    local handler = handlers[cmdId]
+    -- 优先使用本地处理器
+    local handler = localHandlers[cmdId]
     if handler then
         handler(self, clientData, cmdId, userId, seqId, body)
-    else
-        tprint(string.format("\27[33m[LocalGame] 未实现的命令: %d (%s)\27[0m", cmdId, getCmdName(cmdId)))
-        -- 返回空响应
-        self:sendResponse(clientData, cmdId, userId, 0, "")
+        return
     end
+    
+    -- 尝试使用共享处理器
+    if SharedHandlers.has(cmdId) then
+        local ctx = self:buildHandlerContext(clientData, cmdId, userId, body)
+        if SharedHandlers.execute(cmdId, ctx) then
+            return
+        end
+    end
+    
+    -- 未实现的命令
+    tprint(string.format("\27[33m[LocalGame] 未实现的命令: %d (%s)\27[0m", cmdId, getCmdName(cmdId)))
+    self:sendResponse(clientData, cmdId, userId, 0, "")
+end
+
+-- 构建共享处理器的上下文
+function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, body)
+    local self_ref = self
+    return {
+        userId = userId,
+        body = body,
+        userdb = self.userdb,
+        sendResponse = function(packet)
+            pcall(function()
+                clientData.socket:write(packet)
+            end)
+        end,
+        getOrCreateUser = function(uid)
+            return self_ref:getOrCreateUser(uid)
+        end,
+        saveUser = function(uid, userData)
+            self_ref.users[uid] = userData
+            self_ref:saveUserData()
+        end,
+        broadcastToMap = function(packet, excludeUserId)
+            -- 广播给同地图的其他玩家
+            for _, c in ipairs(self_ref.clients) do
+                if c.loggedIn and c.userId ~= excludeUserId and c.mapId == clientData.mapId then
+                    pcall(function()
+                        c.socket:write(packet)
+                    end)
+                end
+            end
+        end
+    }
 end
 
 -- 构建响应数据包
@@ -876,6 +919,10 @@ function LocalGameServer:handleGetSimUserInfo(clientData, cmdId, userId, seqId, 
 end
 
 -- CMD 2052: 获取详细用户信息
+-- 响应格式 (根据 UserInfo.setForMoreInfo):
+-- userID(4) + nick(16) + regTime(4) + petAllNum(4) + petMaxLev(4) + 
+-- bossAchievement(200) + graduationCount(4) + monKingWin(4) + messWin(4) + 
+-- maxStage(4) + maxArenaWins(4) + curTitle(4) = 256 bytes
 function LocalGameServer:handleGetMoreUserInfo(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2052: 获取详细用户信息\27[0m")
     
@@ -885,14 +932,22 @@ function LocalGameServer:handleGetMoreUserInfo(clientData, cmdId, userId, seqId,
     end
     
     local userData = self:getOrCreateUser(targetUserId)
+    local nickname = userData.nick or userData.nickname or userData.username or tostring(targetUserId)
     
-    local responseBody = writeUInt32BE(targetUserId) ..
-        writeFixedString(userData.nick or userData.nickname or userData.username or tostring(targetUserId), 20) ..
-        writeUInt32BE(userData.level or 1) ..
-        writeUInt32BE(userData.exp or 0) ..
-        writeUInt32BE(userData.money or 10000) ..
-        writeUInt32BE(userData.vipLevel or 0) ..
-        writeUInt32BE(userData.petCount or 0)
+    local responseBody = ""
+    responseBody = responseBody .. writeUInt32BE(targetUserId)                      -- userID (4)
+    responseBody = responseBody .. writeFixedString(nickname, 16)                   -- nick (16)
+    responseBody = responseBody .. writeUInt32BE(userData.regTime or os.time())     -- regTime (4)
+    responseBody = responseBody .. writeUInt32BE(userData.petAllNum or 0)           -- petAllNum (4)
+    responseBody = responseBody .. writeUInt32BE(userData.petMaxLev or 100)         -- petMaxLev (4)
+    -- bossAchievement: 200 bytes (每个字节代表一个BOSS成就)
+    responseBody = responseBody .. string.rep("\0", 200)                            -- bossAchievement (200)
+    responseBody = responseBody .. writeUInt32BE(userData.graduationCount or 0)     -- graduationCount (4)
+    responseBody = responseBody .. writeUInt32BE(userData.monKingWin or 0)          -- monKingWin (4)
+    responseBody = responseBody .. writeUInt32BE(userData.messWin or 0)             -- messWin (4)
+    responseBody = responseBody .. writeUInt32BE(userData.maxStage or 0)            -- maxStage (4)
+    responseBody = responseBody .. writeUInt32BE(userData.maxArenaWins or 0)        -- maxArenaWins (4)
+    responseBody = responseBody .. writeUInt32BE(userData.curTitle or 0)            -- curTitle (4)
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -1433,47 +1488,6 @@ function LocalGameServer:handleMailGetUnread(clientData, cmdId, userId, seqId, b
     
     -- 返回未读邮件数量
     local responseBody = writeUInt32BE(0)  -- 0 封未读邮件
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-end
-
--- CMD 9003: 获取NONO信息
--- NonoInfo 结构 (基于 NonoInfo.as):
--- userID(4) + flag(4) + [如果flag!=0: state(4) + nick(16) + superNono(4) + color(4)
---   + power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + func(20)
---   + superEnergy(4) + superLevel(4) + superStage(4)]
--- 官服新用户默认有 NONO，返回完整结构 90 bytes body
-function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 9003: 获取NONO信息\27[0m")
-    
-    local targetUserId = userId
-    if #body >= 4 then
-        targetUserId = readUInt32BE(body, 1)
-    end
-    
-    local userData = self:getOrCreateUser(targetUserId)
-    local nonoData = userData.nono or {}
-    
-    local responseBody = writeUInt32BE(targetUserId)
-    
-    -- 新用户默认有 NONO，flag=1
-    local flag = nonoData.flag or userData.hasNono or 1
-    
-    responseBody = responseBody .. writeUInt32BE(flag)                      -- flag (32位标志)
-    responseBody = responseBody .. writeUInt32BE(nonoData.state or userData.nonoState or 0)  -- state
-    responseBody = responseBody .. writeFixedString(nonoData.nick or userData.nonoNick or "NONO", 16)  -- nick (16字节, 官服默认"NONO")
-    responseBody = responseBody .. writeUInt32BE(nonoData.superNono or userData.superNono or 0)    -- superNono
-    responseBody = responseBody .. writeUInt32BE(nonoData.color or userData.nonoColor or 0x00FFFFFF)  -- color (官服=0x00FFFFFF)
-    responseBody = responseBody .. writeUInt32BE(nonoData.power or 10000)         -- power (官服=10000)
-    responseBody = responseBody .. writeUInt32BE(nonoData.mate or 10000)          -- mate (官服=10000)
-    responseBody = responseBody .. writeUInt32BE(nonoData.iq or 0)                -- iq (官服=0)
-    responseBody = responseBody .. writeUInt16BE(nonoData.ai or 0)                -- ai (2字节)
-    responseBody = responseBody .. writeUInt32BE(nonoData.birth or userData.regTime or os.time())  -- birth
-    responseBody = responseBody .. writeUInt32BE(nonoData.chargeTime or 500)      -- chargeTime (官服=500)
-    responseBody = responseBody .. string.rep("\xFF", 20)                         -- func (20字节, 官服全是0xFF)
-    responseBody = responseBody .. writeUInt32BE(nonoData.superEnergy or 0)       -- superEnergy
-    responseBody = responseBody .. writeUInt32BE(nonoData.superLevel or 0)        -- superLevel
-    responseBody = responseBody .. writeUInt32BE(nonoData.superStage or 0)        -- superStage (官服=0)
-    
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
@@ -2765,11 +2779,13 @@ function LocalGameServer:handleMapOgreList(clientData, cmdId, userId, seqId, bod
 end
 
 -- CMD 2061: 修改昵称
--- ChangeUserNameInfo: 简单响应
+-- CMD 2061: 修改昵称
+-- 请求: nick(16)
+-- 响应: userId(4) + nick(16)
 function LocalGameServer:handleChangeNickName(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2061: 修改昵称\27[0m")
     
-    -- 解析新昵称
+    -- 解析新昵称 (16字节)
     local newNick = ""
     if #body >= 16 then
         for i = 1, 16 do
@@ -2781,11 +2797,17 @@ function LocalGameServer:handleChangeNickName(clientData, cmdId, userId, seqId, 
     end
     
     local userData = self:getOrCreateUser(userId)
+    userData.nick = newNick
     userData.nickname = newNick
+    
+    -- 保存到数据库
+    self:saveUserData(userId)
     
     tprint(string.format("\27[36m[LocalGame] 用户 %d 修改昵称为: %s\27[0m", userId, newNick))
     
-    self:sendResponse(clientData, cmdId, userId, 0, "")
+    -- 响应: userId(4) + nick(16)
+    local responseBody = writeUInt32BE(userId) .. writeFixedString(newNick, 16)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
 -- CMD 2234: 获取每日任务缓存
@@ -2820,12 +2842,6 @@ function LocalGameServer:handlePetShow(clientData, cmdId, userId, seqId, body)
                         writeUInt32BE(0)              -- padding2
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-end
-
--- CMD 2306: 治疗精灵
-function LocalGameServer:handlePetCure(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 2306: 治疗精灵\27[0m")
-    self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
 -- CMD 2309: 精灵图鉴列表

@@ -18,6 +18,9 @@ local SeerCommands = require('../seer_commands')
 -- 加载在线追踪模块
 local OnlineTracker = require('../handlers/online_tracker')
 
+-- 加载共享处理器
+local SharedHandlers = require('../handlers/shared_handlers')
+
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
 end
@@ -163,7 +166,8 @@ function LocalRoomServer:processPacket(clientData, packet)
 end
 
 function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
-    local handlers = {
+    -- 房间服务器特有的处理器
+    local localHandlers = {
         [10001] = self.handleRoomLogin,        -- 房间登录
         [10003] = self.handleLeaveRoom,        -- 离开房间
         [10006] = self.handleFitmentUsering,   -- 正在使用的家具
@@ -180,17 +184,59 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2157] = self.handleSeeOnline,         -- 查看在线状态
         [2201] = self.handleAcceptTask,        -- 接受任务
         [2324] = self.handlePetRoomList,       -- 房间精灵列表
-        [9003] = self.handleNonoInfo,          -- NONO信息
         [80008] = self.handleHeartbeat,        -- 心跳包
     }
     
-    local handler = handlers[cmdId]
+    -- 优先使用本地处理器
+    local handler = localHandlers[cmdId]
     if handler then
         handler(self, clientData, cmdId, userId, seqId, body)
-    else
-        tprint(string.format("\27[33m[RoomServer] 未实现的命令: %d (%s)\27[0m", cmdId, getCmdName(cmdId)))
-        self:sendResponse(clientData, cmdId, userId, 0, "")
+        return
     end
+    
+    -- 尝试使用共享处理器
+    if SharedHandlers.has(cmdId) then
+        local ctx = self:buildHandlerContext(clientData, cmdId, userId, body)
+        if SharedHandlers.execute(cmdId, ctx) then
+            return
+        end
+    end
+    
+    -- 未实现的命令
+    tprint(string.format("\27[33m[RoomServer] 未实现的命令: %d (%s)\27[0m", cmdId, getCmdName(cmdId)))
+    self:sendResponse(clientData, cmdId, userId, 0, "")
+end
+
+-- 构建共享处理器的上下文
+function LocalRoomServer:buildHandlerContext(clientData, cmdId, userId, body)
+    local self_ref = self
+    return {
+        userId = userId,
+        body = body,
+        userdb = self.userdb,
+        sendResponse = function(packet)
+            pcall(function()
+                clientData.socket:write(packet)
+            end)
+        end,
+        getOrCreateUser = function(uid)
+            return self_ref:getOrCreateUser(uid)
+        end,
+        saveUser = function(uid, userData)
+            self_ref.users[uid] = userData
+            self_ref:saveUserData()
+        end,
+        broadcastToMap = function(packet, excludeUserId)
+            -- 广播给同房间的其他玩家
+            for _, c in ipairs(self_ref.clients) do
+                if c.loggedIn and c.userId ~= excludeUserId and c.roomId == clientData.roomId then
+                    pcall(function()
+                        c.socket:write(packet)
+                    end)
+                end
+            end
+        end
+    }
 end
 
 -- 构建响应数据包
@@ -555,6 +601,8 @@ function LocalRoomServer:handleFitmentAll(clientData, cmdId, userId, seqId, body
 end
 
 -- CMD 10008: 设置家具 (SET_FITMENT)
+-- 请求: roomId(4) + count(4) + [fitment: id(4) + x(4) + y(4) + dir(4) + status(4)] * count
+-- 响应: 空 (官服 17 bytes = 只有包头)
 function LocalRoomServer:handleSetFitment(clientData, cmdId, userId, seqId, body)
     tprint("\27[35m[RoomServer] 处理 CMD 10008: 设置家具\27[0m")
     
@@ -582,9 +630,28 @@ function LocalRoomServer:handleSetFitment(clientData, cmdId, userId, seqId, body
     
     local userData = self:getOrCreateUser(userId)
     userData.fitments = fitments
+    
+    -- 同步更新 allFitments 的 usedCount
+    if userData.allFitments then
+        -- 重置所有 usedCount
+        for _, f in ipairs(userData.allFitments) do
+            f.usedCount = 0
+        end
+        -- 统计正在使用的家具
+        for _, fitment in ipairs(fitments) do
+            for _, f in ipairs(userData.allFitments) do
+                if f.id == fitment.id then
+                    f.usedCount = (f.usedCount or 0) + 1
+                    break
+                end
+            end
+        end
+    end
+    
     self:saveUserData()
     
-    self:sendResponse(clientData, cmdId, userId, 0, writeUInt32BE(0))
+    -- 官服响应是空的 (17 bytes = 只有包头)
+    self:sendResponse(clientData, cmdId, userId, 0, "")
     tprint(string.format("\27[32m[RoomServer] 保存 %d 件家具\27[0m", #fitments))
 end
 
@@ -848,40 +915,6 @@ end
 function LocalRoomServer:handlePetRoomList(clientData, cmdId, userId, seqId, body)
     -- 响应: count(4) = 0 (没有精灵在房间)
     self:sendResponse(clientData, cmdId, userId, 0, writeUInt32BE(0))
-end
-
--- CMD 9003: NONO信息 (NONO_INFO)
--- 响应格式 (根据 NonoInfo.as):
--- userID(4) + flag(4) + state(4) + nick(16) + superNono(4) + color(4) + 
--- power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + func(20) + 
--- superEnergy(4) + superLevel(4) + superStage(4)
--- 总计: 90 bytes
-function LocalRoomServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
-    tprint("\27[35m[RoomServer] 处理 CMD 9003: NONO信息\27[0m")
-    
-    local userData = self:getOrCreateUser(userId)
-    local nono = userData.nono or {}
-    
-    local responseBody = ""
-    responseBody = responseBody .. writeUInt32BE(userId)                    -- userID (4)
-    responseBody = responseBody .. writeUInt32BE(nono.flag or 1)            -- flag (4) - bit flags
-    responseBody = responseBody .. writeUInt32BE(nono.state or 1)           -- state (4) - bit flags
-    responseBody = responseBody .. writeFixedString(nono.nick or "NONO", 16) -- nick (16)
-    responseBody = responseBody .. writeUInt32BE(nono.superNono or 0)       -- superNono (4)
-    responseBody = responseBody .. writeUInt32BE(nono.color or 0xFFFFFF)    -- color (4)
-    responseBody = responseBody .. writeUInt32BE((nono.power or 10000))     -- power (4) - 客户端会除以1000
-    responseBody = responseBody .. writeUInt32BE((nono.mate or 10000))      -- mate (4) - 客户端会除以1000
-    responseBody = responseBody .. writeUInt32BE(nono.iq or 0)              -- iq (4)
-    responseBody = responseBody .. writeUInt16BE(nono.ai or 0)              -- ai (2)
-    responseBody = responseBody .. writeUInt32BE(nono.birth or os.time())   -- birth (4)
-    responseBody = responseBody .. writeUInt32BE(nono.chargeTime or 500)    -- chargeTime (4)
-    -- func: 20 bytes (160 bits for function flags)
-    responseBody = responseBody .. string.rep("\xFF", 20)                   -- func (20) - 全部启用
-    responseBody = responseBody .. writeUInt32BE(nono.superEnergy or 0)     -- superEnergy (4)
-    responseBody = responseBody .. writeUInt32BE(nono.superLevel or 0)      -- superLevel (4)
-    responseBody = responseBody .. writeUInt32BE(nono.superStage or 1)      -- superStage (4)
-    
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
 -- CMD 80008: 心跳包
