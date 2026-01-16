@@ -544,7 +544,35 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. string.rep("\0", 27)                               -- reserved (27 bytes)
     
     -- 16. taskList (500 bytes) - 任务状态
-    responseBody = responseBody .. string.rep("\0", 500)
+    -- 每个字节代表一个任务的状态: 0=未接受, 1=已接受, 3=已完成
+    -- 任务ID从1开始，所以任务N的状态在taskList[N-1]
+    local taskListBytes = {}
+    for i = 1, 500 do
+        taskListBytes[i] = 0  -- 默认未接受
+    end
+    
+    -- 从数据库读取任务状态
+    if self.userdb then
+        local db = self.userdb:new()
+        local gameData = db:getOrCreateGameData(userId)
+        if gameData.tasks then
+            for taskIdStr, task in pairs(gameData.tasks) do
+                local taskId = tonumber(taskIdStr)
+                if taskId and taskId >= 1 and taskId <= 500 then
+                    if task.status == "completed" then
+                        taskListBytes[taskId] = 3  -- COMPLETE
+                    elseif task.status == "accepted" then
+                        taskListBytes[taskId] = 1  -- ALR_ACCEPT
+                    end
+                end
+            end
+        end
+    end
+    
+    -- 写入taskList
+    for i = 1, 500 do
+        responseBody = responseBody .. string.char(taskListBytes[i])
+    end
     
     -- 17. petNum + PetInfo[]
     responseBody = responseBody .. writeUInt32BE(#pets)                               -- petNum
