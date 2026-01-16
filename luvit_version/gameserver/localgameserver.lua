@@ -3312,11 +3312,12 @@ end
 
 -- CMD 10003: 离开房间 (LEAVE_ROOM)
 -- 请求: flag(4) + mapID(4) + catchTime(4) + changeShape(4) + actionType(4)
+-- 响应: 先发送 CMD 2001 (ENTER_MAP) 让玩家进入目标地图，再发送 CMD 10003 确认
 function LocalGameServer:handleLeaveRoom(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 10003: 离开房间\27[0m")
     
     local flag = 0
-    local mapID = 515
+    local mapID = 1  -- 默认地图1
     local catchTime = 0
     local changeShape = 0
     local actionType = 0
@@ -3329,6 +3330,67 @@ function LocalGameServer:handleLeaveRoom(clientData, cmdId, userId, seqId, body)
     
     tprint(string.format("\27[36m[LocalGame] 用户 %d 离开房间，返回地图 %d\27[0m", userId, mapID))
     
+    -- 获取用户数据
+    local userData = self:getOrCreateUser(userId)
+    local nickname = userData.nick or userData.nickname or tostring(userId)
+    local clothes = userData.clothes or {}
+    local teamInfo = userData.teamInfo or {}
+    
+    -- 发送 CMD 2001 (ENTER_MAP) - 使用 setForPeoleInfo 格式
+    local enterMapBody = ""
+    enterMapBody = enterMapBody .. writeUInt32BE(os.time())                    -- sysTime
+    enterMapBody = enterMapBody .. writeUInt32BE(userId)                       -- userID
+    enterMapBody = enterMapBody .. writeFixedString(nickname, 16)              -- nick (16字节)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.color or 0)          -- color
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.texture or 0)        -- texture
+    
+    -- vipFlags: bit0=vip, bit1=viped
+    local vipFlags = 0
+    if userData.vip then vipFlags = vipFlags + 1 end
+    if userData.viped then vipFlags = vipFlags + 2 end
+    enterMapBody = enterMapBody .. writeUInt32BE(vipFlags)                     -- vipFlags
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.vipStage or 1)       -- vipStage
+    enterMapBody = enterMapBody .. writeUInt32BE(actionType)                   -- actionType
+    enterMapBody = enterMapBody .. writeUInt32BE(300)                          -- posX
+    enterMapBody = enterMapBody .. writeUInt32BE(200)                          -- posY
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- action
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- direction
+    enterMapBody = enterMapBody .. writeUInt32BE(changeShape)                  -- changeShape
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- spiritTime
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- spiritID
+    enterMapBody = enterMapBody .. writeUInt32BE(31)                           -- petDV
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- petSkin
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- fightFlag
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.teacherID or 0)      -- teacherID
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.studentID or 0)      -- studentID
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- nonoState (32 bits)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoColor or 1)      -- nonoColor
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.superNono and 1 or 0) -- superNono
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- playerForm
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- transTime
+    
+    -- TeamInfo: id(4) + coreCount(4) + isShow(4) + logoBg(2) + logoIcon(2) + logoColor(2) + txtColor(2) + logoWord(4)
+    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.id or 0)             -- team.id
+    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.coreCount or 0)      -- team.coreCount
+    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.isShow and 1 or 0)   -- team.isShow
+    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoBg or 0)         -- team.logoBg
+    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoIcon or 0)       -- team.logoIcon
+    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoColor or 0)      -- team.logoColor
+    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.txtColor or 0)       -- team.txtColor
+    enterMapBody = enterMapBody .. writeFixedString(teamInfo.logoWord or "", 4) -- team.logoWord
+    
+    -- 服装数量和服装列表
+    enterMapBody = enterMapBody .. writeUInt32BE(#clothes)                     -- clothCount
+    for _, cloth in ipairs(clothes) do
+        enterMapBody = enterMapBody .. writeUInt32BE(cloth.id or cloth[1] or 0)
+        enterMapBody = enterMapBody .. writeUInt32BE(cloth.level or cloth[2] or 0)
+    end
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                            -- curTitle
+    
+    self:sendResponse(clientData, 2001, userId, 0, enterMapBody)
+    tprint(string.format("\27[32m[LocalGame] → ENTER_MAP: 地图 %d\27[0m", mapID))
+    
+    -- 再发送 CMD 10003 确认
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
