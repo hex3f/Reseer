@@ -744,6 +744,15 @@ function LocalGameServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     local clothes = userData.clothes or {}
     local teamInfo = userData.teamInfo or {}
     
+    -- 更新玩家位置到用户数据
+    userData.x = posX
+    userData.y = posY
+    userData.mapId = mapId
+    userData.mapType = mapType
+    
+    -- 更新在线追踪
+    OnlineTracker.updatePlayerMap(userId, mapId, mapType)
+    
     tprint(string.format("\27[36m[LocalGame] 用户 %d 进入地图 %d (type=%d) pos=(%d,%d)\27[0m", 
         userId, mapId, mapType, posX, posY))
     
@@ -854,10 +863,60 @@ function LocalGameServer:handleGetMoreUserInfo(clientData, cmdId, userId, seqId,
 end
 
 -- CMD 2101: 人物移动
+-- 请求格式: walkType(4) + x(4) + y(4) + amfLen(4) + amfData...
+-- 响应格式: walkType(4) + userId(4) + x(4) + y(4) + amfLen(4) + amfData...
 function LocalGameServer:handlePeopleWalk(clientData, cmdId, userId, seqId, body)
-    -- 移动不需要响应，或者广播给其他玩家
-    tprint("\27[36m[LocalGame] 处理 CMD 2101: 人物移动\27[0m")
-    self:sendResponse(clientData, cmdId, userId, 0, "")
+    local walkType = 0
+    local x = 0
+    local y = 0
+    local amfLen = 0
+    local amfData = ""
+    
+    if #body >= 4 then
+        walkType = readUInt32BE(body, 1)
+    end
+    if #body >= 8 then
+        x = readUInt32BE(body, 5)
+    end
+    if #body >= 12 then
+        y = readUInt32BE(body, 9)
+    end
+    if #body >= 16 then
+        amfLen = readUInt32BE(body, 13)
+        if #body >= 16 + amfLen then
+            amfData = body:sub(17, 16 + amfLen)
+        end
+    end
+    
+    -- 更新用户位置
+    local userData = self:getOrCreateUser(userId)
+    userData.x = x
+    userData.y = y
+    
+    -- 更新活跃时间
+    OnlineTracker.updateActivity(userId)
+    
+    -- 构建响应 (包含完整的 AMF 数据)
+    local responseBody = writeUInt32BE(walkType) ..
+                writeUInt32BE(userId) ..
+                writeUInt32BE(x) ..
+                writeUInt32BE(y) ..
+                writeUInt32BE(amfLen) ..
+                amfData
+    
+    -- 获取当前地图并广播给同地图所有玩家
+    local currentMapId = OnlineTracker.getPlayerMap(userId)
+    if currentMapId > 0 then
+        local packet = self:buildPacket(cmdId, userId, 0, responseBody)
+        -- 广播给同地图所有玩家 (包括自己)
+        local playersInMap = OnlineTracker.getPlayersInMap(currentMapId)
+        for _, playerId in ipairs(playersInMap) do
+            OnlineTracker.sendToPlayer(playerId, packet)
+        end
+    else
+        -- 如果没有地图信息，只回复给自己
+        self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+    end
 end
 
 -- CMD 2102: 聊天
@@ -888,7 +947,17 @@ function LocalGameServer:handleChat(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(#message)                   -- msgLen
     responseBody = responseBody .. message                                   -- msg
     
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+    -- 广播给同地图所有玩家
+    local currentMapId = OnlineTracker.getPlayerMap(userId)
+    if currentMapId > 0 then
+        local packet = self:buildPacket(cmdId, userId, 0, responseBody)
+        local playersInMap = OnlineTracker.getPlayersInMap(currentMapId)
+        for _, playerId in ipairs(playersInMap) do
+            OnlineTracker.sendToPlayer(playerId, packet)
+        end
+    else
+        self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+    end
 end
 
 -- CMD 2201: 接受任务
@@ -1397,28 +1466,79 @@ function LocalGameServer:handleCmd50008(clientData, cmdId, userId, seqId, body)
 end
 
 -- CMD 2003: 获取地图玩家列表
+-- 返回同地图所有在线玩家的完整信息（包括服装）
 function LocalGameServer:handleListMapPlayer(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2003: 获取地图玩家列表\27[0m")
     
-    local userData = self:getOrCreateUser(userId)
+    -- 获取当前玩家所在地图
+    local currentMapId = OnlineTracker.getPlayerMap(userId)
     
-    -- 返回当前玩家信息 (只有自己)
-    -- 结构: playerCount(4) + [PlayerInfo...]
-    -- PlayerInfo: userId(4) + nickname(20) + x(4) + y(4) + direction(4) + ...
+    -- 获取同地图的所有玩家
+    local playersInMap = OnlineTracker.getPlayersInMap(currentMapId)
     
-    local responseBody = writeUInt32BE(1)  -- 1个玩家
+    tprint(string.format("\27[36m[LocalGame] 地图 %d 有 %d 个玩家\27[0m", currentMapId, #playersInMap))
     
-    -- 玩家信息
-    responseBody = responseBody ..
-        writeUInt32BE(userId) ..
-        writeFixedString(userData.nick or userData.nickname or userData.username or tostring(userId), 20) ..
-        string.rep("\0", 20) ..  -- 额外数据
-        writeUInt32BE(0xFFFFFF) ..  -- 颜色
-        writeUInt32BE(0) ..  -- 未知
-        writeUInt32BE(15) ..  -- 等级
-        writeUInt32BE(0) ..  -- 未知
-        writeUInt32BE(userData.currentPetId or 7) ..  -- 当前精灵ID
-        string.rep("\0", 60)  -- 更多数据
+    -- 构建响应: playerCount(4) + [PeopleInfo...]
+    local responseBody = writeUInt32BE(#playersInMap)
+    
+    for _, playerId in ipairs(playersInMap) do
+        local playerData = self:getOrCreateUser(playerId)
+        local nickname = playerData.nick or playerData.nickname or playerData.username or tostring(playerId)
+        local clothes = playerData.clothes or {}
+        local teamInfo = playerData.teamInfo or {}
+        
+        -- PeopleInfo 结构 (与 ENTER_MAP 响应相同，但不含 sysTime)
+        responseBody = responseBody .. writeUInt32BE(playerId)                    -- userID
+        responseBody = responseBody .. writeFixedString(nickname, 16)             -- nick (16字节)
+        responseBody = responseBody .. writeUInt32BE(playerData.color or 0xFFFFFF) -- color
+        responseBody = responseBody .. writeUInt32BE(playerData.texture or 0)     -- texture
+        
+        -- vipFlags
+        local vipFlags = 0
+        if playerData.vip then vipFlags = vipFlags + 1 end
+        if playerData.viped then vipFlags = vipFlags + 2 end
+        responseBody = responseBody .. writeUInt32BE(vipFlags)                    -- vipFlags
+        responseBody = responseBody .. writeUInt32BE(playerData.vipStage or 1)    -- vipStage
+        
+        responseBody = responseBody .. writeUInt32BE(0)                           -- actionType
+        responseBody = responseBody .. writeUInt32BE(playerData.x or 300)         -- posX
+        responseBody = responseBody .. writeUInt32BE(playerData.y or 200)         -- posY
+        responseBody = responseBody .. writeUInt32BE(0)                           -- action
+        responseBody = responseBody .. writeUInt32BE(1)                           -- direction
+        responseBody = responseBody .. writeUInt32BE(playerData.changeShape or 0) -- changeShape
+        responseBody = responseBody .. writeUInt32BE(playerData.spiritTime or 0)  -- spiritTime
+        responseBody = responseBody .. writeUInt32BE(playerData.spiritID or 0)    -- spiritID
+        responseBody = responseBody .. writeUInt32BE(playerData.petDV or 31)      -- petDV
+        responseBody = responseBody .. writeUInt32BE(playerData.petSkin or 0)     -- petSkin
+        responseBody = responseBody .. writeUInt32BE(playerData.fightFlag or 0)   -- fightFlag
+        responseBody = responseBody .. writeUInt32BE(playerData.teacherID or 0)   -- teacherID
+        responseBody = responseBody .. writeUInt32BE(playerData.studentID or 0)   -- studentID
+        responseBody = responseBody .. writeUInt32BE(playerData.nonoState or 0)   -- nonoState
+        responseBody = responseBody .. writeUInt32BE(playerData.nonoColor or 0)   -- nonoColor
+        responseBody = responseBody .. writeUInt32BE(playerData.superNono or 0)   -- superNono
+        responseBody = responseBody .. writeUInt32BE(playerData.playerForm or 0)  -- playerForm
+        responseBody = responseBody .. writeUInt32BE(playerData.transTime or 0)   -- transTime
+        
+        -- TeamInfo
+        responseBody = responseBody .. writeUInt32BE(teamInfo.id or 0)            -- team.id
+        responseBody = responseBody .. writeUInt32BE(teamInfo.coreCount or 0)     -- team.coreCount
+        responseBody = responseBody .. writeUInt32BE(teamInfo.isShow or 0)        -- team.isShow
+        responseBody = responseBody .. writeUInt16BE(teamInfo.logoBg or 0)        -- team.logoBg
+        responseBody = responseBody .. writeUInt16BE(teamInfo.logoIcon or 0)      -- team.logoIcon
+        responseBody = responseBody .. writeUInt16BE(teamInfo.logoColor or 0)     -- team.logoColor
+        responseBody = responseBody .. writeUInt16BE(teamInfo.txtColor or 0)      -- team.txtColor
+        responseBody = responseBody .. writeFixedString(teamInfo.logoWord or "", 4) -- team.logoWord
+        
+        -- clothes
+        responseBody = responseBody .. writeUInt32BE(#clothes)                    -- clothCount
+        for _, cloth in ipairs(clothes) do
+            responseBody = responseBody .. writeUInt32BE(cloth.id or cloth[1] or 0)
+            responseBody = responseBody .. writeUInt32BE(cloth.level or cloth[2] or 0)
+        end
+        
+        -- curTitle
+        responseBody = responseBody .. writeUInt32BE(playerData.curTitle or 0)    -- curTitle
+    end
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -2717,14 +2837,83 @@ function LocalGameServer:handleItemBuy(clientData, cmdId, userId, seqId, body)
 end
 
 -- CMD 2604: 更换服装
--- ChangeClothInfo: userID(4) + clothCount(4) + [clothId(4) + clothType(4)]...
+-- 请求: clothCount(4) + [clothId(4)]...
+-- 响应: userID(4) + clothCount(4) + [clothId(4) + clothType(4)]...
+-- 需要保存到数据库并广播给同地图其他玩家
 function LocalGameServer:handleChangeCloth(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2604: 更换服装\27[0m")
     
-    local responseBody = writeUInt32BE(userId) ..  -- userID
-                        writeUInt32BE(0)           -- clothCount = 0
+    -- 解析请求
+    local clothCount = 0
+    local clothIds = {}
     
+    if #body >= 4 then
+        clothCount = readUInt32BE(body, 1)
+        for i = 1, clothCount do
+            local offset = 5 + (i - 1) * 4
+            if #body >= offset + 3 then
+                local clothId = readUInt32BE(body, offset)
+                table.insert(clothIds, clothId)
+            end
+        end
+    end
+    
+    tprint(string.format("\27[36m[LocalGame] 更换服装: %d 件\27[0m", #clothIds))
+    
+    -- 保存到用户数据
+    local userData = self:getOrCreateUser(userId)
+    -- 保存为 {id, level} 格式以兼容登录响应
+    userData.clothes = {}
+    for _, clothId in ipairs(clothIds) do
+        table.insert(userData.clothes, {id = clothId, level = 1})
+    end
+    self:saveUserData()
+    
+    -- 构建响应体
+    local responseBody = writeUInt32BE(userId) .. writeUInt32BE(#clothIds)
+    for _, clothId in ipairs(clothIds) do
+        responseBody = responseBody .. writeUInt32BE(clothId)
+        responseBody = responseBody .. writeUInt32BE(1)  -- clothType/level
+    end
+    
+    -- 发送响应给请求者
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+    
+    -- 广播给同地图其他玩家
+    local currentMapId = OnlineTracker.getPlayerMap(userId)
+    if currentMapId > 0 then
+        local packet = self:buildPacket(cmdId, userId, 0, responseBody)
+        OnlineTracker.broadcastToMap(currentMapId, packet, userId)
+        tprint(string.format("\27[32m[LocalGame] 服装变更已广播到地图 %d\27[0m", currentMapId))
+    end
+end
+
+-- 辅助函数：构建数据包
+function LocalGameServer:buildPacket(cmdId, userId, result, body)
+    body = body or ""
+    local length = 17 + #body
+    
+    local header = string.char(
+        math.floor(length / 16777216) % 256,
+        math.floor(length / 65536) % 256,
+        math.floor(length / 256) % 256,
+        length % 256,
+        0x37,  -- version
+        math.floor(cmdId / 16777216) % 256,
+        math.floor(cmdId / 65536) % 256,
+        math.floor(cmdId / 256) % 256,
+        cmdId % 256,
+        math.floor(userId / 16777216) % 256,
+        math.floor(userId / 65536) % 256,
+        math.floor(userId / 256) % 256,
+        userId % 256,
+        math.floor(result / 16777216) % 256,
+        math.floor(result / 65536) % 256,
+        math.floor(result / 256) % 256,
+        result % 256
+    )
+    
+    return header .. body
 end
 
 -- CMD 2751: 获取邮件列表
