@@ -1,0 +1,89 @@
+<taomee>
+	<ext>
+		<item name="核心资源" path="dll/NieoCore.swf?20251113" ver="20251113"/>
+	</ext>
+	<Bean>
+		<!--=====================core  应用程序最好放上面。因为下面的每个注入模块有可能要调用应用程序里的内容 =====================-->
+		<!--系统时间侦听 -->
+		<Bean id="SysTimeCmdListener" class="com.robot.core.cmd.SysTimeCmdListener" />
+		<!-- 动作条 -->
+		<Bean id="LeftToolBarManager" class="com.robot.core.manager.LeftToolBarManager" />
+		<Bean id="ToolBarController" class="com.robot.app.toolBar.ToolBarController" />
+		<!--开通/取消VIP-->
+		<Bean id="VipCmdListener" class="com.robot.core.cmd.VipCmdListener" />
+		<!--获取用户列表-->
+		<Bean id="UserListCmdListener" class="com.robot.core.cmd.UserListCmdListener" />
+		<!--人物走路-->
+		<Bean id="WalkCmdListener" class="com.robot.core.cmd.WalkCmdListener" />
+		<!--改变套装-->
+		<Bean id="ChangeClothCmdListener" class="com.robot.core.cmd.ChangeClothCmdListener" />
+		<!--改变颜色-->
+		<Bean id="ChangeColorCmdListener" class="com.robot.core.cmd.ChangeColorCmdListener" />
+		<!--改变昵称-->
+		<Bean id="ChangeNameCmdListener" class="com.robot.core.cmd.ChangeNameCmdListener" />
+		<!--涂装-->
+		<Bean id="ChangeDoodleCmdListener" class="com.robot.core.cmd.ChangeDoodleCmdListener" />
+		<!--瞄准-->
+		<Bean id="AimatCmdListener" class="com.robot.core.cmd.AimatCmdListener" />
+		<!--精灵相关-->
+		<Bean id="PetCmdListener" class="com.robot.core.cmd.PetCmdListener" />
+		<Bean id="SpecialCmdListener" class="com.robot.core.cmd.SpecialCmdListener" />
+		<Bean id="BefLoad" class="com.robot.core.net.BefLoad" />
+		<!--nono-->
+		<Bean id="OnOffCmdListener" class="com.robot.core.cmd.nono.OnOffCmdListener" />
+		<Bean id="ChangeColorCmdListener" class="com.robot.core.cmd.nono.ChangeColorCmdListener" />
+		<Bean id="ChangeNameCmdListener" class="com.robot.core.cmd.nono.ChangeNameCmdListener" />
+		<Bean id="ChargeCmdListener" class="com.robot.core.cmd.nono.ChargeCmdListener" />
+		<Bean id="NonoPlayCmdListener" class="com.robot.core.cmd.nono.NonoPlayCmdListener" />
+		<Bean id="FollowCmdListener" class="com.robot.core.cmd.nono.FollowCmdListener" />
+		<Bean id="ToolCmdListener" class="com.robot.core.cmd.nono.ToolCmdListener" />
+		<!--战队-->
+		<!--=====================app=====================-->
+		<!--<Bean id="ShowTeamLogo" class="com.robot.core.teamInstallation.ShowTeamLogo" />-->
+		<Bean id="TestCmdListener" class="com.robot.app.cmd.TestCmdListener" />
+		<Bean id="TeamChatCmdListener" class="com.robot.app.cmd.TeamChatCmdListener" />
+		<Bean id="AdviceTeamMateCmdListener" class="com.robot.app.cmd.AdviceTeamMateCmdListener"/>
+		<!--获得成就称号-->
+		<Bean id="AchieveTitleCmdListener" class="com.robot.app.cmd.AchieveTitleCmdListener" />
+		<!--设置称号-->
+		<Bean id="SetTitleCmdListener" class="com.robot.app.cmd.SetTitleCmdListener" />
+		<!--获得特殊技能-->
+		<Bean id="SpecialSkillCmdListener" class="com.robot.app.cmd.SpecialSkillCmdListener" />
+		<Bean id="HeartCmdListener" class="com.robot.app.cmd.HeartCmdListener" />
+		
+		<!--<Bean id="ProtectSystem" class="com.robot.app.protectSys.ProtectSystem" />-->
+		<Bean id="NewsPaper" class="com.robot.app.newspaper.NewsPaper" />
+		<Bean id="MailCmdListener" class="com.robot.core.cmd.MailCmdListener" />
+		<Bean id="TaskCmdListener" class="com.robot.app.cmd.TaskCmdListener" />
+		<Bean id="UserInfoController" class="com.robot.app.user.UserInfoController" />
+		<Bean id="PetInfoController" class="com.robot.core.pet.PetInfoController" />
+		<Bean id="NpcInfoController" class="com.robot.app.npc.NpcInfoController" />
+		<Bean id="FightNoteCmdListener" class="com.robot.app.fightNote.FightNoteCmdListener" />
+		
+		<Bean id="TaskMain" class="com.robot.app.task.TaskMain" />
+		<Bean id="BossCmdListener" class="com.robot.app.cmd.BossCmdListener" />
+		<Bean id="ItemCmdListener" class="com.robot.app.buyItem.ItemCmdListener" />
+		<Bean id="PetUpdateCmdListener" class="com.robot.app.petUpdate.PetUpdateCmdListener" />
+		<Bean id="OgreCmdListener" class="com.robot.app.ogre.OgreCmdListener" />
+		<Bean id="SpecialPetCmdListener" class="com.robot.app.ogre.SpecialPetCmdListener" />
+		<Bean id="BossCmdListener" class="com.robot.app.ogre.BossCmdListener" />
+		<Bean id="TeacherCmdListener" class="com.robot.app.teacher.TeacherCmdListener" />
+		<Bean id="BuyCmdListener" class="com.robot.app.cmd.BuyCmdListener" />
+		<Bean id="EnergyXishouCmdListener" class="com.robot.core.cmd.EnergyXishouCmdListener" />
+		<!--春节大礼包-->
+		<Bean id="SpringGiftNoticeCmdListener" class="com.robot.core.cmd.SpringGiftNoticeCmdListener" />
+		<!--能源采集-->
+		<Bean id="MessageAlarm" class="com.robot.app.systems.MessageAlarm" />
+		<!-- 运营，幽灵变身 -->
+		<Bean id="TranUserCmdListener" class="com.robot.app.cmd.TranUserCmdListener" />
+		<!--小游戏输出-->
+		<Bean id="GameOverCmdListener" class="com.robot.app.cmd.GameOverCmdListener" />
+		<!--战队Logo-->
+		<Bean id="ShowLogoCmdListener" class="com.robot.core.cmd.ShowLogoCmdListener" />
+		<Bean id="ShowTeamLogo" class="com.robot.core.teamInstallation.ShowTeamLogo" />
+		<Bean id="SpeedupCmdListener" class="com.robot.core.cmd.SpeedupCmdListener" />
+		
+		<Bean id="PlateCmdListener" class="com.robot.app.getplate.PlateCmdListener" />
+		<Bean id="TransformCmdListener" class="com.robot.core.cmd.TransformCmdListener" />
+	</Bean>
+</taomee>
