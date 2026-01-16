@@ -1822,10 +1822,12 @@ function LocalGameServer:handleGetRelationList(clientData, cmdId, userId, seqId,
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
--- CMD 70001: 未知命令 (官服有返回)
+-- CMD 70001: 获取兑换信息 (GET_EXCHANGE_INFO)
+-- 响应结构: count(4) + [exchangeID(4) + exchangeNum(4)]...
 function LocalGameServer:handleCmd70001(clientData, cmdId, userId, seqId, body)
-    -- 官服返回了 349 bytes，暂时返回空响应
-    self:sendResponse(clientData, cmdId, userId, 0, "")
+    -- 新用户没有兑换记录，返回空列表
+    local responseBody = writeUInt32BE(0)  -- count = 0
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
 -- CMD 80008: 心跳包 (NIEO_HEART)

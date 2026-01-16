@@ -82,8 +82,7 @@ local conf = {
     -- 2101 = PEOPLE_WALK (移动)
     -- 1002 = SYSTEM_TIME (系统时间)
     hide_cmd_list = {
-        2101,  -- PEOPLE_WALK (移动包，非常频繁)
-        1002,  -- SYSTEM_TIME (系统时间，每秒一次)
+		80008,
     },
 }
 _G.conf = conf

@@ -395,8 +395,10 @@ local SeerCommands = {
     [50015] = "XIN_PETBAG",
     [52102] = "XIN_CHAT",
     
-    -- 70000+ 命令
-    [70001] = "UNKNOWN_70001",
+    -- 70000+ 命令 (兑换系统)
+    [70000] = "PET_GENE_RECAST",
+    [70001] = "GET_EXCHANGE_INFO",  -- 获取兑换信息
+    [70002] = "EXCHANGE_ITEM",      -- 兑换物品
     
     -- 80000+ 命令 (尼尔号特有)
     [80001] = "NIEO_LOGIN",
