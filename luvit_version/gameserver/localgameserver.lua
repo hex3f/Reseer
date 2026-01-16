@@ -1233,19 +1233,19 @@ function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     
     responseBody = responseBody .. writeUInt32BE(flag)                      -- flag (32位标志)
     responseBody = responseBody .. writeUInt32BE(nonoData.state or userData.nonoState or 0)  -- state
-    responseBody = responseBody .. writeFixedString(nonoData.nick or userData.nonoNick or "", 16)  -- nick (16字节)
+    responseBody = responseBody .. writeFixedString(nonoData.nick or userData.nonoNick or "NONO", 16)  -- nick (16字节, 官服默认"NONO")
     responseBody = responseBody .. writeUInt32BE(nonoData.superNono or userData.superNono or 0)    -- superNono
-    responseBody = responseBody .. writeUInt32BE(nonoData.color or userData.nonoColor or 1)        -- color (默认1)
-    responseBody = responseBody .. writeUInt32BE((nonoData.power or 50) * 1000)   -- power (×1000, 默认50%)
-    responseBody = responseBody .. writeUInt32BE((nonoData.mate or 50) * 1000)    -- mate (×1000, 默认50%)
-    responseBody = responseBody .. writeUInt32BE(nonoData.iq or 100)              -- iq (默认100)
+    responseBody = responseBody .. writeUInt32BE(nonoData.color or userData.nonoColor or 0x00FFFFFF)  -- color (官服=0x00FFFFFF)
+    responseBody = responseBody .. writeUInt32BE(nonoData.power or 10000)         -- power (官服=10000)
+    responseBody = responseBody .. writeUInt32BE(nonoData.mate or 10000)          -- mate (官服=10000)
+    responseBody = responseBody .. writeUInt32BE(nonoData.iq or 0)                -- iq (官服=0)
     responseBody = responseBody .. writeUInt16BE(nonoData.ai or 0)                -- ai (2字节)
-    responseBody = responseBody .. writeUInt32BE(nonoData.birth or os.time())     -- birth (默认当前时间)
-    responseBody = responseBody .. writeUInt32BE(nonoData.chargeTime or 0)        -- chargeTime
-    responseBody = responseBody .. string.rep("\0", 20)                           -- func (20字节)
+    responseBody = responseBody .. writeUInt32BE(nonoData.birth or userData.regTime or os.time())  -- birth
+    responseBody = responseBody .. writeUInt32BE(nonoData.chargeTime or 500)      -- chargeTime (官服=500)
+    responseBody = responseBody .. string.rep("\xFF", 20)                         -- func (20字节, 官服全是0xFF)
     responseBody = responseBody .. writeUInt32BE(nonoData.superEnergy or 0)       -- superEnergy
     responseBody = responseBody .. writeUInt32BE(nonoData.superLevel or 0)        -- superLevel
-    responseBody = responseBody .. writeUInt32BE(nonoData.superStage or 1)        -- superStage (默认1)
+    responseBody = responseBody .. writeUInt32BE(nonoData.superStage or 0)        -- superStage (官服=0)
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -1419,6 +1419,7 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     end
     
     -- 计算经验信息
+    -- 新精灵: exp=0 (官服行为), lvExp=0
     local expInfo = SeerMonsters.getExpInfo(petId, petLevel, 0)
     
     local responseBody = ""
@@ -1434,8 +1435,8 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(petDv)      -- dv (个体值=31)
     responseBody = responseBody .. writeUInt32BE(petNature)  -- nature (随机性格)
     responseBody = responseBody .. writeUInt32BE(petLevel)   -- level
-    responseBody = responseBody .. writeUInt32BE(0)          -- exp
-    responseBody = responseBody .. writeUInt32BE(0)          -- lvExp
+    responseBody = responseBody .. writeUInt32BE(0)          -- exp (官服新精灵=0)
+    responseBody = responseBody .. writeUInt32BE(0)          -- lvExp (官服新精灵=0)
     responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp (官服=114)
     responseBody = responseBody .. writeUInt32BE(stats.hp)   -- hp
     responseBody = responseBody .. writeUInt32BE(stats.maxHp) -- maxHp
@@ -2126,19 +2127,19 @@ function LocalGameServer:sendNoteUpdateProp(clientData, userId, userData)
     -- 战斗获得的经验 (官服新手教程=8)
     local gainedExp = 8
     
-    -- 从数据库读取当前经验
-    local currentExp = 0
+    -- 从数据库读取当前等级内的经验
+    local currentLevelExp = 0
     if self.userdb then
         local db = self.userdb:new()
         local pet = db:getPetByCatchTime(userId, catchTime)
         if pet then
-            currentExp = pet.exp or 0
+            currentLevelExp = pet.exp or 0
         end
     end
     
-    -- 计算新的累计经验
-    local newTotalExp = currentExp + gainedExp
-    local expInfo = SeerMonsters.getExpInfo(petId, petLevel, newTotalExp)
+    -- 计算新的当前等级经验
+    local newLevelExp = currentLevelExp + gainedExp
+    local expInfo = SeerMonsters.getExpInfo(petId, petLevel, newLevelExp)
     
     local responseBody = ""
     
@@ -2173,10 +2174,10 @@ function LocalGameServer:sendNoteUpdateProp(clientData, userId, userData)
         local pet = db:getPetByCatchTime(userId, catchTime)
         if pet then
             db:updatePet(userId, catchTime, {
-                exp = newTotalExp,
+                exp = newLevelExp,
                 level = petLevel
             })
-            tprint(string.format("\27[32m[LocalGame] 精灵经验已保存: catchTime=0x%08X, exp=%d\27[0m", catchTime, newTotalExp))
+            tprint(string.format("\27[32m[LocalGame] 精灵经验已保存: catchTime=0x%08X, exp=%d\27[0m", catchTime, newLevelExp))
         end
     end
 end

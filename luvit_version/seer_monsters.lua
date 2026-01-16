@@ -207,21 +207,26 @@ function SeerMonsters.getTotalExpForLevel(petId, level)
 end
 
 -- 计算当前等级所需经验和下一级所需经验
--- exp: 当前等级内已获得的经验 (不是总经验)
-function SeerMonsters.getExpInfo(petId, level, exp)
-    local totalExpCurrent = SeerMonsters.getTotalExpForLevel(petId, level)
-    local totalExpNext = SeerMonsters.getTotalExpForLevel(petId, level + 1)
+-- 赛尔号经验系统:
+--   exp: 当前等级内已获得的经验 (官服新精灵=0)
+--   lvExp: 与 exp 相同 (当前等级进度)
+--   nextLvExp: 升到下一级需要的经验 = expForNextLevel - expForCurrentLevel
+-- 注意: 数据库存储的是当前等级内的经验，不是总累计经验
+function SeerMonsters.getExpInfo(petId, level, currentLevelExp)
+    local expForCurrentLevel = SeerMonsters.getTotalExpForLevel(petId, level)
+    local expForNextLevel = SeerMonsters.getTotalExpForLevel(petId, level + 1)
+    
+    currentLevelExp = currentLevelExp or 0
+    if currentLevelExp < 0 then currentLevelExp = 0 end
     
     -- nextLvExp: 当前等级升到下一级需要的总经验
-    local nextLvExp = totalExpNext - totalExpCurrent
-    
-    -- lvExp: 当前等级已获得的经验 (直接使用传入的 exp)
-    local lvExp = exp or 0
+    local nextLvExp = expForNextLevel - expForCurrentLevel
     
     return {
-        lvExp = lvExp,
-        nextLvExp = nextLvExp,
-        totalExp = totalExpCurrent + lvExp
+        lvExp = currentLevelExp,      -- 当前等级进度
+        nextLvExp = nextLvExp,        -- 升级所需经验
+        exp = currentLevelExp,        -- 与 lvExp 相同
+        totalExp = expForCurrentLevel + currentLevelExp  -- 总累计经验 (用于升级判断)
     }
 end
 
