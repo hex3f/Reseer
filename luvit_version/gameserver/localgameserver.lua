@@ -1566,15 +1566,38 @@ function LocalGameServer:getOrCreateUser(userId)
     -- 首先尝试从 userdb 获取游戏数据
     if self.userdb then
         local db = self.userdb:new()
+        
+        -- 获取登录服务器保存的用户基础数据 (包含 color)
+        local loginUser = db:findByUserId(userId)
+        
+        -- 获取游戏数据
         local gameData = db:getOrCreateGameData(userId)
+        
         if gameData then
             -- 合并到本地缓存
             if not self.users[userId] then
                 self.users[userId] = {}
             end
+            
+            -- 先合并游戏数据
             for k, v in pairs(gameData) do
                 self.users[userId][k] = v
             end
+            
+            -- 再合并登录用户数据 (优先级更高，包含注册时选择的 color)
+            if loginUser then
+                if loginUser.color then
+                    self.users[userId].color = loginUser.color
+                end
+                if loginUser.username then
+                    self.users[userId].nick = loginUser.username
+                    self.users[userId].nickname = loginUser.username
+                end
+                if loginUser.registerTime then
+                    self.users[userId].regTime = loginUser.registerTime
+                end
+            end
+            
             self.users[userId].id = userId
             return self.users[userId]
         end

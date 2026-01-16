@@ -333,17 +333,25 @@ end
 -- CMD_CREATE_ROLE (创建角色)
 lpp.handler[108] = function(socket, userId, buf, length)
     -- 创建角色请求
-    -- session: 16字节
-    -- nickname: 后面的数据
+    -- body 结构: session(16字节) + color(4字节)
     
     print(string.format("\27[33m[CREATE_ROLE] 创建角色请求: userId=%d\27[0m", userId))
+    
+    -- 解析 color (在 session 之后)
+    local color = 1  -- 默认颜色
+    if length >= 20 then
+        -- session(16) + color(4)
+        color = buf:readUInt32BE(17)
+        print(string.format("\27[36m[CREATE_ROLE] 玩家选择颜色: %d\27[0m", color))
+    end
     
     -- 查找用户
     local user = userDB:findByUserId(userId)
     
     if user then
-        -- 标记角色已创建
+        -- 标记角色已创建，保存颜色
         user.roleCreated = true
+        user.color = color
         userDB:saveUser(user)
         
         -- 生成新的session
@@ -370,7 +378,7 @@ lpp.handler[108] = function(socket, userId, buf, length)
         socket:write(tostring(body))
         
         print(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
-        print(string.format("\27[32m║ ✅ 角色创建成功！米米号: %d\27[0m", userId))
+        print(string.format("\27[32m║ ✅ 角色创建成功！米米号: %d, 颜色: %d\27[0m", userId, color))
         print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
     else
         -- 用户不存在
