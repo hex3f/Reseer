@@ -1205,19 +1205,35 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     tprint("\27[36m[LocalGame] 处理 CMD 2304: 释放精灵\27[0m")
     
     local catchId = 0
-    local petType = 0
+    local flag = 0
     
-    if #body >= 8 then
+    if #body >= 4 then
         catchId = readUInt32BE(body, 1)
-        petType = readUInt32BE(body, 5)
+    end
+    if #body >= 8 then
+        flag = readUInt32BE(body, 5)
     end
     
-    tprint(string.format("\27[36m[LocalGame] 用户 %d 释放精灵 catchId=%d type=%d\27[0m", 
-        userId, catchId, petType))
-    
     local userData = self:getOrCreateUser(userId)
-    userData.currentPetId = petType
-    userData.catchId = catchId
+    
+    -- 根据 catchId 查找之前保存的精灵ID
+    -- 如果 catchId 匹配之前任务返回的 catchId，使用保存的 petId
+    local petId = userData.currentPetId or 1
+    if userData.catchId and userData.catchId == catchId then
+        petId = userData.currentPetId or 1
+    end
+    
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 释放精灵 catchId=%d flag=%d petId=%d\27[0m", 
+        userId, catchId, flag, petId))
+    
+    -- 获取精灵数据
+    local petLevel = 5
+    local stats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 100, maxHp = 100}
+    local skills = SeerMonsters.getBattleSkills(petId, petLevel)
+    local skillCount = 0
+    for _, s in ipairs(skills) do
+        if s > 0 then skillCount = skillCount + 1 end
+    end
     
     local responseBody = ""
     
@@ -1227,21 +1243,21 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(1)          -- flag (有精灵信息)
     
     -- PetInfo (完整版)
-    responseBody = responseBody .. writeUInt32BE(petType)    -- id
+    responseBody = responseBody .. writeUInt32BE(petId)      -- id (使用正确的精灵ID)
     responseBody = responseBody .. writeFixedString("", 16)  -- name (16字节)
     responseBody = responseBody .. writeUInt32BE(31)         -- dv (个体值)
     responseBody = responseBody .. writeUInt32BE(0)          -- nature (性格)
-    responseBody = responseBody .. writeUInt32BE(16)         -- level
+    responseBody = responseBody .. writeUInt32BE(petLevel)   -- level
     responseBody = responseBody .. writeUInt32BE(0)          -- exp
     responseBody = responseBody .. writeUInt32BE(0)          -- lvExp
     responseBody = responseBody .. writeUInt32BE(1000)       -- nextLvExp
-    responseBody = responseBody .. writeUInt32BE(100)        -- hp
-    responseBody = responseBody .. writeUInt32BE(100)        -- maxHp
-    responseBody = responseBody .. writeUInt32BE(39)         -- attack
-    responseBody = responseBody .. writeUInt32BE(35)         -- defence
-    responseBody = responseBody .. writeUInt32BE(78)         -- s_a (特攻)
-    responseBody = responseBody .. writeUInt32BE(36)         -- s_d (特防)
-    responseBody = responseBody .. writeUInt32BE(39)         -- speed
+    responseBody = responseBody .. writeUInt32BE(stats.hp)   -- hp
+    responseBody = responseBody .. writeUInt32BE(stats.maxHp) -- maxHp
+    responseBody = responseBody .. writeUInt32BE(stats.attack or 39)   -- attack
+    responseBody = responseBody .. writeUInt32BE(stats.defence or 35)  -- defence
+    responseBody = responseBody .. writeUInt32BE(stats.spAtk or 78)    -- s_a (特攻)
+    responseBody = responseBody .. writeUInt32BE(stats.spDef or 36)    -- s_d (特防)
+    responseBody = responseBody .. writeUInt32BE(stats.speed or 39)    -- speed
     responseBody = responseBody .. writeUInt32BE(0)          -- addMaxHP
     responseBody = responseBody .. writeUInt32BE(0)          -- addMoreMaxHP
     responseBody = responseBody .. writeUInt32BE(0)          -- addAttack
@@ -1255,16 +1271,16 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sa
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sd
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sp
-    responseBody = responseBody .. writeUInt32BE(4)          -- skillNum
+    responseBody = responseBody .. writeUInt32BE(skillCount) -- skillNum
     -- 4个技能槽 (id + pp)
-    responseBody = responseBody .. writeUInt32BE(10022) .. writeUInt32BE(30)  -- 技能1
-    responseBody = responseBody .. writeUInt32BE(10035) .. writeUInt32BE(25)  -- 技能2
-    responseBody = responseBody .. writeUInt32BE(20036) .. writeUInt32BE(20)  -- 技能3
-    responseBody = responseBody .. writeUInt32BE(0) .. writeUInt32BE(0)       -- 技能4 (空)
+    responseBody = responseBody .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(35)
+    responseBody = responseBody .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(25)
+    responseBody = responseBody .. writeUInt32BE(skills[3] or 0) .. writeUInt32BE(20)
+    responseBody = responseBody .. writeUInt32BE(skills[4] or 0) .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(catchId)    -- catchTime
-    responseBody = responseBody .. writeUInt32BE(301)        -- catchMap
+    responseBody = responseBody .. writeUInt32BE(515)        -- catchMap
     responseBody = responseBody .. writeUInt32BE(0)          -- catchRect
-    responseBody = responseBody .. writeUInt32BE(5)          -- catchLevel
+    responseBody = responseBody .. writeUInt32BE(petLevel)   -- catchLevel
     responseBody = responseBody .. writeUInt16BE(0)          -- effectCount
     responseBody = responseBody .. writeUInt32BE(0)          -- peteffect
     responseBody = responseBody .. writeUInt32BE(0)          -- skinID
@@ -1463,7 +1479,6 @@ function LocalGameServer:sendNoteStartFight(clientData, userId, userData)
     responseBody = responseBody .. string.char(0, 0, 0, 0, 0, 0)              -- battleLv (6字节)
     
     self:sendResponse(clientData, 2504, userId, 0, responseBody)
-end
 end
 
 -- CMD 2605: 物品列表
