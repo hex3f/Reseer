@@ -9,6 +9,10 @@ local fs = require "fs"
 local bit = require "../bitop_compat"
 local buffer = require "buffer"
 
+-- 从 Logger 模块获取 tprint
+local Logger = require('../logger')
+local tprint = Logger.tprint
+
 -- MD5 库
 local md5 = nil
 pcall(function()
@@ -209,7 +213,7 @@ end
 -- 加载赛尔号命令列表
 -- 加载命令映射
 local SeerCommands = require('../seer_commands')
-print("\27[36m[GAME] Seer command list loaded\27[0m")
+tprint("\27[36m[GAME] Seer command list loaded\27[0m")
 
 -- 获取命令名称
 local function getCmdName(cmdId)
@@ -259,13 +263,13 @@ local function createSessionCrypto(localPort)
     function crypto:initKey(keyStr)
         self.key = {keyStr:byte(1, #keyStr)}
         self.keyInitialized = true
-        print(string.format("\27[32m[CRYPTO:%d] 密钥已初始化: %s (%d字符)\27[0m", self.port, keyStr, #keyStr))
+        tprint(string.format("\27[32m[CRYPTO:%d] 密钥已初始化: %s (%d字符)\27[0m", self.port, keyStr, #keyStr))
     end
     
     -- 使用初始密钥
     function crypto:useInitialKey()
         self:initKey(INITIAL_KEY)
-        print(string.format("\27[36m[CRYPTO:%d] 使用初始密钥\27[0m", self.port))
+        tprint(string.format("\27[36m[CRYPTO:%d] 使用初始密钥\27[0m", self.port))
     end
     
     -- 从登录响应更新密钥
@@ -273,7 +277,7 @@ local function createSessionCrypto(localPort)
         -- 登录响应的body最后4字节是随机数
         local header = parsePacketHeader(data)
         if not header or header.length < 21 then
-            print(string.format("\27[31m[CRYPTO:%d] 登录响应太短\27[0m", self.port))
+            tprint(string.format("\27[31m[CRYPTO:%d] 登录响应太短\27[0m", self.port))
             return false
         end
         
@@ -302,7 +306,7 @@ local function createSessionCrypto(localPort)
         local newKey = hash:sub(1, 10)
         self:initKey(newKey)
         
-        print(string.format("\27[32m[CRYPTO:%d] 密钥已更新: random=%d, xor=%d, key=%s\27[0m", 
+        tprint(string.format("\27[32m[CRYPTO:%d] 密钥已更新: random=%d, xor=%d, key=%s\27[0m", 
             self.port, randomNum, xorResult, newKey))
         
         return true
@@ -382,11 +386,11 @@ end
 
 -- 创建单个端口的游戏服务器
 local function createGameServerForPort(localPort, targetIP, targetPort, serverID)
-    print(string.format("\27[36m[GAME] createGameServerForPort: port=%d, target=%s:%d, serverID=%d\27[0m", 
+    tprint(string.format("\27[36m[GAME] createGameServerForPort: port=%d, target=%s:%d, serverID=%d\27[0m", 
         localPort, targetIP, targetPort, serverID))
     
     if activeServers[localPort] then
-        print(string.format("\27[33m[GAME] Port %d already listening\27[0m", localPort))
+        tprint(string.format("\27[33m[GAME] Port %d already listening\27[0m", localPort))
         return
     end
     
@@ -415,7 +419,7 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
         local crypto = createSessionCrypto(localPort)
         crypto:useInitialKey()
         
-        print(string.format("\27[35m[GAME:%d] 新客户端连接 (Server ID=%d -> %s:%d)\27[0m", 
+        tprint(string.format("\27[35m[GAME:%d] 新客户端连接 (Server ID=%d -> %s:%d)\27[0m", 
             localPort, serverID, targetIP, targetPort))
         
         pcall(function() fs.mkdirSync("sessionlog") end)
@@ -525,13 +529,13 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                     end
                     
                     -- 主日志行
-                    print(string.format("%s[%s] CMD %d (%s) UID=%d LEN=%d\27[0m", 
+                    tprint(string.format("%s[%s] CMD %d (%s) UID=%d LEN=%d\27[0m", 
                         color, dirStr, header.cmdId, cmdName, header.userId, header.length))
                     
                     -- 显示 HEX 数据 (body 部分)
                     if #decryptedData > 17 then
                         local bodyData = decryptedData:sub(18)
-                        print(string.format("\27[90m  HEX: %s\27[0m", toHexString(bodyData, 48)))
+                        tprint(string.format("\27[90m  HEX: %s\27[0m", toHexString(bodyData, 48)))
                     end
                 end
                 
@@ -551,17 +555,17 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                     if direction == "CLI" then
                         userId = header.userId
                         crypto.userId = userId
-                        print(string.format("\27[36m[GAME:%d] 检测到登录请求, UID=%d\27[0m", localPort, userId))
+                        tprint(string.format("\27[36m[GAME:%d] 检测到登录请求, UID=%d\27[0m", localPort, userId))
                     elseif direction == "SRV" and not loginResponseReceived then
                         -- 登录响应，更新密钥
                         loginResponseReceived = true
-                        print(string.format("\27[36m[GAME:%d] 检测到登录响应, 准备更新密钥\27[0m", localPort))
+                        tprint(string.format("\27[36m[GAME:%d] 检测到登录响应, 准备更新密钥\27[0m", localPort))
                         crypto:updateKeyFromLoginResponse(decryptedData, userId)
                     end
                 end
             else
                 -- 无法解析的数据
-                print(string.format("\27[31m[GAME:%d] 无法解析 %d bytes: %s\27[0m", 
+                tprint(string.format("\27[31m[GAME:%d] 无法解析 %d bytes: %s\27[0m", 
                     localPort, #data, toHexString(data, 32)))
                 decryptedData = data  -- 记录原始数据
             end
@@ -586,7 +590,7 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                 -- 检查长度是否合理
                 if pktLen < 17 or pktLen > 1000000 then
                     -- 长度不合理，可能是数据损坏，跳过一个字节
-                    print(string.format("\27[31m[GAME:%d] 异常包长度: %d, 跳过\27[0m", localPort, pktLen))
+                    tprint(string.format("\27[31m[GAME:%d] 异常包长度: %d, 跳过\27[0m", localPort, pktLen))
                     remaining = remaining:sub(2)
                 elseif #remaining >= pktLen then
                     -- 有完整的包
@@ -604,20 +608,20 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
         
         ce = net.createConnection(targetPort, targetIP, function(err)
             if err then 
-                print(string.format("\27[31m[GAME:%d] Error connecting to official: %s\27[0m", localPort, tostring(err)))
+                tprint(string.format("\27[31m[GAME:%d] Error connecting to official: %s\27[0m", localPort, tostring(err)))
                 pcall(function() client:destroy() end)
                 return
             end
     
-            print(string.format("\27[32m[GAME:%d] Connected to official: %s:%d\27[0m", localPort, targetIP, targetPort))
+            tprint(string.format("\27[32m[GAME:%d] Connected to official: %s:%d\27[0m", localPort, targetIP, targetPort))
             officialReady = true
             
             -- 发送缓存的数据
             if #pendingData > 0 then
-                print(string.format("\27[36m[GAME:%d] 发送 %d 个缓存数据包到官服\27[0m", localPort, #pendingData))
+                tprint(string.format("\27[36m[GAME:%d] 发送 %d 个缓存数据包到官服\27[0m", localPort, #pendingData))
             end
             for _, data in ipairs(pendingData) do
-                print(string.format("\27[36m[GAME:%d] 发送缓存数据: %d bytes\27[0m", localPort, #data))
+                tprint(string.format("\27[36m[GAME:%d] 发送缓存数据: %d bytes\27[0m", localPort, #data))
                 ce:write(data)
             end
             pendingData = {}
@@ -626,14 +630,14 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             local responseReceived = false
             timer.setTimeout(5000, function()
                 if not responseReceived and not officialClosed then
-                    print(string.format("\27[31m[GAME:%d] ⚠ 官服 5 秒内无响应！\27[0m", localPort))
+                    tprint(string.format("\27[31m[GAME:%d] ⚠ 官服 5 秒内无响应！\27[0m", localPort))
                 end
             end)
 
             ce:on("data", function(data)
                 if clientClosed then return end
                 responseReceived = true
-                print(string.format("\27[32m[GAME:%d] 收到官服数据: %d bytes\27[0m", localPort, #data))
+                tprint(string.format("\27[32m[GAME:%d] 收到官服数据: %d bytes\27[0m", localPort, #data))
                 -- 添加到缓冲区并处理
                 serverBuffer = serverBuffer .. data
                 serverBuffer = processBuffer("SRV", serverBuffer)
@@ -642,7 +646,7 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             end)
             
             ce:on("error", function(err)
-                print(string.format("\27[31m[GAME:%d] Official error: %s\27[0m", localPort, tostring(err)))
+                tprint(string.format("\27[31m[GAME:%d] Official error: %s\27[0m", localPort, tostring(err)))
                 officialClosed = true
                 if not clientClosed then pcall(function() client:destroy() end) end
             end)
@@ -654,7 +658,7 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
         end)
 
         client:on("close", function()
-            print(string.format("Closed session (port %d)", localPort))
+            tprint(string.format("Closed session (port %d)", localPort))
             clientClosed = true
             if fd then fd:close() end
             if fdDecrypted then fdDecrypted:close() end
@@ -663,7 +667,7 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
         end)
         
         client:on("error", function(err)
-            print(string.format("[GAME:%d] Client error: %s", localPort, err))
+            tprint(string.format("[GAME:%d] Client error: %s", localPort, err))
             clientClosed = true
         end)
         
@@ -677,18 +681,18 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             if not handshakeComplete and data:match("^GET ") then
                 local wsHandshake = parseWebSocketHandshake(data)
                 if wsHandshake then
-                    print(string.format("\27[36m[GAME:%d] WebSocket 握手请求\27[0m", localPort))
+                    tprint(string.format("\27[36m[GAME:%d] WebSocket 握手请求\27[0m", localPort))
                     isWebSocket = true
                     handshakeComplete = true
                     local response = generateWebSocketResponse(wsHandshake.key)
                     client:write(response)
-                    print(string.format("\27[32m[GAME:%d] ✓ WebSocket 握手完成\27[0m", localPort))
+                    tprint(string.format("\27[32m[GAME:%d] ✓ WebSocket 握手完成\27[0m", localPort))
                     return
                 end
             end
             
             if data == "<policy-file-request/>\000" then
-                print(string.format("Policy file requested (port %d)", localPort))
+                tprint(string.format("Policy file requested (port %d)", localPort))
                 client:write(policy_file)
                 return
             end
@@ -735,30 +739,30 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             
             -- 转发原始数据给官服
             if officialReady and not officialClosed then
-                print(string.format("\27[36m[GAME:%d] 转发数据到官服: %d bytes\27[0m", localPort, #data))
+                tprint(string.format("\27[36m[GAME:%d] 转发数据到官服: %d bytes\27[0m", localPort, #data))
                 local success, err = pcall(function() ce:write(data) end)
                 if not success then
-                    print(string.format("\27[31m[GAME:%d] 转发失败: %s\27[0m", localPort, tostring(err)))
+                    tprint(string.format("\27[31m[GAME:%d] 转发失败: %s\27[0m", localPort, tostring(err)))
                 end
             else
-                print(string.format("\27[33m[GAME:%d] 官服未就绪，缓存数据: %d bytes\27[0m", localPort, #data))
+                tprint(string.format("\27[33m[GAME:%d] 官服未就绪，缓存数据: %d bytes\27[0m", localPort, #data))
                 table.insert(pendingData, data)
             end
         end)
     end)
     
     server:on('error', function(err)
-        print(string.format("\27[31m[GAME] Error on port %d: %s\27[0m", localPort, tostring(err)))
+        tprint(string.format("\27[31m[GAME] Error on port %d: %s\27[0m", localPort, tostring(err)))
     end)
 
     server:listen(localPort)
     activeServers[localPort] = true
-    print(string.format("\27[36m[GAME] Listening on port %d -> %s:%d\27[0m", localPort, targetIP, targetPort))
+    tprint(string.format("\27[36m[GAME] Listening on port %d -> %s:%d\27[0m", localPort, targetIP, targetPort))
 end
 
 function gs:initialize(port)
-    print("\27[36m[GAME] ========== Initializing TrafficLogger ==========\27[0m")
-    print("\27[36m[GAME] Initial key: " .. INITIAL_KEY .. "\27[0m")
+    tprint("\27[36m[GAME] ========== Initializing TrafficLogger ==========\27[0m")
+    tprint("\27[36m[GAME] Initial key: " .. INITIAL_KEY .. "\27[0m")
     
     pcall(function() fs.mkdirSync("sessionlog") end)
     
@@ -773,8 +777,8 @@ function gs:initialize(port)
     
     _G.createGameServerForPort = createGameServerForPort
     
-    print("\27[36m[GAME] TrafficLogger initialized\27[0m")
-    print("\27[36m[GAME] Session files: *.bin (raw), *-decrypted.bin (decrypted)\27[0m")
+    tprint("\27[36m[GAME] TrafficLogger initialized\27[0m")
+    tprint("\27[36m[GAME] Session files: *.bin (raw), *-decrypted.bin (decrypted)\27[0m")
 end
 
 return {GameServer = gs}

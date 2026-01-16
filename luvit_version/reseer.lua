@@ -163,6 +163,20 @@ end
 local timer = require("timer")
 timer.setInterval(1000 * 60, function() end)
 
+-- 监听标准输入，按 Enter 键打印分割线
+-- 使用 pcall 防止在某些环境下 stdin 不可用
+pcall(function()
+    local uv = require('uv')
+    local stdin = uv.new_tty(0, true)
+    if stdin then
+        stdin:read_start(function(err, data)
+            if data and data:match("[\r\n]") then
+                Logger.printSeparator()
+            end
+        end)
+    end
+end)
+
 -- 全局错误捕获
 process:on("uncaughtException", function(err)
     print("\27[31m[CRITICAL] Uncaught Exception: " .. tostring(err) .. "\27[0m")

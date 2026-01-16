@@ -1,10 +1,14 @@
 -- Login Server (TrafficLogger Mode)
 -- TCP Socket 代理到官服，记录所有流量
--- 客户端 TCP → 本地代理 → 官服 TCP
+-- 客户端 TCP -> 本地代理 -> 官服 TCP
 
 local net = require "net"
 local fs = require "fs"
 local json = require "json"
+
+-- 从 Logger 模块获取 tprint
+local Logger = require('../logger')
+local tprint = Logger.tprint
 
 -- 加载赛尔号命令映射
 local SeerCommands = require('../seer_commands')
@@ -98,16 +102,9 @@ end
 
 -- 处理服务器列表响应 (CMD 105)
 local function processServerList(data)
-    print("\27[36m[服务器列表] 处理 CMD 105 响应\27[0m")
+    tprint("\27[36m[服务器列表] 处理 CMD 105 响应\27[0m")
     local bytes = {}
     for i = 1, #data do bytes[i] = data:byte(i) end
-    
-    -- CMD 105 响应结构:
-    -- 17 字节头部
-    -- 4 字节 maxOnlineID
-    -- 4 字节 isVIP
-    -- 4 字节 onlineCnt (服务器数量)
-    -- 然后是 onlineCnt 个 ServerInfo (每个 30 字节)
     
     local headerSize = 17
     local maxOnlineID = (bytes[headerSize + 1] or 0) * 16777216 + (bytes[headerSize + 2] or 0) * 65536 + 
@@ -117,7 +114,7 @@ local function processServerList(data)
     local serverCount = (bytes[headerSize + 9] or 0) * 16777216 + (bytes[headerSize + 10] or 0) * 65536 + 
                         (bytes[headerSize + 11] or 0) * 256 + (bytes[headerSize + 12] or 0)
     
-    print(string.format("\27[36m[服务器列表] maxOnlineID=%d, isVIP=%d, 服务器数量=%d\27[0m", maxOnlineID, isVIP, serverCount))
+    tprint(string.format("\27[36m[服务器列表] maxOnlineID=%d, isVIP=%d, 服务器数量=%d\27[0m", maxOnlineID, isVIP, serverCount))
     
     local serverStart = headerSize + 12 + 1
     local serverSize = 30
@@ -145,17 +142,16 @@ local function processServerList(data)
             local portStart = offset + 24
             local currentPort = (bytes[portStart] or 0) * 256 + (bytes[portStart + 1] or 0)
             
-            -- 检查是否是本地地址（跳过本地服务器，只代理官服）
             local isLocalServer = currentIP:match("^127%.") or currentIP:match("^localhost")
             
             if onlineID > 0 and currentIP ~= "" and currentPort > 0 then
                 local localPort = 5000 + (onlineID % 1000)
                 
                 if isLocalServer then
-                    print(string.format("\27[33m[服务器列表] #%d: ID=%d, 人数=%d, %s:%d (本地服务器，跳过代理)\27[0m", 
+                    tprint(string.format("\27[33m[服务器列表] #%d: ID=%d, 人数=%d, %s:%d (本地服务器，跳过代理)\27[0m", 
                         i+1, onlineID, userCnt, currentIP, currentPort))
                 else
-                    print(string.format("\27[36m[服务器列表] #%d: ID=%d, 人数=%d, %s:%d -> 127.0.0.1:%d\27[0m", 
+                    tprint(string.format("\27[36m[服务器列表] #%d: ID=%d, 人数=%d, %s:%d -> 127.0.0.1:%d\27[0m", 
                         i+1, onlineID, userCnt, currentIP, currentPort, localPort))
                     
                     _G.serverMapping[onlineID] = { ip = currentIP, port = currentPort, localPort = localPort }
@@ -163,18 +159,15 @@ local function processServerList(data)
                     _G.portToServer[localPort] = { id = onlineID, ip = currentIP, port = currentPort }
                     table.insert(_G.lastServerList, { id = onlineID, ip = currentIP, port = currentPort, localPort = localPort })
                     
-                    -- 创建游戏服务器代理
                     if _G.createGameServerForPort then 
                         _G.createGameServerForPort(localPort, currentIP, currentPort, onlineID) 
                     end
                     
-                    -- 替换 IP 为本地代理地址
                     local newIP = "127.0.0.1"
                     for j = 1, 16 do 
                         bytes[ipStart + j - 1] = j <= #newIP and newIP:byte(j) or 0 
                     end
                     
-                    -- 替换端口为本地代理端口
                     bytes[portStart] = math.floor(localPort / 256)
                     bytes[portStart + 1] = localPort % 256
                 end
@@ -182,51 +175,48 @@ local function processServerList(data)
         end
     end
     
-    print(string.format("\27[35m[服务器列表] 总计映射 %d 个服务器\27[0m", #_G.lastServerList))
+    tprint(string.format("\27[35m[服务器列表] 总计映射 %d 个服务器\27[0m", #_G.lastServerList))
     return string.char(table.unpack(bytes))
 end
 
 -- TCP 代理服务器
 local server = net.createServer(function(client)
     local clientAddr = client:address()
-    print(string.format("\27[36m[LOGIN-PROXY] 新客户端连接: %s\27[0m", clientAddr and clientAddr.ip or "unknown"))
+    tprint(string.format("\27[36m[LOGIN-PROXY] 新客户端连接: %s\27[0m", clientAddr and clientAddr.ip or "unknown"))
     
     local officialConn = nil
     local clientClosed = false
     local officialClosed = false
-    local officialConnected = false  -- 新增：标记是否真正连接成功
+    local officialConnected = false
     local clientBuffer = ""
     local officialBuffer = ""
     
-    -- 连接到官服
     local targetHost = conf.official_login_server or "115.238.192.7"
     local targetPort = conf.official_login_port or 9999
     
-    print(string.format("\27[36m[LOGIN-PROXY] 连接官服 TCP %s:%d...\27[0m", targetHost, targetPort))
+    tprint(string.format("\27[36m[LOGIN-PROXY] 连接官服 TCP %s:%d...\27[0m", targetHost, targetPort))
     
     officialConn = net.createConnection(targetPort, targetHost, function(err)
         if err then
-            print("\27[31m[LOGIN-PROXY] 连接官服失败: " .. tostring(err) .. "\27[0m")
+            tprint("\27[31m[LOGIN-PROXY] 连接官服失败: " .. tostring(err) .. "\27[0m")
             pcall(function() client:destroy() end)
             return
         end
         
-        officialConnected = true  -- 标记连接成功
-        print(string.format("\27[32m[LOGIN-PROXY] ✓ 已连接到官服 %s:%d\27[0m", targetHost, targetPort))
+        officialConnected = true
+        tprint(string.format("\27[32m[LOGIN-PROXY] OK 已连接到官服 %s:%d\27[0m", targetHost, targetPort))
         
-        -- 官服数据处理
         officialConn:on("data", function(data)
             if clientClosed then return end
             
             officialBuffer = officialBuffer .. data
             
-            -- 解析完整的数据包
             while #officialBuffer >= 4 do
                 local packetLen = officialBuffer:byte(1)*16777216 + officialBuffer:byte(2)*65536 + 
                                   officialBuffer:byte(3)*256 + officialBuffer:byte(4)
                 
                 if #officialBuffer < packetLen then
-                    break  -- 等待更多数据
+                    break
                 end
                 
                 local packet = officialBuffer:sub(1, packetLen)
@@ -237,24 +227,17 @@ local server = net.createServer(function(client)
                 
                 if header then
                     if not shouldHideCmd(header.cmdId) then
-                        print(string.format("\27[33m╔══════════════════════════════════════════════════════════════╗\27[0m"))
-                        print(string.format("\27[33m║ [官服→客户端] CMD=%d (%s)\27[0m", header.cmdId, getCmdName(header.cmdId)))
-                        print(string.format("\27[33m╚══════════════════════════════════════════════════════════════╝\27[0m"))
-                        print(string.format("\27[33m[官服→客户端] UID=%d, RESULT=%d, 长度=%d bytes\27[0m", 
-                            header.userId, header.result, header.length))
-                        print(string.format("\27[33m[官服→客户端] HEX: %s\27[0m", toHex(packet)))
+                        tprint(string.format("\27[33m[<-官服] CMD %d (%s) UID=%d RES=%d LEN=%d\27[0m", 
+                            header.cmdId, getCmdName(header.cmdId), header.userId, header.result, header.length))
                     end
                     
                     logTraffic("server_to_client", header.cmdId, header.userId, packet)
                     
-                    -- 处理服务器列表（替换IP为本地代理）
                     if header.cmdId == 105 and conf.proxy_game_server then
                         modified = processServerList(packet)
                     end
                     
-                    -- 解析 CMD 3 响应（邮箱验证码）
                     if header.cmdId == 3 and header.result == 0 then
-                        -- 验证码在 body 里，从第18字节开始，32字节
                         local verifyCode = ""
                         for i = 18, math.min(49, #packet) do
                             local b = packet:byte(i)
@@ -262,68 +245,30 @@ local server = net.createServer(function(client)
                                 verifyCode = verifyCode .. string.char(b)
                             end
                         end
-                        print(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
-                        print(string.format("\27[32m║ 📧 邮箱验证码: %s\27[0m", verifyCode))
-                        print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+                        tprint(string.format("\27[32m[LOGIN] 邮箱验证码: %s\27[0m", verifyCode))
                     end
                     
-                    -- 解析 CMD 2 响应（注册结果）
-                    if header.cmdId == 2 then
-                        if header.result == 0 then
-                            print(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
-                            print(string.format("\27[32m║ ✅ 注册成功！米米号: %d\27[0m", header.userId))
-                            print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
-                        else
-                            local errorMsg = "未知错误"
-                            if header.result == 5002 then errorMsg = "邮箱已被注册"
-                            elseif header.result == 5003 then errorMsg = "账号或密码错误"
-                            elseif header.result == 6002 then errorMsg = "验证码错误"
-                            elseif header.result == 1301 then errorMsg = "邮箱已注册过"
-                            elseif header.result == 20002 then errorMsg = "邀请码有误"
-                            end
-                            print(string.format("\27[31m╔══════════════════════════════════════════════════════════════╗\27[0m"))
-                            print(string.format("\27[31m║ ❌ 注册失败！错误码: %d (%s)\27[0m", header.result, errorMsg))
-                            print(string.format("\27[31m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+                    if header.cmdId == 104 and header.result == 0 then
+                        local sessionHex = ""
+                        for i = 18, math.min(33, #packet) do
+                            sessionHex = sessionHex .. string.format("%02X", packet:byte(i) or 0)
                         end
-                    end
-                    
-                    -- 解析 CMD 104 响应（邮箱登录结果）
-                    if header.cmdId == 104 then
-                        if header.result == 0 then
-                            -- 解析 session (16字节) 和 roleCreate (4字节)
-                            local sessionHex = ""
-                            for i = 18, math.min(33, #packet) do
-                                sessionHex = sessionHex .. string.format("%02X", packet:byte(i) or 0)
-                            end
-                            local roleCreate = 0
-                            if #packet >= 37 then
-                                roleCreate = (packet:byte(34) or 0) * 16777216 + (packet:byte(35) or 0) * 65536 + 
-                                            (packet:byte(36) or 0) * 256 + (packet:byte(37) or 0)
-                            end
-                            print(string.format("\27[32m╔══════════════════════════════════════════════════════════════╗\27[0m"))
-                            print(string.format("\27[32m║ ✅ 登录成功！米米号: %d\27[0m", header.userId))
-                            print(string.format("\27[32m║ 🔑 Session: %s\27[0m", sessionHex))
-                            print(string.format("\27[32m║ 👤 角色状态: %s\27[0m", roleCreate == 1 and "已创建" or "未创建"))
-                            print(string.format("\27[32m╚══════════════════════════════════════════════════════════════╝\27[0m"))
-                        else
-                            local errorMsg = "未知错误"
-                            if header.result == 5003 then errorMsg = "账号或密码错误"
-                            elseif header.result == 5002 then errorMsg = "账号不存在"
-                            end
-                            print(string.format("\27[31m╔══════════════════════════════════════════════════════════════╗\27[0m"))
-                            print(string.format("\27[31m║ ❌ 登录失败！错误码: %d (%s)\27[0m", header.result, errorMsg))
-                            print(string.format("\27[31m╚══════════════════════════════════════════════════════════════╝\27[0m"))
+                        local roleCreate = 0
+                        if #packet >= 37 then
+                            roleCreate = (packet:byte(34) or 0) * 16777216 + (packet:byte(35) or 0) * 65536 + 
+                                        (packet:byte(36) or 0) * 256 + (packet:byte(37) or 0)
                         end
+                        tprint(string.format("\27[32m[LOGIN] 登录成功! UID=%d Session=%s Role=%s\27[0m", 
+                            header.userId, sessionHex, roleCreate == 1 and "已创建" or "未创建"))
                     end
                 end
                 
-                -- 发送给客户端
                 pcall(function() client:write(modified) end)
             end
         end)
         
         officialConn:on("error", function(err)
-            print("\27[31m[LOGIN-PROXY] 官服连接错误: " .. tostring(err) .. "\27[0m")
+            tprint("\27[31m[LOGIN-PROXY] 官服连接错误: " .. tostring(err) .. "\27[0m")
             officialClosed = true
             if not clientClosed then 
                 pcall(function() client:destroy() end) 
@@ -331,40 +276,35 @@ local server = net.createServer(function(client)
         end)
         
         officialConn:on("end", function()
-            print("\27[33m[LOGIN-PROXY] 官服断开连接\27[0m")
+            tprint("\27[33m[LOGIN-PROXY] 官服断开连接\27[0m")
             officialClosed = true
             if not clientClosed then 
                 pcall(function() client:destroy() end) 
             end
         end)
         
-        -- 如果有缓存的客户端数据，发送到官服
         if #clientBuffer > 0 then
-            print(string.format("\27[36m[LOGIN-PROXY] 发送缓存数据到官服: %d bytes\27[0m", #clientBuffer))
+            tprint(string.format("\27[36m[LOGIN-PROXY] 发送缓存数据到官服: %d bytes\27[0m", #clientBuffer))
             officialConn:write(clientBuffer)
             clientBuffer = ""
         end
     end)
     
-    -- 客户端数据处理
     client:on("data", function(data)
         if officialClosed then return end
         
-        -- Flash 策略文件请求
         if data == "<policy-file-request/>\000" then
-            print("\27[36m[LOGIN-PROXY] Flash 策略文件请求\27[0m")
+            tprint("\27[36m[LOGIN-PROXY] Flash 策略文件请求\27[0m")
             client:write(policy_file)
             return
         end
         
-        -- 如果官服还没连接好，先缓存
         if not officialConnected then
             clientBuffer = clientBuffer .. data
-            print(string.format("\27[33m[LOGIN-PROXY] 缓存数据等待连接: %d bytes (总计 %d bytes)\27[0m", #data, #clientBuffer))
+            tprint(string.format("\27[33m[LOGIN-PROXY] 缓存数据等待连接: %d bytes\27[0m", #clientBuffer))
             return
         end
         
-        -- 解析并记录数据包
         local tempBuffer = data
         while #tempBuffer >= 4 do
             local packetLen = tempBuffer:byte(1)*16777216 + tempBuffer:byte(2)*65536 + 
@@ -380,23 +320,19 @@ local server = net.createServer(function(client)
             local header = parsePacketHeader(packet)
             if header then
                 if not shouldHideCmd(header.cmdId) then
-                    print(string.format("\27[35m╔══════════════════════════════════════════════════════════════╗\27[0m"))
-                    print(string.format("\27[35m║ [客户端→官服] CMD=%d (%s)\27[0m", header.cmdId, getCmdName(header.cmdId)))
-                    print(string.format("\27[35m╚══════════════════════════════════════════════════════════════╝\27[0m"))
-                    print(string.format("\27[35m[客户端→官服] UID=%d, 长度=%d bytes\27[0m", header.userId, header.length))
-                    print(string.format("\27[35m[客户端→官服] HEX: %s\27[0m", toHex(packet)))
+                    tprint(string.format("\27[35m[->官服] CMD %d (%s) UID=%d LEN=%d\27[0m", 
+                        header.cmdId, getCmdName(header.cmdId), header.userId, header.length))
                 end
                 
                 logTraffic("client_to_server", header.cmdId, header.userId, packet)
             end
         end
         
-        -- 转发原始数据到官服
         pcall(function() officialConn:write(data) end)
     end)
     
     client:on("error", function(err)
-        print("\27[31m[LOGIN-PROXY] 客户端错误: " .. tostring(err) .. "\27[0m")
+        tprint("\27[31m[LOGIN-PROXY] 客户端错误: " .. tostring(err) .. "\27[0m")
         clientClosed = true
         if officialConn then 
             pcall(function() officialConn:destroy() end) 
@@ -404,7 +340,7 @@ local server = net.createServer(function(client)
     end)
     
     client:on("end", function()
-        print("\27[33m[LOGIN-PROXY] 客户端断开连接\27[0m")
+        tprint("\27[33m[LOGIN-PROXY] 客户端断开连接\27[0m")
         clientClosed = true
         if officialConn then 
             pcall(function() officialConn:destroy() end) 
@@ -414,17 +350,10 @@ end)
 
 server:on('error', function(err)
     if err then 
-        print("\27[31m[LOGIN-PROXY] 服务器错误: " .. tostring(err) .. "\27[0m") 
+        tprint("\27[31m[LOGIN-PROXY] 服务器错误: " .. tostring(err) .. "\27[0m") 
     end
 end)
 
 server:listen(conf.login_port)
 
-print("\27[36m╔══════════════════════════════════════════════════════════════╗\27[0m")
-print("\27[36m║ TrafficLogger 登录代理服务器已启动                           ║\27[0m")
-print("\27[36m╠══════════════════════════════════════════════════════════════╣\27[0m")
-print(string.format("\27[36m║ 本地: tcp://127.0.0.1:%d                                    ║\27[0m", conf.login_port))
-print(string.format("\27[36m║ 官服: tcp://%s:%d                              ║\27[0m", 
-    conf.official_login_server or "115.238.192.7", conf.official_login_port or 9999))
-print("\27[36m║ 协议: TCP Socket (原始二进制)                                ║\27[0m")
-print("\27[36m╚══════════════════════════════════════════════════════════════╝\27[0m")
+tprint("\27[36m[LOGIN-PROXY] 登录代理服务器已启动 port=" .. conf.login_port .. "\27[0m")

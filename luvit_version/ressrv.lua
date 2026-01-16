@@ -9,8 +9,9 @@ local proxy_root = conf.res_proxy_dir
 local mimes = require "./mimes"
 mimes.default = "application/octet-stream"
 
--- 获取日志模块
+-- 获取日志模块 (包含 tprint)
 local Logger = require("./logger")
+local tprint = Logger.tprint
 
 -- 确保根目录存在
 if not fs.existsSync(root) then

@@ -1,5 +1,6 @@
 -- Logger Module for RecSeer
 -- 记录所有请求和交互到统一的日志文件
+-- 提供带时间戳的 tprint 函数供所有模块使用
 
 local fs = require('fs')
 local os = require('os')
@@ -7,6 +8,29 @@ local os = require('os')
 local Logger = {}
 Logger.logFile = nil
 Logger.logPath = "logs/server.log"  -- 固定的日志文件名
+
+-- ==================== 工具函数 ====================
+
+-- 获取当前时间戳 (时:分:秒)
+function Logger.getTimeStr()
+    return os.date("%H:%M:%S")
+end
+
+-- 带时间戳的 print 函数
+function Logger.tprint(...)
+    local args = {...}
+    if #args > 0 then
+        args[1] = string.format("[%s] %s", Logger.getTimeStr(), tostring(args[1]))
+    end
+    print(table.unpack(args))
+end
+
+-- 打印分割线 (用于 Enter 键)
+function Logger.printSeparator()
+    print("")
+    print("\27[90m════════════════════════════════════════════════════════════════════════════════\27[0m")
+    print("")
+end
 
 -- 初始化日志系统
 function Logger.init()

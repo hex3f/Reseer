@@ -6,6 +6,10 @@ local bit = require('../bitop_compat')
 local json = require('json')
 local fs = require('fs')
 
+-- 从 Logger 模块获取 tprint
+local Logger = require('../logger')
+local tprint = Logger.tprint
+
 local LocalGameServer = {}
 LocalGameServer.__index = LocalGameServer
 
@@ -40,7 +44,7 @@ function LocalGameServer:loadUserData()
     -- 从 userdb 加载用户数据
     local userdb = require('../userdb')
     self.userdb = userdb
-    print("\27[36m[LocalGame] 用户数据库已加载\27[0m")
+    tprint("\27[36m[LocalGame] 用户数据库已加载\27[0m")
 end
 
 function LocalGameServer:initServerList()
@@ -54,7 +58,7 @@ function LocalGameServer:initServerList()
             friends = 0
         })
     end
-    print(string.format("\27[36m[LocalGame] 初始化 %d 个服务器\27[0m", #self.serverList))
+    tprint(string.format("\27[36m[LocalGame] 初始化 %d 个服务器\27[0m", #self.serverList))
 end
 
 function LocalGameServer:start()
@@ -62,7 +66,7 @@ function LocalGameServer:start()
     
     local server = net.createServer(function(client)
         local addr = client:address()
-        print(string.format("\27[32m[LocalGame] 新连接: %s:%d\27[0m", 
+        tprint(string.format("\27[32m[LocalGame] 新连接: %s:%d\27[0m", 
             addr and addr.address or "unknown", addr and addr.port or 0))
         
         local clientData = {
@@ -87,22 +91,22 @@ function LocalGameServer:start()
         end)
         
         client:on('end', function()
-            print("\27[33m[LocalGame] 客户端断开连接\27[0m")
+            tprint("\27[33m[LocalGame] 客户端断开连接\27[0m")
             self:removeClient(clientData)
         end)
         
         client:on('error', function(err)
-            print("\27[31m[LocalGame] 客户端错误: " .. tostring(err) .. "\27[0m")
+            tprint("\27[31m[LocalGame] 客户端错误: " .. tostring(err) .. "\27[0m")
             self:removeClient(clientData)
         end)
     end)
     
     server:listen(self.port, '0.0.0.0', function()
-        print(string.format("\27[32m[LocalGame] ✓ 本地游戏服务器启动在端口 %d\27[0m", self.port))
+        tprint(string.format("\27[32m[LocalGame] ✓ 本地游戏服务器启动在端口 %d\27[0m", self.port))
     end)
     
     server:on('error', function(err)
-        print("\27[31m[LocalGame] 服务器错误: " .. tostring(err) .. "\27[0m")
+        tprint("\27[31m[LocalGame] 服务器错误: " .. tostring(err) .. "\27[0m")
     end)
 end
 
@@ -171,7 +175,7 @@ function LocalGameServer:processPacket(clientData, packet)
     clientData.userId = userId
     clientData.seqId = seqId
     
-    print(string.format("\27[36m[LocalGame] 收到 CMD=%d (%s) UID=%d SEQ=%d LEN=%d\27[0m", 
+    tprint(string.format("\27[36m[LocalGame] 收到 CMD=%d (%s) UID=%d SEQ=%d LEN=%d\27[0m", 
         cmdId, getCmdName(cmdId), userId, seqId, length))
     
     -- 处理命令
@@ -240,7 +244,7 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
     if handler then
         handler(self, clientData, cmdId, userId, seqId, body)
     else
-        print(string.format("\27[33m[LocalGame] 未实现的命令: %d (%s)\27[0m", cmdId, getCmdName(cmdId)))
+        tprint(string.format("\27[33m[LocalGame] 未实现的命令: %d (%s)\27[0m", cmdId, getCmdName(cmdId)))
         -- 返回空响应
         self:sendResponse(clientData, cmdId, userId, 0, "")
     end
@@ -277,7 +281,7 @@ function LocalGameServer:sendResponse(clientData, cmdId, userId, result, body)
         clientData.socket:write(packet)
     end)
     
-    print(string.format("\27[32m[LocalGame] 发送 CMD=%d (%s) RESULT=%d LEN=%d\27[0m", 
+    tprint(string.format("\27[32m[LocalGame] 发送 CMD=%d (%s) RESULT=%d LEN=%d\27[0m", 
         cmdId, getCmdName(cmdId), result, length))
 end
 
@@ -322,7 +326,7 @@ end
 
 -- CMD 105: 获取服务器列表
 function LocalGameServer:handleCommendOnline(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 105: 获取服务器列表\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 105: 获取服务器列表\27[0m")
     
     -- 响应结构:
     -- maxOnlineID: 4 字节
@@ -353,7 +357,7 @@ end
 
 -- CMD 106: 获取指定范围服务器
 function LocalGameServer:handleRangeOnline(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 106: 获取指定范围服务器\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 106: 获取指定范围服务器\27[0m")
     
     local startId = 1
     local endId = #self.serverList
@@ -388,7 +392,7 @@ end
 -- 响应结构完全按照 UserInfo.setForLoginInfo 解析顺序
 -- 所有数据从用户数据读取
 function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 1001: 登录游戏服务器\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 1001: 登录游戏服务器\27[0m")
     
     -- 从 body 中提取 session (如果有)
     local session = ""
@@ -536,7 +540,7 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
     
-    print(string.format("\27[32m[LocalGame] ✓ 用户 %d 登录成功，响应大小: %d bytes\27[0m", userId, 17 + #responseBody))
+    tprint(string.format("\27[32m[LocalGame] ✓ 用户 %d 登录成功，响应大小: %d bytes\27[0m", userId, 17 + #responseBody))
 end
 
 -- CMD 1002: 获取系统时间
@@ -558,7 +562,7 @@ end
 -- + clothCount(4) + clothes[clothCount]*(id(4)+level(4)) + curTitle(4)
 -- 官服新用户: 161 bytes (body=144, clothCount=0)
 function LocalGameServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2001: 进入地图\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2001: 进入地图\27[0m")
     
     local mapType = 0
     local mapId = 0
@@ -583,7 +587,7 @@ function LocalGameServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     local clothes = userData.clothes or {}
     local teamInfo = userData.teamInfo or {}
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 进入地图 %d (type=%d) pos=(%d,%d)\27[0m", 
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 进入地图 %d (type=%d) pos=(%d,%d)\27[0m", 
         userId, mapId, mapType, posX, posY))
     
     -- 构建 PeopleInfo 响应
@@ -646,13 +650,13 @@ end
 
 -- CMD 2002: 离开地图
 function LocalGameServer:handleLeaveMap(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2002: 离开地图\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2002: 离开地图\27[0m")
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
 -- CMD 2051: 获取简单用户信息
 function LocalGameServer:handleGetSimUserInfo(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2051: 获取简单用户信息\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2051: 获取简单用户信息\27[0m")
     
     local targetUserId = userId
     if #body >= 4 then
@@ -670,7 +674,7 @@ end
 
 -- CMD 2052: 获取详细用户信息
 function LocalGameServer:handleGetMoreUserInfo(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2052: 获取详细用户信息\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2052: 获取详细用户信息\27[0m")
     
     local targetUserId = userId
     if #body >= 4 then
@@ -693,14 +697,14 @@ end
 -- CMD 2101: 人物移动
 function LocalGameServer:handlePeopleWalk(clientData, cmdId, userId, seqId, body)
     -- 移动不需要响应，或者广播给其他玩家
-    print("\27[36m[LocalGame] 处理 CMD 2101: 人物移动\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2101: 人物移动\27[0m")
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
 -- CMD 2102: 聊天
 -- ChatInfo 结构: senderID(4) + senderNickName(16) + toID(4) + msgLen(4) + msg(msgLen)
 function LocalGameServer:handleChat(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2102: 聊天\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2102: 聊天\27[0m")
     
     -- 解析聊天内容
     local chatType = 0
@@ -712,7 +716,7 @@ function LocalGameServer:handleChat(clientData, cmdId, userId, seqId, body)
         end
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 聊天: %s\27[0m", userId, message))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 聊天: %s\27[0m", userId, message))
     
     local userData = self:getOrCreateUser(userId)
     local nickname = userData.nick or userData.nickname or userData.username or ("赛尔" .. userId)
@@ -730,14 +734,14 @@ end
 
 -- CMD 2201: 接受任务
 function LocalGameServer:handleAcceptTask(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2201: 接受任务\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2201: 接受任务\27[0m")
     
     local taskId = 0
     if #body >= 4 then
         taskId = readUInt32BE(body, 1)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 接受任务 %d\27[0m", userId, taskId))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 接受任务 %d\27[0m", userId, taskId))
     
     local responseBody = writeUInt32BE(taskId)
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
@@ -745,7 +749,7 @@ end
 
 -- CMD 2202: 完成任务
 function LocalGameServer:handleCompleteTask(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2202: 完成任务\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2202: 完成任务\27[0m")
     
     local taskId = 0
     local param = 0
@@ -756,7 +760,7 @@ function LocalGameServer:handleCompleteTask(clientData, cmdId, userId, seqId, bo
         param = readUInt32BE(body, 5)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 完成任务 %d (param=%d)\27[0m", userId, taskId, param))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 完成任务 %d (param=%d)\27[0m", userId, taskId, param))
     
     -- 响应格式 (NoviceFinishInfo):
     -- taskID (4字节) - 任务ID
@@ -821,7 +825,7 @@ end
 
 -- CMD 2203: 获取任务缓存
 function LocalGameServer:handleGetTaskBuf(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2203: 获取任务缓存\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2203: 获取任务缓存\27[0m")
     
     -- 返回空任务列表
     local responseBody = writeUInt32BE(0)  -- 任务数量
@@ -837,7 +841,7 @@ end
 -- + skillNum(4) + skills[4]*(id(4)+pp(4)) + catchTime(4) + catchMap(4) + catchRect(4) + catchLevel(4)
 -- + effectCount(2) + [PetEffectInfo]... + peteffect(4) + skinID(4) + shiny(4) + freeForbidden(4) + boss(4)
 function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2301: 获取精灵信息\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2301: 获取精灵信息\27[0m")
     
     local catchId = 0
     if #body >= 4 then
@@ -896,12 +900,12 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- boss
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-    print(string.format("\27[32m[LocalGame] → GET_PET_INFO catchId=%d petId=%d\27[0m", catchId, petId))
+    tprint(string.format("\27[32m[LocalGame] → GET_PET_INFO catchId=%d petId=%d\27[0m", catchId, petId))
 end
 
 -- CMD 2303: 获取精灵列表
 function LocalGameServer:handleGetPetList(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2303: 获取精灵列表\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2303: 获取精灵列表\27[0m")
     
     -- 返回空精灵列表
     local responseBody = writeUInt32BE(0)  -- 精灵数量
@@ -910,7 +914,7 @@ end
 
 -- CMD 2354: 获取灵魂珠列表
 function LocalGameServer:handleGetSoulBeadList(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2354: 获取灵魂珠列表\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2354: 获取灵魂珠列表\27[0m")
     
     -- 返回空列表
     local responseBody = writeUInt32BE(0)
@@ -920,13 +924,13 @@ end
 
 -- CMD 2401: 邀请战斗
 function LocalGameServer:handleInviteToFight(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2401: 邀请战斗\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2401: 邀请战斗\27[0m")
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
 -- CMD 2405: 使用技能
 function LocalGameServer:handleUseSkill(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2405: 使用技能\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2405: 使用技能\27[0m")
     
     local skillId = 0
     if #body >= 4 then
@@ -943,14 +947,14 @@ end
 
 -- CMD 2408: 战斗NPC怪物
 function LocalGameServer:handleFightNpcMonster(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2408: 战斗NPC怪物\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2408: 战斗NPC怪物\27[0m")
     
     local monsterId = 0
     if #body >= 4 then
         monsterId = readUInt32BE(body, 1)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 挑战怪物 %d\27[0m", userId, monsterId))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 挑战怪物 %d\27[0m", userId, monsterId))
     
     -- 返回战斗开始信息
     local responseBody = writeUInt32BE(monsterId) ..
@@ -961,7 +965,7 @@ end
 
 -- CMD 2410: 逃跑
 function LocalGameServer:handleEscapeFight(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2410: 逃跑\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2410: 逃跑\27[0m")
     
     local responseBody = writeUInt32BE(1)  -- 逃跑成功
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
@@ -969,7 +973,7 @@ end
 
 -- CMD 2757: 获取未读邮件
 function LocalGameServer:handleMailGetUnread(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2757: 获取未读邮件\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2757: 获取未读邮件\27[0m")
     
     -- 返回未读邮件数量
     local responseBody = writeUInt32BE(0)  -- 0 封未读邮件
@@ -983,7 +987,7 @@ end
 --   + superEnergy(4) + superLevel(4) + superStage(4)]
 -- 官服新用户默认有 NONO，返回完整结构 90 bytes body
 function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 9003: 获取NONO信息\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 9003: 获取NONO信息\27[0m")
     
     local targetUserId = userId
     if #body >= 4 then
@@ -1019,14 +1023,14 @@ end
 
 -- CMD 50004: 客户端信息上报
 function LocalGameServer:handleCmd50004(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 50004: 客户端信息上报\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 50004: 客户端信息上报\27[0m")
     
     -- 解析客户端信息 (User-Agent 等)
     if #body > 4 then
         local infoType = readUInt32BE(body, 1)
         local infoLen = readUInt32BE(body, 5)
         local info = body:sub(9, 8 + infoLen)
-        print(string.format("\27[36m[LocalGame] 客户端信息: type=%d, info=%s\27[0m", infoType, info:sub(1, 50)))
+        tprint(string.format("\27[36m[LocalGame] 客户端信息: type=%d, info=%s\27[0m", infoType, info:sub(1, 50)))
     end
     
     self:sendResponse(clientData, cmdId, userId, 0, "")
@@ -1034,7 +1038,7 @@ end
 
 -- CMD 50008: 获取四倍经验时间
 function LocalGameServer:handleCmd50008(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 50008: 获取四倍经验时间\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 50008: 获取四倍经验时间\27[0m")
     -- 返回四倍经验剩余时间 (0 = 无)
     local responseBody = writeUInt32BE(0)
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
@@ -1042,7 +1046,7 @@ end
 
 -- CMD 2003: 获取地图玩家列表
 function LocalGameServer:handleListMapPlayer(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2003: 获取地图玩家列表\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2003: 获取地图玩家列表\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     
@@ -1069,7 +1073,7 @@ end
 
 -- CMD 2103: 舞蹈动作
 function LocalGameServer:handleDanceAction(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2103: 舞蹈动作\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2103: 舞蹈动作\27[0m")
     
     local actionId = 0
     local actionType = 0
@@ -1078,7 +1082,7 @@ function LocalGameServer:handleDanceAction(clientData, cmdId, userId, seqId, bod
         actionType = readUInt32BE(body, 5)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 执行动作 %d 类型 %d\27[0m", userId, actionId, actionType))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 执行动作 %d 类型 %d\27[0m", userId, actionId, actionType))
     
     -- 广播给其他玩家
     local responseBody = writeUInt32BE(userId) ..
@@ -1090,7 +1094,7 @@ end
 
 -- CMD 2104: 瞄准/交互
 function LocalGameServer:handleAimat(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2104: 瞄准/交互\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2104: 瞄准/交互\27[0m")
     
     local targetType = 0
     local targetId = 0
@@ -1104,7 +1108,7 @@ function LocalGameServer:handleAimat(clientData, cmdId, userId, seqId, body)
         y = readUInt32BE(body, 13)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 瞄准 type=%d id=%d pos=(%d,%d)\27[0m", 
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 瞄准 type=%d id=%d pos=(%d,%d)\27[0m", 
         userId, targetType, targetId, x, y))
     
     local responseBody = writeUInt32BE(userId) ..
@@ -1119,14 +1123,14 @@ end
 -- CMD 2111: 变身
 -- TransformInfo 结构: userID(4) + changeShape(4)
 function LocalGameServer:handlePeopleTransform(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2111: 变身\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2111: 变身\27[0m")
     
     local transformId = 0
     if #body >= 4 then
         transformId = readUInt32BE(body, 1)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 变身为 %d\27[0m", userId, transformId))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 变身为 %d\27[0m", userId, transformId))
     
     -- 构建 TransformInfo 响应
     local responseBody = writeUInt32BE(userId) .. writeUInt32BE(transformId)
@@ -1149,7 +1153,7 @@ end
 -- + skillNum(4) + skills[4]*(id(4)+pp(4)) + catchTime(4) + catchMap(4) + catchRect(4) + catchLevel(4)
 -- + effectCount(2) + [PetEffectInfo]... + peteffect(4) + skinID(4) + shiny(4) + freeForbidden(4) + boss(4)
 function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2304: 释放精灵\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2304: 释放精灵\27[0m")
     
     local catchId = 0
     local petType = 0
@@ -1159,7 +1163,7 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
         petType = readUInt32BE(body, 5)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 释放精灵 catchId=%d type=%d\27[0m", 
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 释放精灵 catchId=%d type=%d\27[0m", 
         userId, catchId, petType))
     
     local userData = self:getOrCreateUser(userId)
@@ -1224,14 +1228,14 @@ end
 
 -- CMD 2411: 挑战BOSS
 function LocalGameServer:handleChallengeBoss(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2411: 挑战BOSS\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2411: 挑战BOSS\27[0m")
     
     local bossId = 0
     if #body >= 4 then
         bossId = readUInt32BE(body, 1)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 挑战BOSS %d\27[0m", userId, bossId))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 挑战BOSS %d\27[0m", userId, bossId))
     
     local userData = self:getOrCreateUser(userId)
     
@@ -1249,7 +1253,7 @@ end
 --     PetInfo (简化版, param2=false):
 --       id(4) + level(4) + hp(4) + maxHp(4) + skillNum(4) + skills[4]*(id(4)+pp(4)) + catchTime(4) + catchMap(4) + catchRect(4) + catchLevel(4) + skinID(4) + shiny(4) + freeForbidden(4) + boss(4)
 function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userData)
-    print("\27[36m[LocalGame] 发送 CMD 2503: 战斗准备通知\27[0m")
+    tprint("\27[36m[LocalGame] 发送 CMD 2503: 战斗准备通知\27[0m")
     
     local petId = userData.currentPetId or 7
     local catchTime = userData.catchId or (0x69686700 + petId)
@@ -1322,7 +1326,7 @@ end
 
 -- CMD 2404: 准备战斗
 function LocalGameServer:handleReadyToFight(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2404: 准备战斗\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2404: 准备战斗\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     
@@ -1346,7 +1350,7 @@ end
 -- catchable (4字节) - 是否可捕捉 (1=是, 0=否)
 -- battleLv (6字节) - 战斗等级数组
 function LocalGameServer:sendNoteStartFight(clientData, userId, userData)
-    print("\27[36m[LocalGame] 发送 CMD 2504: 战斗开始通知\27[0m")
+    tprint("\27[36m[LocalGame] 发送 CMD 2504: 战斗开始通知\27[0m")
     
     local petId = userData.currentPetId or 7
     local catchTime = userData.catchId or (0x69686700 + petId)
@@ -1384,7 +1388,7 @@ end
 
 -- CMD 2605: 物品列表
 function LocalGameServer:handleItemList(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2605: 物品列表\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2605: 物品列表\27[0m")
     
     -- 解析请求的物品类型
     local itemType1 = 0
@@ -1397,7 +1401,7 @@ function LocalGameServer:handleItemList(clientData, cmdId, userId, seqId, body)
         itemType3 = readUInt32BE(body, 9)
     end
     
-    print(string.format("\27[36m[LocalGame] 查询物品类型: %d, %d, %d\27[0m", itemType1, itemType2, itemType3))
+    tprint(string.format("\27[36m[LocalGame] 查询物品类型: %d, %d, %d\27[0m", itemType1, itemType2, itemType3))
     
     local userData = self:getOrCreateUser(userId)
     
@@ -1445,7 +1449,7 @@ end
 
 -- CMD 1106: 检查金币余额
 function LocalGameServer:handleGoldOnlineCheckRemain(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 1106: 检查金币余额\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 1106: 检查金币余额\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     
@@ -1457,14 +1461,14 @@ end
 
 -- 处理技能使用 (增强版)
 function LocalGameServer:handleUseSkillEnhanced(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2405: 使用技能 (增强版)\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2405: 使用技能 (增强版)\27[0m")
     
     local skillId = 0
     if #body >= 4 then
         skillId = readUInt32BE(body, 1)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 使用技能 %d\27[0m", userId, skillId))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 使用技能 %d\27[0m", userId, skillId))
     
     -- 先发送技能确认
     self:sendResponse(clientData, cmdId, userId, 0, "")
@@ -1496,7 +1500,7 @@ end
 -- status (20字节) - 状态数组
 -- battleLv (6字节) - 战斗等级数组
 function LocalGameServer:sendNoteUseSkill(clientData, userId, skillId)
-    print("\27[36m[LocalGame] 发送 CMD 2505: 技能使用通知\27[0m")
+    tprint("\27[36m[LocalGame] 发送 CMD 2505: 技能使用通知\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     local petId = userData.currentPetId or 7
@@ -1545,7 +1549,7 @@ end
 -- energyTimes (4字节) - 体力次数
 -- learnTimes (4字节) - 学习次数
 function LocalGameServer:sendFightOver(clientData, userId)
-    print("\27[36m[LocalGame] 发送 CMD 2506: 战斗结束\27[0m")
+    tprint("\27[36m[LocalGame] 发送 CMD 2506: 战斗结束\27[0m")
     
     local responseBody = ""
     
@@ -1678,7 +1682,7 @@ end
 -- CMD 1004: 地图热度
 -- MapHotInfo: count(4) + [mapId(4) + hotValue(4)]...
 function LocalGameServer:handleMapHot(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 1004: 地图热度\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 1004: 地图热度\27[0m")
     
     -- 返回空地图热度列表
     local responseBody = writeUInt32BE(0)  -- count = 0
@@ -1688,14 +1692,14 @@ end
 -- CMD 1005: 获取图片地址
 -- GetImgAddrInfo: 简单响应
 function LocalGameServer:handleGetImageAddress(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 1005: 获取图片地址\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 1005: 获取图片地址\27[0m")
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
 -- CMD 1102: 金币购买商品
 -- MoneyBuyProductInfo: unknown(4) + payMoney(4) + money(4)
 function LocalGameServer:handleMoneyBuyProduct(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 1102: 金币购买商品\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 1102: 金币购买商品\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     local money = (userData.money or 10000) * 100  -- 转换为分
@@ -1710,7 +1714,7 @@ end
 -- CMD 1104: 钻石购买商品
 -- GoldBuyProductInfo: unknown(4) + payGold(4) + gold(4)
 function LocalGameServer:handleGoldBuyProduct(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 1104: 钻石购买商品\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 1104: 钻石购买商品\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     local gold = (userData.gold or 0) * 100  -- 转换为分
@@ -1724,7 +1728,7 @@ end
 
 -- CMD 2004: 地图怪物列表
 function LocalGameServer:handleMapOgreList(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2004: 地图怪物列表\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2004: 地图怪物列表\27[0m")
     
     -- 返回空怪物列表
     local responseBody = writeUInt32BE(0)  -- count = 0
@@ -1734,7 +1738,7 @@ end
 -- CMD 2061: 修改昵称
 -- ChangeUserNameInfo: 简单响应
 function LocalGameServer:handleChangeNickName(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2061: 修改昵称\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2061: 修改昵称\27[0m")
     
     -- 解析新昵称
     local newNick = ""
@@ -1750,7 +1754,7 @@ function LocalGameServer:handleChangeNickName(clientData, cmdId, userId, seqId, 
     local userData = self:getOrCreateUser(userId)
     userData.nickname = newNick
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 修改昵称为: %s\27[0m", userId, newNick))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 修改昵称为: %s\27[0m", userId, newNick))
     
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
@@ -1758,7 +1762,7 @@ end
 -- CMD 2234: 获取每日任务缓存
 -- TaskBufInfo: taskId(4) + flag(4) + buf(剩余字节)
 function LocalGameServer:handleGetDailyTaskBuf(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2234: 获取每日任务缓存\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2234: 获取每日任务缓存\27[0m")
     
     local responseBody = writeUInt32BE(0) ..  -- taskId
                         writeUInt32BE(0)      -- flag
@@ -1769,7 +1773,7 @@ end
 -- CMD 2305: 展示精灵
 -- PetShowInfo: userID(4) + catchTime(4) + petID(4) + flag(4) + dv(4) + shiny(4) + skinID(4) + ride(4) + padding(8)
 function LocalGameServer:handlePetShow(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2305: 展示精灵\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2305: 展示精灵\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     local petId = userData.currentPetId or 7
@@ -1791,14 +1795,14 @@ end
 
 -- CMD 2306: 治疗精灵
 function LocalGameServer:handlePetCure(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2306: 治疗精灵\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2306: 治疗精灵\27[0m")
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
 -- CMD 2309: 精灵图鉴列表
 -- PetBargeListInfo: monCount(4) + [monID(4) + enCntCnt(4) + isCatched(4) + isKilled(4)]...
 function LocalGameServer:handlePetBargeList(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2309: 精灵图鉴列表\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2309: 精灵图鉴列表\27[0m")
     
     -- 返回空图鉴列表
     local responseBody = writeUInt32BE(0)  -- monCount = 0
@@ -1808,14 +1812,14 @@ end
 -- CMD 2406: 使用精灵道具
 -- UsePetItemInfo: userID(4) + itemID(4) + userHP(4) + changeHp(4, signed)
 function LocalGameServer:handleUsePetItem(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2406: 使用精灵道具\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2406: 使用精灵道具\27[0m")
     
     local itemId = 0
     if #body >= 4 then
         itemId = readUInt32BE(body, 1)
     end
     
-    print(string.format("\27[36m[LocalGame] 用户 %d 使用道具 %d\27[0m", userId, itemId))
+    tprint(string.format("\27[36m[LocalGame] 用户 %d 使用道具 %d\27[0m", userId, itemId))
     
     local responseBody = writeUInt32BE(userId) ..  -- userID
                         writeUInt32BE(itemId) ..   -- itemID
@@ -1828,7 +1832,7 @@ end
 -- CMD 2407: 更换精灵
 -- ChangePetInfo: userID(4) + petID(4) + petName(16) + level(4) + hp(4) + maxHp(4) + catchTime(4)
 function LocalGameServer:handleChangePet(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2407: 更换精灵\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2407: 更换精灵\27[0m")
     
     local catchTime = 0
     if #body >= 4 then
@@ -1852,7 +1856,7 @@ end
 -- CMD 2409: 捕捉精灵
 -- CatchPetInfo: catchTime(4) + petID(4)
 function LocalGameServer:handleCatchMonster(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2409: 捕捉精灵\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2409: 捕捉精灵\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     local bossId = userData.currentBossId or 58
@@ -1861,7 +1865,7 @@ function LocalGameServer:handleCatchMonster(clientData, cmdId, userId, seqId, bo
     local responseBody = writeUInt32BE(catchTime) ..  -- catchTime
                         writeUInt32BE(bossId)         -- petID
     
-    print(string.format("\27[32m[LocalGame] 用户 %d 捕捉精灵 %d 成功\27[0m", userId, bossId))
+    tprint(string.format("\27[32m[LocalGame] 用户 %d 捕捉精灵 %d 成功\27[0m", userId, bossId))
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -1869,14 +1873,14 @@ end
 -- CMD 2601: 购买物品
 -- BuyItemInfo: 简单响应
 function LocalGameServer:handleItemBuy(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2601: 购买物品\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2601: 购买物品\27[0m")
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
 -- CMD 2604: 更换服装
 -- ChangeClothInfo: userID(4) + clothCount(4) + [clothId(4) + clothType(4)]...
 function LocalGameServer:handleChangeCloth(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2604: 更换服装\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2604: 更换服装\27[0m")
     
     local responseBody = writeUInt32BE(userId) ..  -- userID
                         writeUInt32BE(0)           -- clothCount = 0
@@ -1888,7 +1892,7 @@ end
 -- MailListInfo: total(4) + count(4) + [SingleMailInfo]...
 -- SingleMailInfo: id(4) + template(4) + time(4) + fromID(4) + fromNick(16) + flag(4)
 function LocalGameServer:handleMailGetList(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2751: 获取邮件列表\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2751: 获取邮件列表\27[0m")
     
     local responseBody = writeUInt32BE(0) ..  -- total
                         writeUInt32BE(0)      -- count = 0
@@ -1899,7 +1903,7 @@ end
 -- CMD 8001: 通知
 -- InformInfo: type(4) + userID(4) + nick(16) + accept(4) + serverID(4) + mapType(4) + mapID(4) + mapName(64)
 function LocalGameServer:handleInform(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 8001: 通知\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 8001: 通知\27[0m")
     
     local responseBody = writeUInt32BE(0) ..           -- type
                         writeUInt32BE(userId) ..       -- userID
@@ -1916,7 +1920,7 @@ end
 -- CMD 8004: 获取BOSS怪物
 -- BossMonsterInfo: 简单响应
 function LocalGameServer:handleGetBossMonster(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 8004: 获取BOSS怪物\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 8004: 获取BOSS怪物\27[0m")
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
@@ -1925,7 +1929,7 @@ end
 -- 官服新用户: friendCount=0, blackCount=0, body = 8 bytes
 -- 官服有好友用户: 根据好友数量返回
 function LocalGameServer:handleGetRelationList(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 2150: 获取好友/黑名单列表\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 2150: 获取好友/黑名单列表\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     local friends = userData.friends or {}
@@ -1955,7 +1959,7 @@ end
 -- 官服新用户: count=0, body = 4 bytes
 -- 官服有记录用户: 根据兑换记录数量返回
 function LocalGameServer:handleCmd70001(clientData, cmdId, userId, seqId, body)
-    print("\27[36m[LocalGame] 处理 CMD 70001: 获取兑换信息 (荣誉兑换手册)\27[0m")
+    tprint("\27[36m[LocalGame] 处理 CMD 70001: 获取兑换信息 (荣誉兑换手册)\27[0m")
     
     local userData = self:getOrCreateUser(userId)
     local exchangeList = userData.exchangeList or {}
