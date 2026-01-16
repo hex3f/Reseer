@@ -585,13 +585,28 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             print(string.format("\27[32m[GAME:%d] Connected to official: %s:%d\27[0m", localPort, targetIP, targetPort))
             officialReady = true
             
+            -- 发送缓存的数据
+            if #pendingData > 0 then
+                print(string.format("\27[36m[GAME:%d] 发送 %d 个缓存数据包到官服\27[0m", localPort, #pendingData))
+            end
             for _, data in ipairs(pendingData) do
+                print(string.format("\27[36m[GAME:%d] 发送缓存数据: %d bytes\27[0m", localPort, #data))
                 ce:write(data)
             end
             pendingData = {}
+            
+            -- 设置超时检测
+            local responseReceived = false
+            timer.setTimeout(5000, function()
+                if not responseReceived and not officialClosed then
+                    print(string.format("\27[31m[GAME:%d] ⚠ 官服 5 秒内无响应！\27[0m", localPort))
+                end
+            end)
 
             ce:on("data", function(data)
                 if clientClosed then return end
+                responseReceived = true
+                print(string.format("\27[32m[GAME:%d] 收到官服数据: %d bytes\27[0m", localPort, #data))
                 -- 添加到缓冲区并处理
                 serverBuffer = serverBuffer .. data
                 serverBuffer = processBuffer("SRV", serverBuffer)
@@ -693,8 +708,13 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             
             -- 转发原始数据给官服
             if officialReady and not officialClosed then
-                ce:write(data)
+                print(string.format("\27[36m[GAME:%d] 转发数据到官服: %d bytes\27[0m", localPort, #data))
+                local success, err = pcall(function() ce:write(data) end)
+                if not success then
+                    print(string.format("\27[31m[GAME:%d] 转发失败: %s\27[0m", localPort, tostring(err)))
+                end
             else
+                print(string.format("\27[33m[GAME:%d] 官服未就绪，缓存数据: %d bytes\27[0m", localPort, #data))
                 table.insert(pendingData, data)
             end
         end)

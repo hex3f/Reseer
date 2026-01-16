@@ -47,7 +47,7 @@ local conf = {
     -- [核心开关] 本地模式 vs 官服代理模式
     -- true  = 本地模式：使用本地数据库，不连接官服（开发/测试用）
     -- false = 官服代理模式：所有请求转发到官服，记录流量（抓包分析用）
-    local_server_mode = true,
+    local_server_mode = false,
     
     -- [资源模式] 是否从官服下载资源
     -- true  = 从官服下载资源并缓存到 res_dir
