@@ -464,9 +464,11 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(userData.energy or 100)              -- energy
     responseBody = responseBody .. writeUInt32BE(userData.coins or 1000)              -- coins
     responseBody = responseBody .. writeUInt32BE(userData.fightBadge or 0)            -- fightBadge
-    responseBody = responseBody .. writeUInt32BE(userData.mapID or 515)               -- mapID
-    responseBody = responseBody .. writeUInt32BE(userData.posX or 300)                -- posX
-    responseBody = responseBody .. writeUInt32BE(userData.posY or 200)                -- posY
+    
+    -- 登录时默认地图始终是515，位置会保存但不用于登录恢复
+    responseBody = responseBody .. writeUInt32BE(515)                                 -- mapID (固定515)
+    responseBody = responseBody .. writeUInt32BE(300)                                 -- posX
+    responseBody = responseBody .. writeUInt32BE(200)                                 -- posY
     responseBody = responseBody .. writeUInt32BE(userData.timeToday or 0)             -- timeToday
     responseBody = responseBody .. writeUInt32BE(userData.timeLimit or 86400)         -- timeLimit (24小时=86400秒)
     

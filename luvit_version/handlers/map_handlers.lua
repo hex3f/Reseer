@@ -35,19 +35,22 @@ local function handleEnterMap(ctx)
     -- 验证 mapId，如果为0则使用默认地图或用户上次的地图
     if mapId == 0 then
         local user = ctx.getOrCreateUser(ctx.userId)
-        mapId = user.mapId or 515  -- 默认新手教程地图
+        mapId = user.mapId or user.mapID or 515  -- 默认新手教程地图
         print(string.format("\27[33m[Handler] ENTER_MAP: mapId=0, 使用默认地图 %d\27[0m", mapId))
     end
     
     local user = ctx.getOrCreateUser(ctx.userId)
     
-    -- 保存玩家实际地图位置（用于后续可能的恢复）
-    -- lastMapId 记录玩家最后实际所在的地图
-    if mapId ~= 515 then  -- 不保存新手地图
+    -- 保存玩家地图位置（用于下次登录恢复）
+    -- 只保存非新手地图的位置
+    if mapId ~= 515 then
+        user.mapId = mapId
+        user.mapID = mapId  -- 兼容两种字段名
+        user.posX = x
+        user.posY = y
         user.lastMapId = mapId
     end
     
-    user.mapId = mapId
     user.mapType = mapType
     user.x = x
     user.y = y
