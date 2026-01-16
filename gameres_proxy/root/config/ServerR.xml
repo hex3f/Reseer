@@ -1,26 +1,43 @@
-<!--本地模式 - 所有连接走本地服务器-->
+<!--公网-->
 <config>
-	<newsversion>20250307</newsversion>
-	<regversion>20250403</regversion>
+	<newsversion>20250907</newsversion>
+	<regversion>20250907</regversion>
 	<dailyTask>2</dailyTask>
 	<superNoNo>1</superNoNo>
-	<uiversion>20250307</uiversion>
-	<fightVersion>20250307</fightVersion>
+	<uiversion>20250907</uiversion>
+	<fightVersion>20250907</fightVersion>
 	<ipConfig>
 		<http url="/ip.txt"/>
-        <EmailLogin url="http://127.0.0.1:8211/"/>
-		<!-- 本地模式：所有 Socket 连接指向本地服务器 -->
+		<!--http url="http://login.51seer.com/ip.txt"/-->
 		<Email ip="127.0.0.1" port="1863"/>
 		<DirSer ip="127.0.0.1" port="1863"/>
 		<Visitor ip="127.0.0.1" port="1863"/>
+		<!-- 拉服务器列表、创建人物形象-->
 		<SubServer ip="127.0.0.1" port="1863"/>
+		<!-- 注册服务器 -->
 		<RegistSer ip="127.0.0.1" port="1863"/>
 	</ipConfig>
 	<ServerList max="300">
-		<list name="本地服务器1"/>
-		<list name="本地服务器2"/>
+		<list name="开发专用测试服"/>
 		<list name="测试服务器"/>
+		<list name="尼尔号"/>
+		<list name="星空号"/>
+		<list name="凌晨号"/>
+		<list name="星空号1"/>
+		<list name="星空号2"/>
+		<list name="星空号3"/>
+		<list name="星空号4"/>
+		<list name="扎克星"/>	
+		<list name="天蝎星"/>
+		<list name="射手星"/>
+		<list name="山羊星"/>
+		<list name="水瓶星"/>
+		<list name="双鱼星"/>
+		<list name="天鹰星"/>
+		<list name="测试内部服"/>
+		<list name="天秤星"/>
 	</ServerList>
+	<!-- <Res url="http://10.1.1.4/resource/" />-->
 	<Res url="resource/" />
 	<Npc url="resource/npc/" />
 	<AppModule url="module/com/robot/module/app/" />
@@ -32,29 +49,36 @@
 	<MailTemplateURL url="resource/mail/" />
 	<ClothLight url="resource/eff/clothLight/" />
 	<Transform url="resource/transform/movie/" />
+	<DailyActive url="module/com/robot/module/dailyActive/" />
 </config>
 ****
+<!--
+	定期更新内容：
+	包括：Loading文字
+-->
 <root>
+	<!-- loading文字 -->
 	<loading>
-		<list str = "欢迎来到本地服务器！"/>
-		<list str = "XIN计划，启动！"/>
+		<list str = "快去探索！"/>
 	</loading>
+	<!-- 咚咚说话 $号代表换行-->
 	<blue>
 		<list str = "！"/>
 	</blue>
+	<!-- 叮叮说话 $号代表换行-->
 	<green>
 		<list str = "……"/>
+
 	</green>
 	<brother>
 		<list str = "！"/>
 	</brother>
 	<map>
+
 		<list str = "◎ 封印"/>
-		<list str = "XIN计划，启动！"/>
-	</map>
-	<news>
-		<list str = "小XIN要来挑战我吗！"/>
-		<list str = "XIN计划，启动！"/>
+	</map>	<news>
+		<list str = "第四封印迸发！"/>
+
 	</news>
 	<newsChangeMap>
 		<list id = "5"/>

@@ -1,123 +1,43 @@
-<!--官服代理模式 - 连接官服但经过本地代理记录流量-->
+<!--公网-->
 <config>
-	<newsversion>20250307</newsversion>
-	<regversion>20250403</regversion>
+	<newsversion>20250907</newsversion>
+	<regversion>20250907</regversion>
 	<dailyTask>2</dailyTask>
 	<superNoNo>1</superNoNo>
-	<uiversion>20250307</uiversion>
-	<fightVersion>20250307</fightVersion>
+	<uiversion>20250907</uiversion>
+	<fightVersion>20250907</fightVersion>
 	<ipConfig>
 		<http url="/ip.txt"/>
-        <EmailLogin url="http://127.0.0.1:8211/"/>
-		<!-- 官服代理模式：Socket 连接指向本地代理（会转发到官服） -->
+		<!--http url="http://login.51seer.com/ip.txt"/-->
 		<Email ip="127.0.0.1" port="1863"/>
 		<DirSer ip="127.0.0.1" port="1863"/>
 		<Visitor ip="127.0.0.1" port="1863"/>
+		<!-- 拉服务器列表、创建人物形象-->
 		<SubServer ip="127.0.0.1" port="1863"/>
+		<!-- 注册服务器 -->
 		<RegistSer ip="127.0.0.1" port="1863"/>
 	</ipConfig>
 	<ServerList max="300">
-		<!-- 服务器名称列表 - 按 ID 顺序 (1, 2, 3, ...) -->
-		<list name="克洛斯星"/>
-		<list name="火山星"/>
-		<list name="海洋星"/>
-		<list name="云霄星"/>
-		<list name="双子阿尔法星"/>
-		<list name="双子贝塔星"/>
-		<list name="赫尔卡星"/>
-		<list name="尼古尔星"/>
-		<list name="塞西利亚星"/>
-		<list name="帕诺星"/>
-		<list name="遗迹星"/>
-		<list name="精灵星"/>
-		<list name="露希欧星"/>
-		<list name="卡兰星"/>
-		<list name="星际站"/>
-		<list name="彩虹星"/>
-		<list name="极地星"/>
-		<list name="荒原星"/>
-		<list name="暗黑星"/>
-		<list name="光明星"/>
-		<list name="机械星"/>
-		<list name="魔法星"/>
-		<list name="龙之星"/>
-		<list name="精灵王星"/>
-		<list name="传说星"/>
-		<list name="神秘星"/>
-		<list name="冒险星"/>
-		<list name="勇者星"/>
-		<list name="英雄星"/>
-		<list name="战神星"/>
-		<list name="守护星"/>
-		<list name="希望星"/>
-		<list name="梦想星"/>
-		<list name="荣耀星"/>
-		<list name="王者星"/>
-		<list name="至尊星"/>
-		<list name="无敌星"/>
-		<list name="超级星"/>
-		<list name="终极星"/>
-		<list name="巅峰星"/>
-		<list name="传奇星"/>
-		<list name="史诗星"/>
-		<list name="神话星"/>
-		<list name="永恒星"/>
-		<list name="不朽星"/>
-		<list name="璀璨星"/>
-		<list name="辉煌星"/>
-		<list name="荣光星"/>
-		<list name="胜利星"/>
-		<list name="凯旋星"/>
-		<list name="征服星"/>
-		<list name="霸主星"/>
-		<list name="帝王星"/>
-		<list name="皇者星"/>
-		<list name="天王星"/>
-		<list name="圣王星"/>
-		<list name="神王星"/>
-		<list name="创世星"/>
-		<list name="起源星"/>
-		<list name="新生星"/>
-		<list name="觉醒星"/>
-		<list name="进化星"/>
-		<list name="突破星"/>
-		<list name="超越星"/>
-		<list name="极限星"/>
-		<list name="无限星"/>
-		<list name="永恒星II"/>
-		<list name="不朽星II"/>
-		<list name="璀璨星II"/>
-		<list name="辉煌星II"/>
-		<list name="荣光星II"/>
-		<list name="胜利星II"/>
-		<list name="凯旋星II"/>
-		<list name="征服星II"/>
-		<list name="霸主星II"/>
-		<list name="帝王星II"/>
-		<list name="皇者星II"/>
-		<list name="天王星II"/>
-		<list name="圣王星II"/>
-		<list name="神王星II"/>
-		<list name="创世星II"/>
-		<list name="起源星II"/>
-		<list name="新生星II"/>
-		<list name="觉醒星II"/>
-		<list name="进化星II"/>
-		<list name="突破星II"/>
-		<list name="超越星II"/>
-		<list name="极限星II"/>
-		<list name="无限星II"/>
-		<list name="永恒星III"/>
-		<list name="不朽星III"/>
-		<list name="璀璨星III"/>
-		<list name="辉煌星III"/>
-		<list name="荣光星III"/>
-		<list name="胜利星III"/>
-		<list name="凯旋星III"/>
-		<list name="征服星III"/>
-		<list name="霸主星III"/>
-		<list name="帝王星III"/>
+		<list name="开发专用测试服"/>
+		<list name="测试服务器"/>
+		<list name="尼尔号"/>
+		<list name="星空号"/>
+		<list name="凌晨号"/>
+		<list name="星空号1"/>
+		<list name="星空号2"/>
+		<list name="星空号3"/>
+		<list name="星空号4"/>
+		<list name="扎克星"/>	
+		<list name="天蝎星"/>
+		<list name="射手星"/>
+		<list name="山羊星"/>
+		<list name="水瓶星"/>
+		<list name="双鱼星"/>
+		<list name="天鹰星"/>
+		<list name="测试内部服"/>
+		<list name="天秤星"/>
 	</ServerList>
+	<!-- <Res url="http://10.1.1.4/resource/" />-->
 	<Res url="resource/" />
 	<Npc url="resource/npc/" />
 	<AppModule url="module/com/robot/module/app/" />
@@ -129,29 +49,36 @@
 	<MailTemplateURL url="resource/mail/" />
 	<ClothLight url="resource/eff/clothLight/" />
 	<Transform url="resource/transform/movie/" />
+	<DailyActive url="module/com/robot/module/dailyActive/" />
 </config>
 ****
+<!--
+	定期更新内容：
+	包括：Loading文字
+-->
 <root>
+	<!-- loading文字 -->
 	<loading>
-		<list str = "官服代理模式 - 流量记录中"/>
-		<list str = "所有请求都会被记录"/>
+		<list str = "快去探索！"/>
 	</loading>
+	<!-- 咚咚说话 $号代表换行-->
 	<blue>
 		<list str = "！"/>
 	</blue>
+	<!-- 叮叮说话 $号代表换行-->
 	<green>
 		<list str = "……"/>
+
 	</green>
 	<brother>
 		<list str = "！"/>
 	</brother>
 	<map>
+
 		<list str = "◎ 封印"/>
-		<list str = "官服代理模式"/>
-	</map>
-	<news>
-		<list str = "官服代理模式"/>
-		<list str = "流量记录中"/>
+	</map>	<news>
+		<list str = "第四封印迸发！"/>
+
 	</news>
 	<newsChangeMap>
 		<list id = "5"/>

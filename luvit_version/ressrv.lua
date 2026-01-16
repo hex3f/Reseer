@@ -269,34 +269,125 @@ local resServer = http.createServer(function(req, res)
     
     -- ========== 动态选择 ServerR.xml ==========
     if dest == "/config/ServerR.xml" then
-        local configFile
         if conf.local_server_mode then
-            configFile = proxy_root .. "/config/ServerR.xml"
+            -- 本地模式：使用本地配置文件
+            local configFile = proxy_root .. "/config/ServerR.xml"
             print("\27[36m[CONFIG] 本地模式: 使用 ServerR.xml (本地服务器)\27[0m")
+            
+            fs.stat(configFile, function(err, stat)
+                if not err and stat.type == "file" then
+                    res:writeHead(200, {
+                        ["Content-Type"] = "application/xml",
+                        ["Content-Length"] = stat.size,
+                        ["Access-Control-Allow-Origin"] = "*"
+                    })
+                    fs.createReadStream(configFile):pipe(res)
+                else
+                    local errorMsg = "Config file not found: " .. configFile
+                    res:writeHead(404, {
+                        ["Content-Type"] = "text/plain",
+                        ["Content-Length"] = #errorMsg,
+                        ["Access-Control-Allow-Origin"] = "*"
+                    })
+                    res:write(errorMsg)
+                end
+            end)
         else
-            configFile = proxy_root .. "/config/ServerOfficial.xml"
-            print("\27[35m[CONFIG] 官服代理模式: 使用 ServerOfficial.xml (代理到官服)\27[0m")
+            -- 官服代理模式：优先使用本地缓存 ServerOfficial.xml
+            local cachedFile = proxy_root .. "/config/ServerOfficial.xml"
+            
+            fs.stat(cachedFile, function(cacheErr, cacheStat)
+                if not cacheErr and cacheStat.type == "file" and cacheStat.size > 0 then
+                    -- 使用本地缓存
+                    print("\27[32m[CONFIG] 官服代理模式: 使用本地缓存 ServerOfficial.xml\27[0m")
+                    res:writeHead(200, {
+                        ["Content-Type"] = "application/xml",
+                        ["Content-Length"] = cacheStat.size,
+                        ["Access-Control-Allow-Origin"] = "*"
+                    })
+                    fs.createReadStream(cachedFile):pipe(res)
+                else
+                    -- 本地缓存不存在，从官服获取
+                    print("\27[35m[CONFIG] 官服代理模式: 从官服获取 ServerR.xml\27[0m")
+                    
+                    local officialUrl = conf.res_official_address:gsub("/$", "") .. "/config/ServerR.xml"
+                    local protocol = officialUrl:match("^https://") and https or http
+                    
+                    protocol.request(officialUrl, function(officialRes)
+                        local officialData = ""
+                        
+                        officialRes:on('data', function(chunk)
+                            officialData = officialData .. chunk
+                        end)
+                        
+                        officialRes:on('end', function()
+                            if officialRes.statusCode == 200 and #officialData > 0 then
+                                print("\27[32m[CONFIG] ✓ 获取官服 ServerR.xml 成功\27[0m")
+                                
+                                -- 修改 ipConfig，让所有 Socket 连接走本地代理
+                                local modifiedData = officialData
+                                local proxyPort = tostring(conf.login_port)
+                                
+                                modifiedData = modifiedData:gsub('(<Email[^>]*ip=")[^"]*(")', '%1127.0.0.1%2')
+                                modifiedData = modifiedData:gsub('(<DirSer[^>]*ip=")[^"]*(")', '%1127.0.0.1%2')
+                                modifiedData = modifiedData:gsub('(<Visitor[^>]*ip=")[^"]*(")', '%1127.0.0.1%2')
+                                modifiedData = modifiedData:gsub('(<SubServer[^>]*ip=")[^"]*(")', '%1127.0.0.1%2')
+                                modifiedData = modifiedData:gsub('(<RegistSer[^>]*ip=")[^"]*(")', '%1127.0.0.1%2')
+                                modifiedData = modifiedData:gsub('(<Email[^>]*port=")[^"]*(")', '%1' .. proxyPort .. '%2')
+                                modifiedData = modifiedData:gsub('(<DirSer[^>]*port=")[^"]*(")', '%1' .. proxyPort .. '%2')
+                                modifiedData = modifiedData:gsub('(<Visitor[^>]*port=")[^"]*(")', '%1' .. proxyPort .. '%2')
+                                modifiedData = modifiedData:gsub('(<SubServer[^>]*port=")[^"]*(")', '%1' .. proxyPort .. '%2')
+                                modifiedData = modifiedData:gsub('(<RegistSer[^>]*port=")[^"]*(")', '%1' .. proxyPort .. '%2')
+                                
+                                print("\27[35m[CONFIG] 已修改 ipConfig -> 127.0.0.1:" .. proxyPort .. "\27[0m")
+                                
+                                -- 确保 config 目录存在
+                                local configDir = proxy_root .. "/config"
+                                if not fs.existsSync(configDir) then
+                                    pcall(function() fs.mkdirSync(configDir) end)
+                                end
+                                
+                                -- 保存到本地缓存
+                                local saveOk, saveErr = pcall(function()
+                                    fs.writeFileSync(cachedFile, modifiedData)
+                                end)
+                                
+                                if saveOk then
+                                    print("\27[32m[CONFIG] ✓ 已缓存到 " .. cachedFile .. "\27[0m")
+                                else
+                                    print("\27[31m[CONFIG] 缓存保存失败: " .. tostring(saveErr) .. "\27[0m")
+                                end
+                                
+                                res:writeHead(200, {
+                                    ["Content-Type"] = "application/xml",
+                                    ["Content-Length"] = #modifiedData,
+                                    ["Access-Control-Allow-Origin"] = "*"
+                                })
+                                res:write(modifiedData)
+                            else
+                                local errorMsg = "Failed to fetch ServerR.xml from official (status=" .. tostring(officialRes.statusCode) .. ")"
+                                print("\27[31m[CONFIG] " .. errorMsg .. "\27[0m")
+                                res:writeHead(500, {
+                                    ["Content-Type"] = "text/plain",
+                                    ["Content-Length"] = #errorMsg,
+                                    ["Access-Control-Allow-Origin"] = "*"
+                                })
+                                res:write(errorMsg)
+                            end
+                        end)
+                    end):on('error', function(err)
+                        local errorMsg = "Failed to fetch ServerR.xml: " .. tostring(err)
+                        print("\27[31m[CONFIG] " .. errorMsg .. "\27[0m")
+                        res:writeHead(500, {
+                            ["Content-Type"] = "text/plain",
+                            ["Content-Length"] = #errorMsg,
+                            ["Access-Control-Allow-Origin"] = "*"
+                        })
+                        res:write(errorMsg)
+                    end):done()
+                end
+            end)
         end
-        
-        fs.stat(configFile, function(err, stat)
-            if not err and stat.type == "file" then
-                res:writeHead(200, {
-                    ["Content-Type"] = "application/xml",
-                    ["Content-Length"] = stat.size,
-                    ["Access-Control-Allow-Origin"] = "*"
-                })
-                fs.createReadStream(configFile):pipe(res)
-            else
-                -- 如果文件不存在，返回错误
-                local errorMsg = "Config file not found: " .. configFile
-                res:writeHead(404, {
-                    ["Content-Type"] = "text/plain",
-                    ["Content-Length"] = #errorMsg,
-                    ["Access-Control-Allow-Origin"] = "*"
-                })
-                res:write(errorMsg)
-            end
-        end)
         return
     end
     
