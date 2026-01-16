@@ -27,7 +27,7 @@ end
 
 function LocalRoomServer:new(sharedUserDB)
     local obj = {
-        port = conf.roomserver_port or 5001,
+        port = conf.roomserver_port or 5100,
         clients = {},
         userdb = sharedUserDB,  -- 共享用户数据库
         users = {},             -- userId -> user data (缓存)

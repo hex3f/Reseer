@@ -11,14 +11,32 @@ local json = require "json"
 local UserDB = {}
 UserDB.__index = UserDB
 
+-- 单例实例
+local _instance = nil
+
 function UserDB:new()
+    -- 使用单例模式，避免多次加载覆盖数据
+    if _instance then
+        return _instance
+    end
+    
+    -- 获取当前脚本所在目录，确保 users.json 在正确的位置
+    local scriptPath = debug.getinfo(1, "S").source:sub(2)
+    -- 支持 Windows 和 Unix 路径分隔符
+    local scriptDir = scriptPath:match("(.*[/\\])")
+    if not scriptDir then
+        scriptDir = "./"
+    end
+    
     local obj = {
-        dbPath = "./users.json",
+        dbPath = scriptDir .. "users.json",
         users = {},
         gameData = {}
     }
     setmetatable(obj, UserDB)
+    print(string.format("\27[32m[UserDB] 数据库路径: %s\27[0m", obj.dbPath))
     obj:load()
+    _instance = obj
     return obj
 end
 
@@ -33,7 +51,11 @@ function UserDB:load()
             self.gameData = result.gameData or {}
             local userCount = 0
             for _ in pairs(self.users) do userCount = userCount + 1 end
-            print("\27[32m[UserDB] 加载了 " .. userCount .. " 个用户\27[0m")
+            -- 只在首次加载时打印
+            if not self._loaded then
+                print("\27[32m[UserDB] 加载了 " .. userCount .. " 个用户\27[0m")
+                self._loaded = true
+            end
         else
             print("\27[33m[UserDB] 用户数据解析失败，使用空数据库\27[0m")
             self.users = {}
@@ -53,6 +75,21 @@ function UserDB:save()
         gameData = self.gameData
     })
     fs.writeFileSync(self.dbPath, data)
+end
+
+function UserDB:saveGameData(userId, data)
+    self.gameData[tostring(userId)] = data
+    self:save()
+    -- 调试: 打印保存的任务状态
+    if data.tasks then
+        local taskCount = 0
+        for taskId, task in pairs(data.tasks) do
+            taskCount = taskCount + 1
+        end
+        if taskCount > 0 then
+            print(string.format("\27[35m[UserDB] 保存游戏数据: userId=%d, 任务数=%d\27[0m", userId, taskCount))
+        end
+    end
 end
 
 -- ==================== 账号管理 ====================
@@ -176,11 +213,6 @@ function UserDB:getOrCreateGameData(userId)
         print(string.format("\27[32m[UserDB] 创建游戏数据: userId=%d (含默认家具)\27[0m", userId))
     end
     return self.gameData[key]
-end
-
-function UserDB:saveGameData(userId, data)
-    self.gameData[tostring(userId)] = data
-    self:save()
 end
 
 -- ==================== 物品管理 ====================

@@ -465,7 +465,9 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     
     -- 1. 基本信息
     responseBody = responseBody .. writeUInt32BE(userId)                              -- userID
-    responseBody = responseBody .. writeUInt32BE(userData.regTime or os.time())       -- regTime
+    -- 使用2009年的时间戳，让 checkIsNovice() 返回 false，跳过新手任务检查
+    -- 2009-01-01 00:00:00 UTC = 1230768000
+    responseBody = responseBody .. writeUInt32BE(1230768000)                          -- regTime (固定为2009年)
     responseBody = responseBody .. writeFixedString(nickname, 16)                     -- nick (16字节)
     
     -- vipFlags: bit0=vip, bit1=viped
@@ -480,8 +482,19 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(userData.coins or 1000)              -- coins
     responseBody = responseBody .. writeUInt32BE(userData.fightBadge or 0)            -- fightBadge
     
-    -- 登录时默认地图始终是515，位置会保存但不用于登录恢复
-    responseBody = responseBody .. writeUInt32BE(515)                                 -- mapID (固定515)
+    -- 登录时默认地图: 如果新手任务完成则进地图1，否则进515
+    -- 检查任务88是否完成来判断新手任务是否完成
+    local defaultMapId = 1  -- 默认进地图1（克洛斯星）
+    if self.userdb then
+        local db = self.userdb:new()
+        local gameData = db:getOrCreateGameData(userId)
+        if gameData.tasks and gameData.tasks["88"] and gameData.tasks["88"].status == "completed" then
+            defaultMapId = gameData.mapId or 1  -- 新手任务完成，进保存的地图或地图1
+        else
+            defaultMapId = 515  -- 新手任务未完成，进新手地图
+        end
+    end
+    responseBody = responseBody .. writeUInt32BE(defaultMapId)                        -- mapID
     responseBody = responseBody .. writeUInt32BE(300)                                 -- posX
     responseBody = responseBody .. writeUInt32BE(200)                                 -- posY
     responseBody = responseBody .. writeUInt32BE(userData.timeToday or 0)             -- timeToday
@@ -585,16 +598,24 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
         local db = self.userdb:new()
         local gameData = db:getOrCreateGameData(userId)
         if gameData.tasks then
+            local taskCount = 0
             for taskIdStr, task in pairs(gameData.tasks) do
                 local taskId = tonumber(taskIdStr)
                 if taskId and taskId >= 1 and taskId <= 500 then
                     if task.status == "completed" then
                         taskListBytes[taskId] = 3  -- COMPLETE
+                        taskCount = taskCount + 1
                     elseif task.status == "accepted" then
                         taskListBytes[taskId] = 1  -- ALR_ACCEPT
+                        taskCount = taskCount + 1
                     end
                 end
             end
+            -- 调试: 打印关键任务状态
+            tprint(string.format("\27[35m[LocalGame] 登录任务状态: 任务85=%d, 任务86=%d, 任务87=%d, 任务88=%d (共%d个任务)\27[0m",
+                taskListBytes[85], taskListBytes[86], taskListBytes[87], taskListBytes[88], taskCount))
+        else
+            tprint("\27[33m[LocalGame] 警告: 用户没有任务数据\27[0m")
         end
     end
     
@@ -602,6 +623,13 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     for i = 1, 500 do
         responseBody = responseBody .. string.char(taskListBytes[i])
     end
+    
+    -- 调试: 打印任务列表的前100个字节的HEX
+    local taskHex = ""
+    for i = 1, 100 do
+        taskHex = taskHex .. string.format("%02X ", taskListBytes[i])
+    end
+    tprint(string.format("\27[35m[LocalGame] taskList[1-100]: %s\27[0m", taskHex))
     
     -- 17. petNum + PetInfo[]
     responseBody = responseBody .. writeUInt32BE(#pets)                               -- petNum
@@ -3245,86 +3273,11 @@ end
 -- ==================== 家园系统 ====================
 
 -- CMD 10001: 家园登录 (ROOM_LOGIN)
+-- 注意: 此命令由房间服务器处理，游戏服务器只保留壳
 -- 请求: targetUserId(4) + session(24) + catchTime(4) + flag(4) + mapId(4) + x(4) + y(4)
--- 注意: mapId 实际上是房主的 userId
 function LocalGameServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 10001: 家园登录\27[0m")
-    
-    -- 解析请求参数
-    local targetUserId = userId
-    local catchTime = 0
-    local flag = 0
-    local mapId = userId  -- 默认是自己的家
-    local x = 300
-    local y = 200
-    
-    if #body >= 4 then targetUserId = readUInt32BE(body, 1) end
-    -- session 在 5-28 字节，跳过
-    if #body >= 32 then catchTime = readUInt32BE(body, 29) end
-    if #body >= 36 then flag = readUInt32BE(body, 33) end
-    if #body >= 40 then mapId = readUInt32BE(body, 37) end  -- 实际是房主ID
-    if #body >= 44 then x = readUInt32BE(body, 41) end
-    if #body >= 48 then y = readUInt32BE(body, 45) end
-    
-    tprint(string.format("\27[36m[LocalGame] 用户 %d 进入家园 (房主=%d) pos=(%d,%d)\27[0m", userId, mapId, x, y))
-    
-    -- 返回空响应表示成功
-    self:sendResponse(clientData, cmdId, userId, 0, "")
-    
-    -- 然后发送 ENTER_MAP 让客户端进入家园地图
-    local userData = self:getOrCreateUser(userId)
-    local nickname = userData.nick or userData.nickname or userData.username or tostring(userId)
-    local clothes = userData.clothes or {}
-    local teamInfo = userData.teamInfo or {}
-    
-    local enterMapBody = ""
-    enterMapBody = enterMapBody .. writeUInt32BE(os.time())                 -- sysTime
-    enterMapBody = enterMapBody .. writeUInt32BE(userId)                    -- userID
-    enterMapBody = enterMapBody .. writeFixedString(nickname, 16)           -- nick
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.color or 1)       -- color
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.texture or 1)     -- texture
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.vip and 1 or 0)   -- vipFlags
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.vipStage or 1)    -- vipStage
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- actionType
-    enterMapBody = enterMapBody .. writeUInt32BE(x)                         -- posX
-    enterMapBody = enterMapBody .. writeUInt32BE(y)                         -- posY
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- action
-    enterMapBody = enterMapBody .. writeUInt32BE(1)                         -- direction
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- changeShape
-    enterMapBody = enterMapBody .. writeUInt32BE(catchTime)                 -- spiritTime
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.spiritID or 0)    -- spiritID
-    enterMapBody = enterMapBody .. writeUInt32BE(31)                        -- petDV
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- petSkin
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- fightFlag
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- teacherID
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- studentID
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- nonoState
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- nonoColor
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- superNono
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- playerForm
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- transTime
-    -- TeamInfo
-    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.id or 0)
-    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.coreCount or 0)
-    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.isShow or 0)
-    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoBg or 0)
-    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoIcon or 0)
-    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoColor or 0)
-    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.txtColor or 0)
-    enterMapBody = enterMapBody .. writeFixedString(teamInfo.logoWord or "", 4)
-    -- clothes
-    enterMapBody = enterMapBody .. writeUInt32BE(#clothes)
-    for _, cloth in ipairs(clothes) do
-        enterMapBody = enterMapBody .. writeUInt32BE(cloth.id or cloth[1] or 0)
-        enterMapBody = enterMapBody .. writeUInt32BE(cloth.level or cloth[2] or 0)
-    end
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- curTitle
-    
-    self:sendResponse(clientData, 2001, userId, 0, enterMapBody)
-    
-    -- 更新在线追踪
-    OnlineTracker.updatePlayerMap(userId, mapId, 0)
-    tprint(string.format("\27[32m[LocalGame] → ENTER_MAP (家园 %d)\27[0m", mapId))
+    tprint("\27[33m[LocalGame] CMD 10001: 家园登录 - 此命令应由房间服务器处理\27[0m")
+    -- 房间服务器会处理此命令，游戏服务器不做任何处理
 end
 
 -- CMD 10002: 获取房间地址 (GET_ROOM_ADDRES)
@@ -3380,124 +3333,28 @@ function LocalGameServer:handleLeaveRoom(clientData, cmdId, userId, seqId, body)
 end
 
 -- CMD 10006: 正在使用的家具 (FITMENT_USERING)
+-- 注意: 此命令由房间服务器处理，游戏服务器只保留壳
 -- 请求: targetUserId(4)
 -- 响应: ownerUserId(4) + visitorUserId(4) + count(4) + [FitmentInfo]...
--- FitmentInfo: id(4) + x(4) + y(4) + dir(4) + status(4) = 20 bytes
 function LocalGameServer:handleFitmentUsering(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 10006: 正在使用的家具\27[0m")
-    
-    local targetUserId = userId
-    if #body >= 4 then
-        targetUserId = readUInt32BE(body, 1)
-    end
-    
-    tprint(string.format("\27[36m[LocalGame] 用户 %d 请求家具列表 (房主: %d)\27[0m", userId, targetUserId))
-    
-    -- 获取房主的家具数据
-    local userData = self:getOrCreateUser(targetUserId)
-    
-    -- 初始化默认家具 (如果没有)
-    if not userData.fitments or #userData.fitments == 0 then
-        userData.fitments = {
-            -- 默认房间风格 (500001)
-            {id = 500001, x = 0, y = 0, dir = 0, status = 0}
-        }
-        self:saveUserData(targetUserId)
-    end
-    
-    local fitments = userData.fitments or {}
-    
-    -- 响应格式: ownerUserId(4) + visitorUserId(4) + count(4) + [FitmentInfo]...
-    local responseBody = writeUInt32BE(targetUserId) ..  -- 房主ID
-                        writeUInt32BE(userId) ..         -- 访客ID (当前用户)
-                        writeUInt32BE(#fitments)         -- 家具数量
-    
-    for _, fitment in ipairs(fitments) do
-        responseBody = responseBody .. writeUInt32BE(fitment.id or 0)
-        responseBody = responseBody .. writeUInt32BE(fitment.x or 0)
-        responseBody = responseBody .. writeUInt32BE(fitment.y or 0)
-        responseBody = responseBody .. writeUInt32BE(fitment.dir or 0)
-        responseBody = responseBody .. writeUInt32BE(fitment.status or 0)
-    end
-    
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-    tprint(string.format("\27[32m[LocalGame] → FITMENT_USERING: %d 件家具\27[0m", #fitments))
+    tprint("\27[33m[LocalGame] CMD 10006: 正在使用的家具 - 此命令应由房间服务器处理\27[0m")
+    -- 房间服务器会处理此命令，游戏服务器不做任何处理
 end
 
 -- CMD 10007: 所有家具 (FITMENT_ALL)
+-- 注意: 此命令由房间服务器处理，游戏服务器只保留壳
 -- 响应: count(4) + [FitmentInfo]...
--- FitmentInfo: id(4) + usedCount(4) + allCount(4) = 12 bytes
 function LocalGameServer:handleFitmentAll(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 10007: 所有家具\27[0m")
-    
-    local userData = self:getOrCreateUser(userId)
-    
-    -- 初始化默认家具仓库 (如果没有)
-    if not userData.allFitments or #userData.allFitments == 0 then
-        userData.allFitments = {
-            -- 默认房间风格 (500001) - 已使用1个，总共1个
-            {id = 500001, usedCount = 1, allCount = 1}
-        }
-        self:saveUserData(userId)
-    end
-    
-    local allFitments = userData.allFitments or {}
-    
-    local responseBody = writeUInt32BE(#allFitments)
-    
-    for _, fitment in ipairs(allFitments) do
-        responseBody = responseBody .. writeUInt32BE(fitment.id or 0)
-        responseBody = responseBody .. writeUInt32BE(fitment.usedCount or 0)
-        responseBody = responseBody .. writeUInt32BE(fitment.allCount or 1)
-    end
-    
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-    tprint(string.format("\27[32m[LocalGame] → FITMENT_ALL: %d 种家具\27[0m", #allFitments))
+    tprint("\27[33m[LocalGame] CMD 10007: 所有家具 - 此命令应由房间服务器处理\27[0m")
+    -- 房间服务器会处理此命令，游戏服务器不做任何处理
 end
 
 -- CMD 10008: 设置家具 (SET_FITMENT)
+-- 注意: 此命令由房间服务器处理，游戏服务器只保留壳
 -- 请求: roomId(4) + count(4) + [id(4) + x(4) + y(4) + dir(4) + status(4)]...
--- 响应: result(4)
 function LocalGameServer:handleSetFitment(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 10008: 设置家具\27[0m")
-    
-    local roomId = 0
-    local count = 0
-    local fitments = {}
-    
-    if #body >= 4 then
-        roomId = readUInt32BE(body, 1)
-    end
-    if #body >= 8 then
-        count = readUInt32BE(body, 5)
-    end
-    
-    -- 解析家具列表
-    local offset = 9
-    for i = 1, count do
-        if #body >= offset + 19 then
-            local fitment = {
-                id = readUInt32BE(body, offset),
-                x = readUInt32BE(body, offset + 4),
-                y = readUInt32BE(body, offset + 8),
-                dir = readUInt32BE(body, offset + 12),
-                status = readUInt32BE(body, offset + 16)
-            }
-            table.insert(fitments, fitment)
-            offset = offset + 20
-        end
-    end
-    
-    tprint(string.format("\27[36m[LocalGame] 设置 %d 件家具 (roomId=%d)\27[0m", #fitments, roomId))
-    
-    -- 保存家具位置
-    local userData = self:getOrCreateUser(userId)
-    userData.fitments = fitments
-    self:saveUserData(userId)
-    
-    local responseBody = writeUInt32BE(0)  -- result = 0 (成功)
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-    tprint("\27[32m[LocalGame] → SET_FITMENT: 保存成功\27[0m")
+    tprint("\27[33m[LocalGame] CMD 10008: 设置家具 - 此命令应由房间服务器处理\27[0m")
+    -- 房间服务器会处理此命令，游戏服务器不做任何处理
 end
 
 return {LocalGameServer = LocalGameServer}
