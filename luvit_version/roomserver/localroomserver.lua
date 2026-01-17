@@ -18,9 +18,6 @@ local SeerCommands = require('../seer_commands')
 -- 加载在线追踪模块
 local OnlineTracker = require('../handlers/online_tracker')
 
--- 加载共享处理器
-local SharedHandlers = require('../handlers/shared_handlers')
-
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
 end
@@ -28,12 +25,13 @@ end
 -- 数据包结构:
 -- 17 字节头部: length(4) + version(1) + cmdId(4) + userId(4) + result(4)
 
-function LocalRoomServer:new(sharedUserDB)
+function LocalRoomServer:new(sharedUserDB, sharedGameServer)
     local obj = {
         port = conf.roomserver_port or 5100,
         clients = {},
-        userdb = sharedUserDB,  -- 共享用户数据库
-        users = {},             -- userId -> user data (缓存)
+        userdb = sharedUserDB,      -- 共享用户数据库
+        gameServer = sharedGameServer, -- 共享游戏服务器（用于命令处理）
+        users = {},                 -- userId -> user data (缓存)
     }
     setmetatable(obj, LocalRoomServer)
     obj:start()
@@ -194,10 +192,16 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
         return
     end
     
-    -- 尝试使用共享处理器
-    if SharedHandlers.has(cmdId) then
-        local ctx = self:buildHandlerContext(clientData, cmdId, userId, body)
-        if SharedHandlers.execute(cmdId, ctx) then
+    -- 尝试使用游戏服务器的处理器（共用命令）
+    if self.gameServer and self.gameServer.handleCommandDirect then
+        local success = self.gameServer:handleCommandDirect(clientData, cmdId, userId, seqId, body)
+        if success then
+            -- 如果是会修改用户数据的命令，清除 RoomServer 的缓存
+            -- 这样下次访问时会从数据库重新加载最新数据
+            if cmdId == 2604 then  -- CHANGE_CLOTH
+                self.users[userId] = nil
+                tprint(string.format("\27[35m[RoomServer] 清除用户 %d 的缓存（衣服已更新）\27[0m", userId))
+            end
             return
         end
     end
@@ -205,38 +209,6 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
     -- 未实现的命令
     tprint(string.format("\27[33m[RoomServer] 未实现的命令: %d (%s)\27[0m", cmdId, getCmdName(cmdId)))
     self:sendResponse(clientData, cmdId, userId, 0, "")
-end
-
--- 构建共享处理器的上下文
-function LocalRoomServer:buildHandlerContext(clientData, cmdId, userId, body)
-    local self_ref = self
-    return {
-        userId = userId,
-        body = body,
-        userdb = self.userdb,
-        sendResponse = function(packet)
-            pcall(function()
-                clientData.socket:write(packet)
-            end)
-        end,
-        getOrCreateUser = function(uid)
-            return self_ref:getOrCreateUser(uid)
-        end,
-        saveUser = function(uid, userData)
-            self_ref.users[uid] = userData
-            self_ref:saveUserData()
-        end,
-        broadcastToMap = function(packet, excludeUserId)
-            -- 广播给同房间的其他玩家
-            for _, c in ipairs(self_ref.clients) do
-                if c.loggedIn and c.userId ~= excludeUserId and c.roomId == clientData.roomId then
-                    pcall(function()
-                        c.socket:write(packet)
-                    end)
-                end
-            end
-        end
-    }
 end
 
 -- 构建响应数据包
@@ -364,16 +336,10 @@ function LocalRoomServer:getOrCreateUser(userId)
         end
         tprint(string.format("\27[35m[RoomServer] 用户 %d 服装数量: %d\27[0m", userId, clothesCount))
         
-        -- 从 items 中提取服装 (100xxx) - 只在 clothes 为空时
-        if gameData.items and (not userData.clothes or clothesCount == 0) then
+        -- 不再自动从 items 提取服装
+        -- 用户需要通过 CMD 2604 (CHANGE_CLOTH) 来装备衣服
+        if not userData.clothes then
             userData.clothes = {}
-            for itemIdStr, itemData in pairs(gameData.items) do
-                local itemId = tonumber(itemIdStr)
-                if itemId and itemId >= 100000 and itemId < 200000 then
-                    table.insert(userData.clothes, {id = itemId, level = 1})
-                    tprint(string.format("\27[35m[RoomServer] 从 items 提取服装: %d\27[0m", itemId))
-                end
-            end
         end
         
         -- 从 items 中提取家具到 allFitments (500xxx)
@@ -477,52 +443,56 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     -- 获取用户数据
     local userData = self:getOrCreateUser(userId)
     local nickname = userData.nick or userData.nickname or ("赛尔" .. userId)
-    local clothes = userData.clothes or {}
     local teamInfo = userData.teamInfo or {}
     
     -- 先发送 ENTER_MAP 响应
+    -- 官服行为：如果用户装备了衣服，则发送衣服数据；否则 clothCount=0
+    local clothes = userData.clothes or {}
+    local clothCount = type(clothes) == "table" and #clothes or 0
+    
     local enterMapBody = ""
-    enterMapBody = enterMapBody .. writeUInt32BE(os.time())                 -- sysTime
-    enterMapBody = enterMapBody .. writeUInt32BE(userId)                    -- userID
-    enterMapBody = enterMapBody .. writeFixedString(nickname, 16)           -- nick
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.color or 0x0F)    -- color
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.texture or 0)     -- texture
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.vip and 1 or 0)   -- vipFlags
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.vipStage or 1)    -- vipStage
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- actionType
-    enterMapBody = enterMapBody .. writeUInt32BE(x)                         -- posX
-    enterMapBody = enterMapBody .. writeUInt32BE(y)                         -- posY
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- action
-    enterMapBody = enterMapBody .. writeUInt32BE(2)                         -- direction
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- changeShape
-    enterMapBody = enterMapBody .. writeUInt32BE(catchTime)                 -- spiritTime
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.spiritID or 0)    -- spiritID
-    enterMapBody = enterMapBody .. writeUInt32BE(31)                        -- petDV
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- petSkin
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- fightFlag
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- teacherID
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- studentID
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoState or 1)   -- nonoState
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoColor or 0)   -- nonoColor
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.superNono or 0)   -- superNono
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- playerForm
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- transTime
-    -- TeamInfo
-    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.id or 0)
-    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.coreCount or 0)
-    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.isShow or 0)
-    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoBg or 0)
-    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoIcon or 0)
-    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoColor or 0xFFFFFF)
-    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.txtColor or 0)
-    enterMapBody = enterMapBody .. writeFixedString(teamInfo.logoWord or "", 4)
-    -- clothes
-    enterMapBody = enterMapBody .. writeUInt32BE(#clothes)
+    enterMapBody = enterMapBody .. writeUInt32BE(os.time())                 -- sysTime (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(userId)                    -- userID (4)
+    enterMapBody = enterMapBody .. writeFixedString(nickname, 16)           -- nick (16)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.color or 0x0F)    -- color (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.texture or 0)     -- texture (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.vip and 1 or 0)   -- vipFlags (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.vipStage or 1)    -- vipStage (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- actionType (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(x)                         -- posX (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(y)                         -- posY (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- action (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(2)                         -- direction (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- changeShape (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(catchTime)                 -- spiritTime (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.spiritID or 0)    -- spiritID (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(31)                        -- petDV (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- petSkin (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- fightFlag (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- teacherID (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- studentID (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoState or 1)   -- nonoState (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoColor or 0)   -- nonoColor (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.superNono or 0)   -- superNono (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- playerForm (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- transTime (4)
+    -- TeamInfo (24 bytes)
+    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.id or 0)          -- teamId (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.coreCount or 0)   -- coreCount (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(teamInfo.isShow or 0)      -- isShow (4)
+    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoBg or 0)      -- logoBg (2)
+    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoIcon or 0)    -- logoIcon (2)
+    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.logoColor or 0)   -- logoColor (2)
+    enterMapBody = enterMapBody .. writeUInt16BE(teamInfo.txtColor or 0)    -- txtColor (2)
+    enterMapBody = enterMapBody .. writeFixedString(teamInfo.logoWord or "", 4)  -- logoWord (4)
+    -- 衣服数据（官服：有衣服就发送，没有就 clothCount=0）
+    enterMapBody = enterMapBody .. writeUInt32BE(clothCount)                -- clothCount (4)
     for _, cloth in ipairs(clothes) do
-        enterMapBody = enterMapBody .. writeUInt32BE(cloth.id or cloth[1] or 0)
-        enterMapBody = enterMapBody .. writeUInt32BE(cloth.level or cloth[2] or 0)
+        enterMapBody = enterMapBody .. writeUInt32BE(cloth.id or 0)         -- clothId (4)
+        enterMapBody = enterMapBody .. writeUInt32BE(cloth.level or 1)      -- level (4)
     end
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- curTitle
+    enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- curTitle (4)
+    -- 总计: 144 + clothCount * 8 bytes
     
     self:sendResponse(clientData, 2001, userId, 0, enterMapBody)
     tprint(string.format("\27[32m[RoomServer] → ENTER_MAP (家园)\27[0m"))
@@ -713,50 +683,53 @@ function LocalRoomServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     local userData = self:getOrCreateUser(userId)
     local nickname = userData.nick or userData.nickname or ("赛尔" .. userId)
     local clothes = userData.clothes or {}
+    local clothCount = type(clothes) == "table" and #clothes or 0
     local teamInfo = userData.teamInfo or {}
     
+    -- 房间服务器 ENTER_MAP 格式: 144 + clothCount * 8 bytes (与官服一致)
     local responseBody = ""
-    responseBody = responseBody .. writeUInt32BE(os.time())
-    responseBody = responseBody .. writeUInt32BE(userId)
-    responseBody = responseBody .. writeFixedString(nickname, 16)
-    responseBody = responseBody .. writeUInt32BE(userData.color or 0xFFFFFF)
-    responseBody = responseBody .. writeUInt32BE(userData.texture or 0)
-    responseBody = responseBody .. writeUInt32BE(userData.vip and 1 or 0)
-    responseBody = responseBody .. writeUInt32BE(userData.vipStage or 1)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(x)
-    responseBody = responseBody .. writeUInt32BE(y)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(1)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(31)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    -- TeamInfo
-    responseBody = responseBody .. writeUInt32BE(teamInfo.id or 0)
-    responseBody = responseBody .. writeUInt32BE(teamInfo.coreCount or 0)
-    responseBody = responseBody .. writeUInt32BE(teamInfo.isShow or 0)
-    responseBody = responseBody .. writeUInt16BE(teamInfo.logoBg or 0)
-    responseBody = responseBody .. writeUInt16BE(teamInfo.logoIcon or 0)
-    responseBody = responseBody .. writeUInt16BE(teamInfo.logoColor or 0)
-    responseBody = responseBody .. writeUInt16BE(teamInfo.txtColor or 0)
-    responseBody = responseBody .. writeFixedString(teamInfo.logoWord or "", 4)
-    -- clothes
-    responseBody = responseBody .. writeUInt32BE(#clothes)
+    responseBody = responseBody .. writeUInt32BE(os.time())                 -- sysTime (4)
+    responseBody = responseBody .. writeUInt32BE(userId)                    -- userID (4)
+    responseBody = responseBody .. writeFixedString(nickname, 16)           -- nick (16)
+    responseBody = responseBody .. writeUInt32BE(userData.color or 0x0F)    -- color (4)
+    responseBody = responseBody .. writeUInt32BE(userData.texture or 0)     -- texture (4)
+    responseBody = responseBody .. writeUInt32BE(userData.vip and 1 or 0)   -- vipFlags (4)
+    responseBody = responseBody .. writeUInt32BE(userData.vipStage or 1)    -- vipStage (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- actionType (4)
+    responseBody = responseBody .. writeUInt32BE(x)                         -- posX (4)
+    responseBody = responseBody .. writeUInt32BE(y)                         -- posY (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- action (4)
+    responseBody = responseBody .. writeUInt32BE(1)                         -- direction (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- changeShape (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- spiritTime (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- spiritID (4)
+    responseBody = responseBody .. writeUInt32BE(31)                        -- petDV (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- petSkin (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- fightFlag (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- teacherID (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- studentID (4)
+    responseBody = responseBody .. writeUInt32BE(userData.nonoState or 1)   -- nonoState (4)
+    responseBody = responseBody .. writeUInt32BE(userData.nonoColor or 0)   -- nonoColor (4)
+    responseBody = responseBody .. writeUInt32BE(userData.superNono or 0)   -- superNono (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- playerForm (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- transTime (4)
+    -- TeamInfo (24 bytes)
+    responseBody = responseBody .. writeUInt32BE(teamInfo.id or 0)          -- teamId (4)
+    responseBody = responseBody .. writeUInt32BE(teamInfo.coreCount or 0)   -- coreCount (4)
+    responseBody = responseBody .. writeUInt32BE(teamInfo.isShow or 0)      -- isShow (4)
+    responseBody = responseBody .. writeUInt16BE(teamInfo.logoBg or 0)      -- logoBg (2)
+    responseBody = responseBody .. writeUInt16BE(teamInfo.logoIcon or 0)    -- logoIcon (2)
+    responseBody = responseBody .. writeUInt16BE(teamInfo.logoColor or 0)   -- logoColor (2)
+    responseBody = responseBody .. writeUInt16BE(teamInfo.txtColor or 0)    -- txtColor (2)
+    responseBody = responseBody .. writeFixedString(teamInfo.logoWord or "", 4)  -- logoWord (4)
+    -- 衣服数据（官服：有衣服就发送，没有就 clothCount=0）
+    responseBody = responseBody .. writeUInt32BE(clothCount)                -- clothCount (4)
     for _, cloth in ipairs(clothes) do
-        responseBody = responseBody .. writeUInt32BE(cloth.id or cloth[1] or 0)
-        responseBody = responseBody .. writeUInt32BE(cloth.level or cloth[2] or 0)
+        responseBody = responseBody .. writeUInt32BE(cloth.id or 0)         -- clothId (4)
+        responseBody = responseBody .. writeUInt32BE(cloth.level or 1)      -- level (4)
     end
-    responseBody = responseBody .. writeUInt32BE(0)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- curTitle (4)
+    -- 总计: 144 + clothCount * 8 bytes
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -775,51 +748,54 @@ function LocalRoomServer:handleListMapPlayer(clientData, cmdId, userId, seqId, b
     local userData = self:getOrCreateUser(userId)
     local nickname = userData.nick or userData.nickname or ("赛尔" .. userId)
     local clothes = userData.clothes or {}
+    local clothCount = type(clothes) == "table" and #clothes or 0
     local teamInfo = userData.teamInfo or {}
     
-    local responseBody = writeUInt32BE(1)  -- 1个玩家
+    local responseBody = writeUInt32BE(1)  -- 1个玩家 (4 bytes)
     
-    -- PeopleInfo
-    responseBody = responseBody .. writeUInt32BE(userId)
-    responseBody = responseBody .. writeFixedString(nickname, 16)
-    responseBody = responseBody .. writeUInt32BE(userData.color or 0xFFFFFF)
-    responseBody = responseBody .. writeUInt32BE(userData.texture or 0)
-    responseBody = responseBody .. writeUInt32BE(userData.vip and 1 or 0)
-    responseBody = responseBody .. writeUInt32BE(userData.vipStage or 1)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(userData.x or 300)
-    responseBody = responseBody .. writeUInt32BE(userData.y or 200)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(1)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(31)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(0)
-    -- TeamInfo
-    responseBody = responseBody .. writeUInt32BE(teamInfo.id or 0)
-    responseBody = responseBody .. writeUInt32BE(teamInfo.coreCount or 0)
-    responseBody = responseBody .. writeUInt32BE(teamInfo.isShow or 0)
-    responseBody = responseBody .. writeUInt16BE(teamInfo.logoBg or 0)
-    responseBody = responseBody .. writeUInt16BE(teamInfo.logoIcon or 0)
-    responseBody = responseBody .. writeUInt16BE(teamInfo.logoColor or 0)
-    responseBody = responseBody .. writeUInt16BE(teamInfo.txtColor or 0)
-    responseBody = responseBody .. writeFixedString(teamInfo.logoWord or "", 4)
-    -- clothes
-    responseBody = responseBody .. writeUInt32BE(#clothes)
+    -- PeopleInfo (144 + clothCount * 8 bytes, 与 ENTER_MAP 格式相同)
+    responseBody = responseBody .. writeUInt32BE(os.time())                 -- sysTime (4)
+    responseBody = responseBody .. writeUInt32BE(userId)                    -- userID (4)
+    responseBody = responseBody .. writeFixedString(nickname, 16)           -- nick (16)
+    responseBody = responseBody .. writeUInt32BE(userData.color or 0x0F)    -- color (4)
+    responseBody = responseBody .. writeUInt32BE(userData.texture or 0)     -- texture (4)
+    responseBody = responseBody .. writeUInt32BE(userData.vip and 1 or 0)   -- vipFlags (4)
+    responseBody = responseBody .. writeUInt32BE(userData.vipStage or 1)    -- vipStage (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- actionType (4)
+    responseBody = responseBody .. writeUInt32BE(userData.x or 300)         -- posX (4)
+    responseBody = responseBody .. writeUInt32BE(userData.y or 200)         -- posY (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- action (4)
+    responseBody = responseBody .. writeUInt32BE(1)                         -- direction (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- changeShape (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- spiritTime (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- spiritID (4)
+    responseBody = responseBody .. writeUInt32BE(31)                        -- petDV (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- petSkin (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- fightFlag (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- teacherID (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- studentID (4)
+    responseBody = responseBody .. writeUInt32BE(userData.nonoState or 1)   -- nonoState (4)
+    responseBody = responseBody .. writeUInt32BE(userData.nonoColor or 0)   -- nonoColor (4)
+    responseBody = responseBody .. writeUInt32BE(userData.superNono or 0)   -- superNono (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- playerForm (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- transTime (4)
+    -- TeamInfo (24 bytes)
+    responseBody = responseBody .. writeUInt32BE(teamInfo.id or 0)          -- teamId (4)
+    responseBody = responseBody .. writeUInt32BE(teamInfo.coreCount or 0)   -- coreCount (4)
+    responseBody = responseBody .. writeUInt32BE(teamInfo.isShow or 0)      -- isShow (4)
+    responseBody = responseBody .. writeUInt16BE(teamInfo.logoBg or 0)      -- logoBg (2)
+    responseBody = responseBody .. writeUInt16BE(teamInfo.logoIcon or 0)    -- logoIcon (2)
+    responseBody = responseBody .. writeUInt16BE(teamInfo.logoColor or 0)   -- logoColor (2)
+    responseBody = responseBody .. writeUInt16BE(teamInfo.txtColor or 0)    -- txtColor (2)
+    responseBody = responseBody .. writeFixedString(teamInfo.logoWord or "", 4)  -- logoWord (4)
+    -- 衣服数据（官服：有衣服就发送，没有就 clothCount=0）
+    responseBody = responseBody .. writeUInt32BE(clothCount)                -- clothCount (4)
     for _, cloth in ipairs(clothes) do
-        responseBody = responseBody .. writeUInt32BE(cloth.id or cloth[1] or 0)
-        responseBody = responseBody .. writeUInt32BE(cloth.level or cloth[2] or 0)
+        responseBody = responseBody .. writeUInt32BE(cloth.id or 0)         -- clothId (4)
+        responseBody = responseBody .. writeUInt32BE(cloth.level or 1)      -- level (4)
     end
-    responseBody = responseBody .. writeUInt32BE(0)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- curTitle (4)
+    -- 总计: 4 (count) + 144 + clothCount * 8 bytes
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end

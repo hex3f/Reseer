@@ -99,7 +99,8 @@ for _, p in ipairs(protocols) do
     elseif p.minSize == p.maxSize then
         sizeInfo = string.format("%d字节 (固定)", p.minSize)
     else
-        sizeInfo = string.format("%d-%d字节", p.minSize, p.maxSize or "∞")
+        local maxStr = p.maxSize and tostring(p.maxSize) or "∞"
+        sizeInfo = string.format("%d-%s字节", p.minSize, maxStr)
     end
     print(string.format("CMD %4d: %-25s %s", p.cmdId, p.name, sizeInfo))
 end

@@ -360,9 +360,31 @@ function SeerLoginResponse.makeLoginResponse(user)
     parts[#parts+1] = tostring(petBuf):sub(1, 4)
     
     -- ========== Clothes (lines 894-900) ==========
-    local clothBuf = buffer.Buffer:new(4)
-    clothBuf:wuint(1, 0) -- clothes count
-    parts[#parts+1] = tostring(clothBuf):sub(1, 4)
+    -- 从用户数据读取服装列表
+    local clothes = user.clothes or {}
+    local clothBuf = buffer.Buffer:new(4 + #clothes * 8)
+    local pos = 1
+    
+    -- clothes count (4 bytes)
+    clothBuf:wuint(pos, #clothes)
+    pos = pos + 4
+    
+    -- 每件服装: id(4) + level(4)
+    -- 注意：客户端把第二个字段当作 level 读取，不是 expireTime！
+    for _, cloth in ipairs(clothes) do
+        local clothId = cloth.id or cloth[1] or 0
+        local level = cloth.level or 1  -- 默认等级为 1
+        clothBuf:wuint(pos, clothId)
+        pos = pos + 4
+        clothBuf:wuint(pos, level)
+        pos = pos + 4
+    end
+    
+    parts[#parts+1] = tostring(clothBuf):sub(1, pos - 1)
+    
+    if #clothes > 0 then
+        print(string.format("\27[32m[LOGIN] 加载了 %d 件服装\27[0m", #clothes))
+    end
     
     -- ========== curTitle (line 901) ==========
     local titleBuf = buffer.Buffer:new(4)

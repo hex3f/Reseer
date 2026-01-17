@@ -41,9 +41,24 @@ ProtocolValidator.protocols = {
     -- ========== 地图相关 ==========
     [2001] = {
         name = "ENTER_MAP",
-        minSize = 160,
-        maxSize = 160,
-        description = "玩家信息 + 地图信息"
+        minSize = 144,  -- 基础大小(clothes=0时)
+        maxSize = nil,  -- 动态大小
+        calculateSize = function(body)
+            -- 基础部分: 136 bytes (到clothCount之前)
+            -- clothCount: 4 bytes
+            -- curTitle: 4 bytes
+            if #body < 140 then return 144 end
+            
+            -- 读取clothes count (在第137-140字节位置)
+            local clothesCount = string.byte(body, 137) * 0x1000000 + 
+                               string.byte(body, 138) * 0x10000 + 
+                               string.byte(body, 139) * 0x100 + 
+                               string.byte(body, 140)
+            
+            -- 每件服装: clothId(4) + level(4) = 8 bytes
+            return 144 + clothesCount * 8
+        end,
+        description = "玩家信息 + 地图信息 (动态大小，取决于服装数量)"
     },
     
     [2002] = {
@@ -57,7 +72,19 @@ ProtocolValidator.protocols = {
         name = "LIST_MAP_PLAYER",
         minSize = 4,
         maxSize = nil,
-        description = "playerCount(4) + 玩家列表（动态）"
+        calculateSize = function(body)
+            if #body < 4 then return 4 end
+            local playerCount = string.byte(body, 1) * 0x1000000 + 
+                              string.byte(body, 2) * 0x10000 + 
+                              string.byte(body, 3) * 0x100 + 
+                              string.byte(body, 4)
+            -- 每个玩家的PeopleInfo是动态大小的(取决于服装数量)
+            -- 基础: 140 bytes + clothCount(4) + clothes数据 + curTitle(4)
+            -- 为简化，假设每个玩家平均0件服装 = 144 bytes
+            -- TODO: 需要逐个解析每个玩家的clothCount来精确计算
+            return 4 + playerCount * 144
+        end,
+        description = "playerCount(4) + 玩家列表（动态，每个玩家144+字节）"
     },
     
     [2101] = {
@@ -200,24 +227,25 @@ ProtocolValidator.protocols = {
     -- ========== 其他 ==========
     [1001] = {
         name = "LOGIN_IN",
-        minSize = 1142,  -- 基础大小(clothes=0时)
+        minSize = 1146,  -- 基础大小(clothes=0时)
         maxSize = nil,   -- 动态大小(取决于clothes数量)
         description = "登录响应完整信息",
         calculateSize = function(body)
-            -- 基础部分: 1138 bytes (到clothes count之前)
-            -- clothes count: 4 bytes
-            -- curTitle: 4 bytes  
-            -- bossAchievement: 200 bytes
-            if #body < 1142 then return 1142 end
+            -- 基础大小: 1146 bytes (clothes=0时)
+            -- clothes数据从偏移 938 开始 (0-based), Lua索引 939 (1-based)
+            if #body < 942 then return 1146 end
             
-            -- 读取clothes count (在第1135-1138字节位置)
-            local clothesCount = string.byte(body, 1135) * 0x1000000 + 
-                               string.byte(body, 1136) * 0x10000 + 
-                               string.byte(body, 1137) * 0x100 + 
-                               string.byte(body, 1138)
+            -- 读取clothes count (在第939-942字节位置，Lua索引从1开始)
+            local clothesCount = string.byte(body, 939) * 0x1000000 + 
+                               string.byte(body, 940) * 0x10000 + 
+                               string.byte(body, 941) * 0x100 + 
+                               string.byte(body, 942)
             
-            -- 每个cloth: id(4) + expireTime(4) = 8 bytes
-            return 1142 + clothesCount * 8
+            -- 每个cloth: id(4) + level(4) = 8 bytes
+            -- 注意：客户端把第二个字段当作 level 读取，不是 expireTime
+            -- 总大小 = 1146 (基础) + clothCount * 8 (clothes数据)
+            local expectedSize = 1146 + clothesCount * 8
+            return expectedSize
         end
     },
     
@@ -272,9 +300,9 @@ ProtocolValidator.protocols = {
     
     [9003] = {
         name = "NONO_INFO",
-        minSize = 48,
-        maxSize = 48,
-        description = "NoNo信息"
+        minSize = 90,
+        maxSize = 90,
+        description = "NoNo信息: userID(4) + flag(4) + state(4) + nick(16) + superNono(4) + color(4) + power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + func(20) + superEnergy(4) + superLevel(4) + superStage(4) = 90字节"
     },
     
     [70001] = {
@@ -290,6 +318,22 @@ ProtocolValidator.protocols = {
         minSize = 16,
         maxSize = 16,
         description = "购买响应: Coins(4) + ItemID(4) + Count(4) + Padding(4)"
+    },
+    
+    [2604] = {
+        name = "CHANGE_CLOTH",
+        minSize = 8,  -- userID(4) + clothCount(4)
+        maxSize = nil,
+        calculateSize = function(body)
+            if #body < 8 then return 8 end
+            local clothCount = string.byte(body, 5) * 0x1000000 + 
+                             string.byte(body, 6) * 0x10000 + 
+                             string.byte(body, 7) * 0x100 + 
+                             string.byte(body, 8)
+            -- 每件服装: clothId(4) + clothType(4) = 8字节
+            return 8 + clothCount * 8
+        end,
+        description = "更换服装: userID(4) + clothCount(4) + [clothId(4) + clothType(4)]..."
     },
     
     [2605] = {

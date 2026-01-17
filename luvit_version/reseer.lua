@@ -222,9 +222,9 @@ if conf.local_server_mode then
     local lgs = require "./gameserver/localgameserver"
     local gameServer = lgs.LocalGameServer:new()
     
-    -- 启动房间服务器 (共享用户数据库)
+    -- 启动房间服务器 (共享用户数据库和命令处理器)
     local lrs = require "./roomserver/localroomserver"
-    local roomServer = lrs.LocalRoomServer:new(gameServer.userdb)
+    local roomServer = lrs.LocalRoomServer:new(gameServer.userdb, gameServer)
     
     -- 启动登录服务器
     require "./loginserver/login"

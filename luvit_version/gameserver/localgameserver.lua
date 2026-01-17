@@ -44,9 +44,6 @@ local ProtocolValidator = require('../protocol_validator')
 -- 加载在线追踪模块
 local OnlineTracker = require('../handlers/online_tracker')
 
--- 加载共享处理器
-local SharedHandlers = require('../handlers/shared_handlers')
-
 -- 加载配置
 local GameConfig = require('../game_config')
 local SeerLoginResponse = require('./seer_login_response')
@@ -250,8 +247,9 @@ local function shouldHideCmd(cmdId)
     return false
 end
 
-function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
-    local localHandlers = {
+-- 获取本地处理器表（供 handleCommand 和 handleCommandDirect 共用）
+function LocalGameServer:getLocalHandlers()
+    return {
         [105] = self.handleCommendOnline,      -- 获取服务器列表
         [106] = self.handleRangeOnline,        -- 获取指定范围服务器
         [1001] = self.handleLoginIn,           -- 登录游戏服务器
@@ -320,20 +318,16 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [70001] = self.handleCmd70001,         -- 兑换信息
         [80008] = self.handleNieoHeart,        -- 心跳包
     }
+end
+
+function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
+    local localHandlers = self:getLocalHandlers()
     
-    -- 优先使用本地处理器
+    -- 使用本地处理器
     local handler = localHandlers[cmdId]
     if handler then
         handler(self, clientData, cmdId, userId, seqId, body)
         return
-    end
-    
-    -- 尝试使用共享处理器
-    if SharedHandlers.has(cmdId) then
-        local ctx = self:buildHandlerContext(clientData, cmdId, userId, body)
-        if SharedHandlers.execute(cmdId, ctx) then
-            return
-        end
     end
     
     -- 未实现的命令
@@ -341,36 +335,20 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
     self:sendResponse(clientData, cmdId, userId, 0, "")
 end
 
--- 构建共享处理器的上下文
-function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, body)
-    local self_ref = self
-    return {
-        userId = userId,
-        body = body,
-        userdb = self.userdb,
-        sendResponse = function(packet)
-            pcall(function()
-                clientData.socket:write(packet)
-            end)
-        end,
-        getOrCreateUser = function(uid)
-            return self_ref:getOrCreateUser(uid)
-        end,
-        saveUser = function(uid, userData)
-            self_ref.users[uid] = userData
-            self_ref:saveUserData()
-        end,
-        broadcastToMap = function(packet, excludeUserId)
-            -- 广播给同地图的其他玩家
-            for _, c in ipairs(self_ref.clients) do
-                if c.loggedIn and c.userId ~= excludeUserId and c.mapId == clientData.mapId then
-                    pcall(function()
-                        c.socket:write(packet)
-                    end)
-                end
-            end
-        end
-    }
+-- 直接处理命令（供 RoomServer 调用，实现命令处理器共享）
+-- 返回 true 表示命令已处理，false 表示未找到处理器
+function LocalGameServer:handleCommandDirect(clientData, cmdId, userId, seqId, body)
+    local localHandlers = self:getLocalHandlers()
+    
+    -- 检查是否有本地处理器
+    local handler = localHandlers[cmdId]
+    if handler then
+        handler(self, clientData, cmdId, userId, seqId, body)
+        return true
+    end
+    
+    -- 未找到处理器
+    return false
 end
 
 -- 构建响应数据包
@@ -1155,22 +1133,39 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sa
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sd
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sp
-    responseBody = responseBody .. writeUInt32BE(4)          -- skillNum (Always 4)
     
-    -- 4个技能槽 (id + pp) - 官服 PP: 30, 35, 0, 0
-    local ppValues = {30, 35, 0, 0}
+    -- 计算实际技能数量（官服格式）
+    local actualSkillCount = 0
     for i = 1, 4 do
         local skillId = skills[i] or 0
         if type(skillId) == "table" then
             skillId = skillId.id or 0
         end
-        responseBody = responseBody .. writeUInt32BE(skillId) .. writeUInt32BE(ppValues[i])
+        if skillId ~= 0 then
+            actualSkillCount = actualSkillCount + 1
+        end
+    end
+    responseBody = responseBody .. writeUInt32BE(actualSkillCount)  -- skillNum (实际技能数量)
+    
+    -- 4个技能槽 (id + pp) - 使用技能的默认PP值
+    for i = 1, 4 do
+        local skillId = skills[i] or 0
+        if type(skillId) == "table" then
+            skillId = skillId.id or 0
+        end
+        -- 获取技能的默认PP值
+        local skillPP = 0
+        if skillId ~= 0 then
+            local skillInfo = SeerSkills.get(skillId)
+            skillPP = (skillInfo and skillInfo.pp) or 30
+        end
+        responseBody = responseBody .. writeUInt32BE(skillId) .. writeUInt32BE(skillPP)
     end
     
     responseBody = responseBody .. writeUInt32BE(catchId)    -- catchTime
-    responseBody = responseBody .. writeUInt32BE(301)        -- catchMap (Corrected to 301)
+    responseBody = responseBody .. writeUInt32BE(0)          -- catchMap (官服为0)
     responseBody = responseBody .. writeUInt32BE(0)          -- catchRect
-    responseBody = responseBody .. writeUInt32BE(petLevel)   -- catchLevel (Corrected to petLevel)
+    responseBody = responseBody .. writeUInt32BE(0)          -- catchLevel (官服为0)
     -- effectCount (2字节) + effectList (如果有)
     responseBody = responseBody .. writeUInt16BE(0)          -- effectCount
     -- 注意: 客户端 PetInfo.as 在 effectCount 之后直接读取 skinID，没有 peteffect/shiny/freeForbidden/boss 字段
@@ -1308,53 +1303,61 @@ function LocalGameServer:handleCmd50008(clientData, cmdId, userId, seqId, body)
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
--- CMD 70001: 获取兑换信息 (HonourManual)
--- 用于 HonourManualController
-function LocalGameServer:handleCmd70001(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 70001: 获取兑换信息\27[0m")
-    
-    -- Structure: count(4) + [id(4) + value(4)]...
-    -- 暂时返回空列表 (count=0)
-    local responseBody = writeUInt32BE(0)
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-end
-
--- CMD 2150: 获取好友/黑名单列表
--- FriendList/BlackList
-function LocalGameServer:handleGetRelationList(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 2150: 获取好友列表\27[0m")
-    
-    -- Structure: count(4) + [FriendInfo...]
-    -- 暂时返回空列表
-    local responseBody = writeUInt32BE(0)
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-end
-
 -- CMD 9003: 获取 NoNo 信息
+-- NonoInfo 结构 (86 bytes body):
+-- userID(4) + flag(4) + state(4) + nick(16) + superNono(4) + color(4) + 
+-- power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + 
+-- func(20) + superEnergy(4) + superLevel(4) + superStage(4)
 function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 9003: 获取NoNo信息\27[0m")
     
-    -- 返回 NoNoInfo (简化版)
-    -- flag(4) + isChip(4) + name(16) + ...
-    -- 官服数据: 00 00 00 01, 00 00 00 01, "NONO"..., + 82 bytes reserved?
-    -- 为简化，直接按照 LOG 返回大概结构
-    
     local userData = self:getOrCreateUser(userId)
-    local hasNono = userData.hasNono or false
     
-    if not hasNono then
-        -- 如果没有NoNo，可能返回空或者特定错误?
-        -- 这里模拟官服返回一个默认的
+    -- 从 game_config 获取默认 NONO 配置
+    local nonoDefaults = GameConfig.InitialPlayer.nono or {}
+    
+    -- 确保用户有 nono 数据
+    if not userData.nono then
+        userData.nono = {
+            flag = nonoDefaults.flag or 0,
+            state = nonoDefaults.state or 0,
+            nick = nonoDefaults.nick or "NoNo",
+            superNono = nonoDefaults.superNono or 0,
+            color = nonoDefaults.color or 1,
+            power = 10000,
+            mate = 10000,
+            iq = 0,
+            ai = 0,
+            birth = os.time(),
+            chargeTime = 500,
+            superEnergy = 0,
+            superLevel = 0,
+            superStage = 1,
+            hp = 10000,
+            maxHp = 10000,
+            isFollowing = false
+        }
     end
     
-    local responseBody = ""
-    responseBody = responseBody .. writeUInt32BE(1)  -- flag?
-    responseBody = responseBody .. writeUInt32BE(1)  -- isChip?
-    responseBody = responseBody .. writeFixedString("NoNo", 16)
+    local nono = userData.nono
     
-    -- 填充剩余字节以匹配 LOG (~80 bytes or more)
-    -- NonoInfo.as 读取相当多属性，暂且填充0
-    responseBody = responseBody .. string.rep("\0", 80)
+    local responseBody = ""
+    responseBody = responseBody .. writeUInt32BE(userId)                        -- userID
+    responseBody = responseBody .. writeUInt32BE(nono.flag or 0)                -- flag
+    responseBody = responseBody .. writeUInt32BE(nono.state or 0)               -- state
+    responseBody = responseBody .. writeFixedString(nono.nick or "NoNo", 16)    -- nick
+    responseBody = responseBody .. writeUInt32BE(nono.superNono or 0)           -- superNono
+    responseBody = responseBody .. writeUInt32BE(nono.color or 1)               -- color
+    responseBody = responseBody .. writeUInt32BE(nono.power or 10000)           -- power
+    responseBody = responseBody .. writeUInt32BE(nono.mate or 10000)            -- mate
+    responseBody = responseBody .. writeUInt32BE(nono.iq or 0)                  -- iq
+    responseBody = responseBody .. writeUInt16BE(nono.ai or 0)                  -- ai
+    responseBody = responseBody .. writeUInt32BE(nono.birth or os.time())       -- birth
+    responseBody = responseBody .. writeUInt32BE(nono.chargeTime or 500)        -- chargeTime
+    responseBody = responseBody .. string.rep("\xFF", 20)                       -- func (所有功能开启)
+    responseBody = responseBody .. writeUInt32BE(nono.superEnergy or 0)         -- superEnergy
+    responseBody = responseBody .. writeUInt32BE(nono.superLevel or 0)          -- superLevel
+    responseBody = responseBody .. writeUInt32BE(nono.superStage or 1)          -- superStage
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
@@ -1935,57 +1938,6 @@ function LocalGameServer:sendNoteStartFight(clientData, userId, userData)
     
     tprint(string.format("\27[33m[LocalGame] 2504 包体大小: %d bytes\27[0m", #responseBody))
     self:sendResponse(clientData, 2504, userId, 0, responseBody)
-end
-
--- CMD 2605: 物品列表
-function LocalGameServer:handleItemList(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 2605: 物品列表\27[0m")
-    
-    -- 解析请求的物品类型范围
-    local itemType1 = 0
-    local itemType2 = 0
-    local itemType3 = 0
-    
-    if #body >= 12 then
-        itemType1 = readUInt32BE(body, 1)
-        itemType2 = readUInt32BE(body, 5)
-        itemType3 = readUInt32BE(body, 9)
-    end
-    
-    tprint(string.format("\27[36m[LocalGame] 查询物品类型: %d, %d, %d\27[0m", itemType1, itemType2, itemType3))
-    
-    -- 从数据库读取物品
-    local itemCount = 0
-    local itemData = ""
-    
-    if self.userdb then
-        local db = self.userdb:new()
-        local gameData = db:getOrCreateGameData(userId)
-        gameData.items = gameData.items or {}
-        
-        -- 遍历所有物品，筛选在请求范围内的
-        for itemIdStr, itemInfo in pairs(gameData.items) do
-            local itemId = tonumber(itemIdStr) or 0
-            -- 检查物品是否在请求的范围内
-            if itemId >= itemType1 and itemId <= itemType2 then
-                local count = itemInfo.count or 1
-                local expireTime = itemInfo.expireTime or 0x057E40
-                
-                itemData = itemData ..
-                    writeUInt32BE(itemId) ..
-                    writeUInt32BE(count) ..
-                    writeUInt32BE(expireTime) ..
-                    writeUInt32BE(0)  -- 额外数据
-                itemCount = itemCount + 1
-                
-                tprint(string.format("\27[36m[LocalGame] 返回物品: id=%d, count=%d\27[0m", itemId, count))
-            end
-        end
-    end
-    
-    local responseBody = writeUInt32BE(itemCount) .. itemData
-    
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
 -- CMD 1106: 检查金币余额
@@ -3002,7 +2954,13 @@ function LocalGameServer:handleChangeCloth(clientData, cmdId, userId, seqId, bod
     for _, clothId in ipairs(clothIds) do
         table.insert(userData.clothes, {id = clothId, level = 1})
     end
-    self:saveUserData()
+    
+    -- 保存到数据库
+    if self.userdb then
+        local db = self.userdb:new()
+        db:saveGameData(userId, userData)
+        tprint(string.format("\27[32m[LocalGame] 用户 %d 服装已保存到数据库\27[0m", userId))
+    end
     
     -- 构建响应体
     local responseBody = writeUInt32BE(userId) .. writeUInt32BE(#clothIds)
@@ -3291,35 +3249,6 @@ function LocalGameServer:handleCmd70001(clientData, cmdId, userId, seqId, body)
         responseBody = responseBody .. writeUInt32BE(exchange.exchangeNum or exchange.num or 0)
     end
     
-    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-end
-
--- CMD 9003: 获取NoNo信息
--- 响应: userID(4) + nonoType(4) + nonoColor(4) + nonoNick(16) + ...
-function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
-    tprint("\27[36m[LocalGame] 处理 CMD 9003: 获取NoNo信息\27[0m")
-    
-    local targetUserId = userId
-    if #body >= 4 then
-         targetUserId = readUInt32BE(body, 1)
-    end
-
-    local nono = {}
-    if self.userdb then
-        local db = self.userdb:new()
-        nono = db:getNonoData(targetUserId)
-    end
-    
-    local responseBody = writeUInt32BE(targetUserId) ..
-                         writeUInt32BE(nono.isSuper and 1 or 0) .. -- type/flag
-                         writeUInt32BE(nono.color or 0) ..
-                         writeFixedString(nono.nick or "NoNo", 16) ..
-                         writeUInt32BE(nono.energy or 100) ..       -- energy/battery
-                         writeUInt32BE(nono.mate or 0) ..
-                         writeUInt32BE(nono.chip or 0) ..           -- chip ID
-                         writeUInt32BE(nono.grow or 0) ..           -- growth
-                         writeUInt32BE(0) -- func (4)
-                         
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
