@@ -125,20 +125,51 @@ local function handleChallengeBoss(ctx)
     
     -- 发送 NOTE_READY_TO_FIGHT (2503)
     -- NoteReadyToFightInfo: userCount(4) + [FighetUserInfo + petCount(4) + PetInfo[]]...
+    -- Official Struct (from HEX analysis): 
+    -- Header: 00 00 00 03 (Count = 3, NOT 2!)
+    -- User 1: UID(4) + Nick(16) + PetCount(4) + PetInfo...
+    -- PetInfo (Battle): ... + SkillCount(4) + SkillID(4)*4 (Padding)
+    
     local body = ""
-    body = body .. writeUInt32BE(2)  -- userCount
+    body = body .. writeUInt32BE(3)  -- userCount = 3 (Official!)
+    
+    -- Helper to build Battle Pet Info (with 4-slot padding)
+    local function buildBattlePetInfo(pId, _catchTime, hp, maxHp, lv)
+        local pb = ""
+        pb = pb .. writeUInt32BE(pId)
+        pb = pb .. writeUInt32BE(_catchTime)
+        pb = pb .. writeUInt32BE(hp)
+        pb = pb .. writeUInt32BE(maxHp)
+        pb = pb .. writeUInt32BE(lv)
+        pb = pb .. writeUInt32BE(0) -- mode/status
+        pb = pb .. writeUInt32BE(0) -- catchTime? (duplicate?) - No, follow 2304 simplified structure but with SKILLS
+        -- Wait, CMD 2503 PetInfo is specific.
+        -- Let's use the one that worked in localgameserver.lua CMD 2503
+        -- Structure: ID(4) + CatchTime(4) + HP(4) + MaxHP(4) + Lv(4) + SkillCount(4) + Skill1(4)...Skill4(4)
+        
+        -- Get Skills for Pet
+        local skills = SeerPets.getDefaultSkills(pId, lv)
+        
+        pb = pb .. writeUInt32BE(4) -- SkillCount (Fixed 4)
+        for i=1, 4 do
+            pb = pb .. writeUInt32BE(skills[i] or 0)
+        end
+        
+        pb = pb .. writeUInt32BE(301) -- CatchMap (Fixed 301 for safety)
+        return pb
+    end
     
     -- 玩家1 (自己)
     body = body .. writeUInt32BE(ctx.userId)
     body = body .. writeFixedString(nickname, 16)
     body = body .. writeUInt32BE(1)  -- petCount
-    body = body .. PetHandlers.buildSimplePetInfo(petId, 16, 100, 100, catchTime)
+    body = body .. buildBattlePetInfo(petId, catchTime, 100, 100, 16)
     
     -- 玩家2 (敌人/BOSS)
     body = body .. writeUInt32BE(0)
     body = body .. writeFixedString("", 16)
     body = body .. writeUInt32BE(1)  -- petCount
-    body = body .. PetHandlers.buildSimplePetInfo(bossId, 5, 50, 50, 0)
+    body = body .. buildBattlePetInfo(bossId, 0, 50, 50, 5)
     
     ctx.sendResponse(buildResponse(2503, ctx.userId, 0, body))
     print(string.format("\27[32m[Handler] → CHALLENGE_BOSS %d (sent NOTE_READY_TO_FIGHT)\27[0m", bossId))

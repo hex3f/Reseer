@@ -24,6 +24,7 @@ Pets.load()
 
 -- 构建完整版 PetInfo (param2=true)
 -- 用于 GET_PET_INFO (2301), PET_RELEASE (2304) 等
+-- 官服格式 (183 bytes): 基础信息 + 属性 + 努力值 + 技能 + 捕获信息 + 特效 + skinID
 local function buildFullPetInfo(petId, catchTime, level)
     level = level or 5
     
@@ -31,32 +32,38 @@ local function buildFullPetInfo(petId, catchTime, level)
     local pet = Pets.createStarterPet(petId, level)
     
     local body = ""
-    body = body .. writeUInt32BE(petId)          -- id
-    body = body .. writeFixedString(pet.name, 16) -- name (16字节)
-    body = body .. writeUInt32BE(pet.iv)         -- dv (个体值)
-    body = body .. writeUInt32BE(pet.nature)     -- nature (性格)
-    body = body .. writeUInt32BE(level)          -- level
+    -- 基础信息 (60 bytes)
+    body = body .. writeUInt32BE(petId)          -- id (4)
+    body = body .. string.rep("\0", 16)          -- name (16字节) - 野生精灵名字为空
+    body = body .. writeUInt32BE(pet.iv)         -- dv (个体值) (4)
+    body = body .. writeUInt32BE(pet.nature)     -- nature (性格) (4)
+    body = body .. writeUInt32BE(level)          -- level (4)
+    
+    -- 经验值信息 (16 bytes)
     local expInfo = Pets.getExpInfo(petId, level, pet.exp)
-    body = body .. writeUInt32BE(expInfo.exp)        -- exp
-    body = body .. writeUInt32BE(expInfo.lvExp)      -- lvExp
-    body = body .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp
-    body = body .. writeUInt32BE(expInfo.nextLvExp)  -- padding (match official log)
-    body = body .. writeUInt32BE(pet.hp)         -- hp
-    body = body .. writeUInt32BE(pet.maxHp)      -- maxHp
-    body = body .. writeUInt32BE(pet.attack)     -- attack
-    body = body .. writeUInt32BE(pet.defence)    -- defence
-    body = body .. writeUInt32BE(pet.s_a)        -- s_a (特攻)
-    body = body .. writeUInt32BE(pet.s_d)        -- s_d (特防)
-    body = body .. writeUInt32BE(pet.speed)      -- speed
-    -- 注意: 客户端 PetInfo.as 没有 addMaxHP/addMoreMaxHP/addAttack/addDefence/addSA/addSD/addSpeed 字段
-    -- 直接跳到 ev_* 字段
-    body = body .. writeUInt32BE(pet.ev.hp)      -- ev_hp
-    body = body .. writeUInt32BE(pet.ev.atk)     -- ev_attack
-    body = body .. writeUInt32BE(pet.ev.def)     -- ev_defence
-    body = body .. writeUInt32BE(pet.ev.spa)     -- ev_sa
-    body = body .. writeUInt32BE(pet.ev.spd)     -- ev_sd
-    body = body .. writeUInt32BE(pet.ev.spe)     -- ev_sp
-    -- 过滤有效技能
+    body = body .. writeUInt32BE(expInfo.exp)        -- exp (4)
+    body = body .. writeUInt32BE(expInfo.lvExp)      -- lvExp (4)
+    body = body .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp (4)
+    body = body .. writeUInt32BE(0)                  -- padding (4)
+    
+    -- 战斗属性 (28 bytes)
+    body = body .. writeUInt32BE(pet.hp)         -- hp (4)
+    body = body .. writeUInt32BE(pet.maxHp)      -- maxHp (4)
+    body = body .. writeUInt32BE(pet.attack)     -- attack (4)
+    body = body .. writeUInt32BE(pet.defence)    -- defence (4)
+    body = body .. writeUInt32BE(pet.s_a)        -- s_a (特攻) (4)
+    body = body .. writeUInt32BE(pet.s_d)        -- s_d (特防) (4)
+    body = body .. writeUInt32BE(pet.speed)      -- speed (4)
+    
+    -- 努力值 (24 bytes)
+    body = body .. writeUInt32BE(pet.ev.hp)      -- ev_hp (4)
+    body = body .. writeUInt32BE(pet.ev.atk)     -- ev_attack (4)
+    body = body .. writeUInt32BE(pet.ev.def)     -- ev_defence (4)
+    body = body .. writeUInt32BE(pet.ev.spa)     -- ev_sa (4)
+    body = body .. writeUInt32BE(pet.ev.spd)     -- ev_sd (4)
+    body = body .. writeUInt32BE(pet.ev.spe)     -- ev_sp (4)
+    
+    -- 技能列表 (动态长度)
     local validSkills = {}
     local rawSkills = pet.skills or {10001, 0, 0, 0}
     for i = 1, 4 do
@@ -66,22 +73,28 @@ local function buildFullPetInfo(petId, catchTime, level)
         end
     end
     
-    body = body .. writeUInt32BE(#validSkills)   -- skillNum
+    body = body .. writeUInt32BE(#validSkills)   -- skillNum (4)
     
-    -- 写入有效技能
+    -- 写入有效技能 (每个技能 8 bytes)
     for _, sid in ipairs(validSkills) do
-        local skill = Skills.get(sid) -- 获取技能信息
+        local skill = Skills.get(sid)
         local pp = skill and skill.pp or 20
-        body = body .. writeUInt32BE(sid) .. writeUInt32BE(pp)
+        body = body .. writeUInt32BE(sid)        -- skillID (4)
+        body = body .. writeUInt32BE(pp)         -- pp (4)
     end
-    body = body .. writeUInt32BE(catchTime)      -- catchTime
-    body = body .. writeUInt32BE(pet.catchMap)   -- catchMap
-    body = body .. writeUInt32BE(0)              -- catchRect
-    body = body .. writeUInt32BE(pet.catchLevel) -- catchLevel
-    -- effectCount (2字节) + effectList (如果有)
+    
+    -- 捕获信息 (16 bytes)
+    body = body .. writeUInt32BE(catchTime)      -- catchTime (4)
+    body = body .. writeUInt32BE(pet.catchMap)   -- catchMap (4)
+    body = body .. writeUInt32BE(0)              -- catchRect (4)
+    body = body .. writeUInt32BE(pet.catchLevel) -- catchLevel (4)
+    
+    -- 特效列表 (2 bytes + 动态)
     body = body .. writeUInt16BE(0)              -- effectCount (2字节)
-    -- 注意: 客户端 PetInfo.as 在 effectCount 之后直接读取 skinID，没有 peteffect/shiny/freeForbidden/boss 字段
-    body = body .. writeUInt32BE(0)              -- skinID
+    -- 如果 effectCount > 0，这里应该有 effectList，但我们没有特效
+    
+    -- skinID (4 bytes)
+    body = body .. writeUInt32BE(0)              -- skinID (4)
     
     return body
 end
@@ -186,7 +199,7 @@ local function handlePetRelease(ctx)
     
     -- 构建 PetTakeOutInfo 响应
     local body = ""
-    body = body .. writeUInt32BE(100)            -- homeEnergy
+    body = body .. writeUInt32BE(0)              -- homeEnergy = 0 (Official)
     body = body .. writeUInt32BE(catchId)        -- firstPetTime (使用 catchId)
     body = body .. writeUInt32BE(1)              -- flag (有精灵信息)
     body = body .. buildFullPetInfo(petType, catchId)

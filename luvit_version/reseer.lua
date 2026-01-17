@@ -132,6 +132,87 @@ require "./loginip"
 require "./oauthserver"
 require "./apiserver"  -- API 服务器（提供配置管理和模式切换）
 
+-- ============================================================
+-- 数据预加载（在服务器启动前加载所有数据文件）
+-- ============================================================
+print("\27[36m========== 数据预加载 ==========\27[0m")
+
+local dataLoadSuccess = true
+
+-- 1. 加载精灵数据
+print("\27[36m[数据加载] 正在加载精灵数据...\27[0m")
+local Pets = require("./seer_pets")
+Pets.load()
+
+-- 统计加载的精灵数量
+local petCount = 0
+for _ in pairs(Pets.pets) do
+    petCount = petCount + 1
+end
+
+if not Pets.loaded or petCount == 0 then
+    print("\27[31m[错误] 精灵数据加载失败！\27[0m")
+    print("\27[33m[提示] 请检查 data/spt.xml 文件是否存在且格式正确\27[0m")
+    print("\27[33m[提示] 服务器将使用默认精灵数据运行\27[0m")
+    dataLoadSuccess = false
+else
+    print(string.format("\27[32m[数据加载] ✓ 精灵数据加载成功 (%d 个精灵)\27[0m", petCount))
+end
+
+-- 2. 加载物品数据
+print("\27[36m[数据加载] 正在加载物品数据...\27[0m")
+local Items = require("./seer_items")
+Items.load()
+if not Items.loaded then
+    print("\27[31m[错误] 物品数据加载失败！\27[0m")
+    print("\27[33m[提示] 请检查 data/items.xml 文件是否存在\27[0m")
+    dataLoadSuccess = false
+else
+    print(string.format("\27[32m[数据加载] ✓ 物品数据加载成功 (%d 个物品)\27[0m", Items.count))
+end
+
+-- 3. 加载技能数据
+print("\27[36m[数据加载] 正在加载技能数据...\27[0m")
+local Skills = require("./seer_skills")
+Skills.load()
+if not Skills.loaded then
+    print("\27[31m[错误] 技能数据加载失败！\27[0m")
+    print("\27[33m[提示] 请检查 data/skill.xml 文件是否存在\27[0m")
+    dataLoadSuccess = false
+else
+    local skillCount = 0
+    for _ in pairs(Skills.skills) do
+        skillCount = skillCount + 1
+    end
+    print(string.format("\27[32m[数据加载] ✓ 技能数据加载成功 (%d 个技能)\27[0m", skillCount))
+end
+
+-- 4. 加载技能效果数据
+print("\27[36m[数据加载] 正在加载技能效果数据...\27[0m")
+local SkillEffects = require("./seer_skill_effects")
+SkillEffects.load()
+if not SkillEffects.loaded then
+    print("\27[31m[错误] 技能效果数据加载失败！\27[0m")
+    print("\27[33m[提示] 请检查 data/skill_effects.xml 文件是否存在\27[0m")
+    dataLoadSuccess = false
+else
+    print(string.format("\27[32m[数据加载] ✓ 技能效果数据加载成功 (%d 个效果)\27[0m", SkillEffects.count))
+end
+
+-- 检查数据加载状态
+if not dataLoadSuccess then
+    print("")
+    print("\27[31m╔════════════════════════════════════════════════════════════╗\27[0m")
+    print("\27[31m║  ⚠️  警告：部分数据文件加载失败！                          ║\27[0m")
+    print("\27[31m║  服务器将使用默认数据运行，可能导致功能异常               ║\27[0m")
+    print("\27[31m║  建议：检查 data/ 目录下的 XML 文件是否完整               ║\27[0m")
+    print("\27[31m╚════════════════════════════════════════════════════════════╝\27[0m")
+    print("")
+else
+    print("\27[32m[数据加载] ✓ 所有数据加载完成\27[0m")
+end
+print("")
+
 -- 根据模式选择登录服务器
 if conf.local_server_mode then
     -- 本地模式：使用 TCP 登录服务器（Flash Socket 连接）

@@ -3,8 +3,12 @@ local xml_parser = require("./gameserver/xml_parser")
 
 local SeerItems = {}
 local itemsMap = {}
+SeerItems.loaded = false
+SeerItems.count = 0
 
 function SeerItems.load()
+    if SeerItems.loaded then return end
+    
     print("Loading items from data/items.xml...")
     local data = fs.readFileSync("data/items.xml")
     if not data then 
@@ -60,6 +64,9 @@ function SeerItems.load()
             end
         end
     end
+    
+    SeerItems.count = count
+    SeerItems.loaded = true
     print("Loaded " .. count .. " items from XML.")
 end
 

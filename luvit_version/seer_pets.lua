@@ -1,405 +1,570 @@
--- 赛尔号精灵数据库
--- 包含精灵种族值、属性、进化链等信息
--- 优先从 data/monsters.json 加载，回退到内置数据
+-- seer_pets.lua
+-- 赛尔号精灵数据加载器
+-- 从 data/spt.xml 加载完整精灵信息，建立与技能的引用关系
 
-local fs = require('fs')
-local Elements = require('./seer_elements')
-local Algorithm = require('./seer_algorithm')
-local Natures = require('./seer_natures')
--- Try to load xml_parser from gameserver directory
-local xml_parser = require('./gameserver/xml_parser')
+local fs = require("fs")
+local xml_parser = require("./gameserver/xml_parser")
 
-local Pets = {}
-local petsMap = {}
+local SeerPets = {}
+SeerPets.pets = {}
+SeerPets.loaded = false
 
-function Pets.load()
-    print("Loading pets from data/pets.xml...")
-    local data = fs.readFileSync("data/pets.xml")
-    if not data then 
-        print("Error: data/pets.xml not found")
-        return 
+-- 加载精灵数据
+function SeerPets.load()
+    if SeerPets.loaded then return end
+    
+    print("\27[36m[SeerPets] 正在加载精灵数据...\27[0m")
+    
+    -- 使用 pcall 捕获文件读取错误
+    local success, content = pcall(function()
+        return fs.readFileSync("data/spt.xml")
+    end)
+    
+    if not success or not content then
+        print("\27[31m[SeerPets] 无法读取精灵数据文件 data/spt.xml\27[0m")
+        if not success then
+            print("\27[31m[SeerPets] 错误详情: " .. tostring(content) .. "\27[0m")
+        end
+        return
+    end
+    
+    -- 移除 UTF-8 BOM (Byte Order Mark)
+    if content:sub(1, 3) == "\xEF\xBB\xBF" then
+        content = content:sub(4)
+        print("\27[33m[SeerPets] 已移除 UTF-8 BOM\27[0m")
     end
     
     local parser = xml_parser:new()
-    local tree = parser:parse(data)
+    local tree = parser:parse(content)
     
-    if not tree or tree.name ~= "Monsters" then
-        print("Error: Invalid pets.xml format")
+    if not tree then
+        print("\27[31m[SeerPets] XML解析失败 - parser:parse 返回 nil\27[0m")
+        return
+    end
+    
+    -- 调试：打印根节点信息
+    print(string.format("\27[33m[SeerPets] 根节点: name=%s, children=%s\27[0m", 
+        tostring(tree.name), tree.children and #tree.children or "nil"))
+    
+    -- 查找 Monsters 节点
+    local monstersNode = nil
+    if tree.name == "Monsters" then
+        monstersNode = tree
+    elseif tree.children then
+        for _, child in ipairs(tree.children) do
+            print(string.format("\27[33m[SeerPets] 子节点: %s\27[0m", tostring(child.name)))
+            if child.name == "Monsters" then
+                monstersNode = child
+                break
+            end
+        end
+    end
+    
+    if not monstersNode then
+        print("\27[31m[SeerPets] 未找到 Monsters 节点\27[0m")
+        print("\27[33m[SeerPets] 提示: 请检查 data/spt.xml 文件是否存在且格式正确\27[0m")
+        -- 创建空数据以避免后续错误
+        SeerPets.loaded = true
         return
     end
     
     local count = 0
-    for _, node in ipairs(tree.children) do
+    for _, node in ipairs(monstersNode.children or {}) do
         if node.name == "Monster" and node.attributes then
-            local id = tonumber(node.attributes.ID)
+            local attrs = node.attributes
+            local id = tonumber(attrs.ID)
+            
             if id then
+                -- 基础属性
                 local pet = {
                     id = id,
-                    name = node.attributes.DefName,
-                    element = tonumber(node.attributes.Type),
-                    growthType = tonumber(node.attributes.GrowthType) or 3,  -- Add GrowthType
-                    stats = {
-                        hp = tonumber(node.attributes.HP),
-                        atk = tonumber(node.attributes.Atk),
-                        def = tonumber(node.attributes.Def),
-                        spa = tonumber(node.attributes.SpAtk),
-                        spd = tonumber(node.attributes.SpDef),
-                        spe = tonumber(node.attributes.Spd)
-                    },
-                    learnableMoves = {}
+                    defName = attrs.DefName or "未知精灵",
+                    type = tonumber(attrs.Type) or 8,
+                    type2 = tonumber(attrs.Type2) or 0,  -- 第二属性
+                    
+                    -- 种族值
+                    hp = tonumber(attrs.Hp) or 100,
+                    atk = tonumber(attrs.Atk) or 50,
+                    def = tonumber(attrs.Def) or 50,
+                    spAtk = tonumber(attrs.SpAtk) or 50,
+                    spDef = tonumber(attrs.SpDef) or 50,
+                    spd = tonumber(attrs.Spd) or 50,
+                    
+                    -- 进化相关
+                    evolvesFrom = tonumber(attrs.EvolvesFrom) or 0,
+                    evolvesTo = tonumber(attrs.EvolvesTo) or 0,
+                    evolvingLv = tonumber(attrs.EvolvingLv) or 0,
+                    evolvFlag = tonumber(attrs.EvolvFlag) or 0,
+                    evolvItem = tonumber(attrs.EvolvItem) or 0,
+                    evolvItemCount = tonumber(attrs.EvolvItemCount) or 1,
+                    evolveBabin = tonumber(attrs.EvolveBabin) or 0,
+                    
+                    -- 捕获相关
+                    catchRate = tonumber(attrs.CatchRate) or 255,
+                    freeForbidden = tonumber(attrs.FreeForbidden) or 0,
+                    
+                    -- 经验和努力值
+                    yieldingExp = tonumber(attrs.YieldingExp) or 100,
+                    yieldingEV = attrs.YieldingEV or "0,0,0,0,0,0",
+                    growthType = tonumber(attrs.GrowthType) or 0,
+                    
+                    -- 特殊标记
+                    isRareMon = tonumber(attrs.IsRareMon) or 0,
+                    isDark = tonumber(attrs.IsDark) or 0,
+                    isAbilityMon = tonumber(attrs.IsAbilityMon) or 0,
+                    variationID = tonumber(attrs.VariationID) or 0,
+                    breedingmon = tonumber(attrs.breedingmon) or 0,
+                    supermon = tonumber(attrs.supermon) or 0,
+                    
+                    -- 形态相关
+                    realId = tonumber(attrs.RealId) or 0,
+                    transform = attrs.Transform,
+                    
+                    -- 战斗力系数
+                    formParam = tonumber(attrs.FormParam) or 1.0,
+                    gradeParam = tonumber(attrs.GradeParam) or 1.0,
+                    addSeParam = tonumber(attrs.AddSeParam) or 0,
+                    modifyPower = tonumber(attrs.ModifyPower) or 0,
+                    
+                    -- 坐骑相关
+                    isRidePet = tonumber(attrs.isRidePet) or 0,
+                    isFlyPet = tonumber(attrs.isFlyPet) or 0,
+                    scale = tonumber(attrs.scale),
+                    nameY = tonumber(attrs.nameY),
+                    speed = tonumber(attrs.speed),
+                    
+                    -- 其他
+                    gender = tonumber(attrs.Gender) or 0,
+                    petClass = tonumber(attrs.PetClass) or id,
+                    vipBtlAdj = tonumber(attrs.VipBtlAdj) or 0,
+                    resist = tonumber(attrs.Resist) or 0,
+                    combo = attrs.Combo,
+                    
+                    -- 技能列表 (稍后解析)
+                    learnableMoves = {},
+                    extraMoves = {},
+                    recMoves = {},
+                    othMoves = {},
+                    advMove = {},
+                    
+                    -- 天敌列表
+                    naturalEnemy = {}
                 }
                 
-                -- Parse moves
-                for _, child in ipairs(node.children) do
-                    if child.name == "LearnableMoves" then
-                        for _, moveNode in ipairs(child.children) do
-                            if moveNode.name == "Move" then
-                                table.insert(pet.learnableMoves, {
-                                    id = tonumber(moveNode.attributes.ID),
-                                    level = tonumber(moveNode.attributes.LearningLv)
-                                })
+                -- 解析子节点
+                for _, childNode in ipairs(node.children or {}) do
+                    if childNode.name == "LearnableMoves" then
+                        -- 解析可学习技能
+                        for _, moveNode in ipairs(childNode.children or {}) do
+                            if moveNode.name == "Move" and moveNode.attributes then
+                                local moveId = tonumber(moveNode.attributes.ID)
+                                local moveLv = tonumber(moveNode.attributes.LearningLv) or 0
+                                if moveId then
+                                    table.insert(pet.learnableMoves, {
+                                        id = moveId,
+                                        level = moveLv
+                                    })
+                                end
+                            end
+                        end
+                    elseif childNode.name == "ExtraMoves" then
+                        -- 解析额外技能
+                        for _, moveNode in ipairs(childNode.children or {}) do
+                            if moveNode.name == "Move" and moveNode.attributes then
+                                local moveId = tonumber(moveNode.attributes.ID)
+                                if moveId then
+                                    table.insert(pet.extraMoves, moveId)
+                                end
+                            end
+                        end
+                    elseif childNode.name == "Rec" then
+                        -- 解析推荐技能
+                        for _, moveNode in ipairs(childNode.children or {}) do
+                            if moveNode.name == "Move" and moveNode.attributes then
+                                local moveId = tonumber(moveNode.attributes.ID)
+                                local tag = tonumber(moveNode.attributes.Tag) or 0
+                                if moveId then
+                                    table.insert(pet.recMoves, {id = moveId, tag = tag})
+                                end
+                            end
+                        end
+                    elseif childNode.name == "Oth" then
+                        -- 解析其他推荐技能
+                        for _, moveNode in ipairs(childNode.children or {}) do
+                            if moveNode.name == "Move" and moveNode.attributes then
+                                local moveId = tonumber(moveNode.attributes.ID)
+                                if moveId then
+                                    table.insert(pet.othMoves, moveId)
+                                end
+                            end
+                        end
+                    elseif childNode.name == "AdvMove" then
+                        -- 解析神谕进阶技能
+                        for _, moveNode in ipairs(childNode.children or {}) do
+                            if moveNode.name == "Move" and moveNode.attributes then
+                                local moveId = tonumber(moveNode.attributes.ID)
+                                if moveId then
+                                    table.insert(pet.advMove, moveId)
+                                end
+                            end
+                        end
+                    elseif childNode.name == "NaturalEnemy" then
+                        -- 解析天敌
+                        for _, enemyNode in ipairs(childNode.children or {}) do
+                            if enemyNode.name == "Enemy" and enemyNode.attributes then
+                                local enemyId = tonumber(enemyNode.attributes.ID)
+                                if enemyId then
+                                    table.insert(pet.naturalEnemy, enemyId)
+                                end
                             end
                         end
                     end
                 end
                 
-                -- Sort moves by level
-                table.sort(pet.learnableMoves, function(a, b) return a.level < b.level end)
-                
-                petsMap[id] = pet
+                SeerPets.pets[id] = pet
                 count = count + 1
             end
         end
     end
-    print("Loaded " .. count .. " pets from XML.")
+    
+    print(string.format("\27[32m[SeerPets] 加载了 %d 个精灵数据\27[0m", count))
+    SeerPets.loaded = true
 end
 
--- ==================== 精灵种族值数据 (内置备份) ====================
--- 格式: {hp, atk, def, spa, spd, spe}
-
-Pets.BASE_STATS = {
-    -- ========== 草系初始精灵线 ==========
-    [1] = {  -- 布布种子
-        name = "布布种子",
-        element = Elements.TYPE.GRASS,
-        stats = {hp=55, atk=69, def=65, spa=45, spd=55, spe=31},
-        skills = {10001, 20001, 10002, 10003},
-    },
-    [2] = {  -- 布布草
-        name = "布布草",
-        element = Elements.TYPE.GRASS,
-        stats = {hp=75, atk=89, def=85, spa=55, spd=65, spe=41},
-        skills = {10001, 20001, 10002, 10003},
-    },
-    [3] = {  -- 布布花
-        name = "布布花",
-        element = Elements.TYPE.GRASS,
-        stats = {hp=95, atk=109, def=105, spa=75, spd=85, spe=56},
-        skills = {10001, 20001, 10002, 10003},
-    },
-    
-    -- ========== 水系初始精灵线 ==========
-    [4] = {  -- 伊优
-        name = "伊优",
-        element = Elements.TYPE.WATER,
-        stats = {hp=53, atk=51, def=53, spa=61, spd=56, spe=40},
-        skills = {10004, 20002, 10005, 20003},
-    },
-    [5] = {  -- 尤里安
-        name = "尤里安",
-        element = Elements.TYPE.WATER,
-        stats = {hp=64, atk=66, def=68, spa=81, spd=76, spe=50},
-        skills = {10004, 20002, 10005, 20003},
-    },
-    [6] = {  -- 巴鲁斯
-        name = "巴鲁斯",
-        element = Elements.TYPE.WATER,
-        stats = {hp=84, atk=86, def=88, spa=111, spd=101, spe=65},
-        skills = {10004, 20002, 10005, 20003},
-    },
-    
-    -- ========== 火系初始精灵线 ==========
-    [7] = {  -- 小火猴
-        name = "小火猴",
-        element = Elements.TYPE.FIRE,
-        stats = {hp=44, atk=58, def=44, spa=58, spd=44, spe=61},
-        skills = {10006, 20004, 10007, 20005},
-    },
-    [8] = {  -- 烈火猴
-        name = "烈火猴",
-        element = Elements.TYPE.FIRE,
-        stats = {hp=64, atk=78, def=52, spa=78, spd=52, spe=81},
-        skills = {10006, 20004, 10007, 20005},
-    },
-    [9] = {  -- 烈焰猩猩
-        name = "烈焰猩猩",
-        element = Elements.TYPE.FIRE,
-        stats = {hp=76, atk=104, def=71, spa=104, spd=71, spe=108},
-        skills = {10006, 20004, 10007, 20005},
-    },
-    
-    -- ========== 新手BOSS ==========
-    [58] = {  -- 艾里逊
-        name = "艾里逊",
-        element = Elements.TYPE.NORMAL,
-        stats = {hp=35, atk=46, def=34, spa=35, spd=45, spe=90},
-        skills = {10001},
-    },
-    
-    -- ========== 其他常见精灵 ==========
-    [10] = {  -- 皮皮
-        name = "皮皮",
-        element = Elements.TYPE.FLYING,
-        stats = {hp=40, atk=55, def=30, spa=30, spd=30, spe=60},
-        skills = {10001, 20002, 10008, 10009},
-    },
-    [13] = {  -- 比比鼠
-        name = "比比鼠",
-        element = Elements.TYPE.ELECTRIC,
-        stats = {hp=45, atk=65, def=34, spa=40, spd=34, spe=45},
-        skills = {10001, 20004, 20006, 10011},
-    },
-}
-
--- ==================== 精灵数据获取 ====================
-
--- 获取精灵基础数据（优先从 monsters.json）
--- 获取精灵基础数据
-function Pets.getData(petId)
-    local pet = petsMap[petId]
-    if pet then
-        -- Return skills as list of IDs for compatibility
-        local skillIds = {}
-        for _, m in ipairs(pet.learnableMoves) do
-            table.insert(skillIds, m.id)
-        end
-        return {
-            name = pet.name,
-            element = pet.element,
-            stats = pet.stats,
-            skills = skillIds
-        }
+-- 获取精灵数据
+function SeerPets.get(petId)
+    if not SeerPets.loaded then
+        SeerPets.load()
     end
-    -- 回退到内置数据
-    return Pets.BASE_STATS[petId]
+    return SeerPets.pets[petId]
+end
+
+-- 获取精灵的所有可学习技能
+function SeerPets.getLearnableMoves(petId, level)
+    local pet = SeerPets.get(petId)
+    if not pet then return {} end
+    
+    local moves = {}
+    for _, move in ipairs(pet.learnableMoves) do
+        if not level or move.level <= level then
+            table.insert(moves, move)
+        end
+    end
+    return moves
+end
+
+-- 检查精灵是否可以学习某个技能
+function SeerPets.canLearnMove(petId, moveId)
+    local pet = SeerPets.get(petId)
+    if not pet then return false end
+    
+    -- 检查可学习技能
+    for _, move in ipairs(pet.learnableMoves) do
+        if move.id == moveId then
+            return true
+        end
+    end
+    
+    -- 检查额外技能
+    for _, id in ipairs(pet.extraMoves) do
+        if id == moveId then
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- 获取精灵的进化链
+function SeerPets.getEvolutionChain(petId)
+    local chain = {}
+    local current = petId
+    
+    -- 向前追溯到最初形态
+    while current do
+        local pet = SeerPets.get(current)
+        if not pet or pet.evolvesFrom == 0 then
+            break
+        end
+        current = pet.evolvesFrom
+    end
+    
+    -- 从最初形态开始构建进化链
+    while current do
+        table.insert(chain, current)
+        local pet = SeerPets.get(current)
+        if not pet or pet.evolvesTo == 0 then
+            break
+        end
+        current = pet.evolvesTo
+    end
+    
+    return chain
+end
+
+-- 检查精灵是否可以进化
+function SeerPets.canEvolve(petId, level, hasItem)
+    local pet = SeerPets.get(petId)
+    if not pet or pet.evolvesTo == 0 then
+        return false, "无法进化"
+    end
+    
+    -- 检查等级
+    if pet.evolvingLv > 0 and level < pet.evolvingLv then
+        return false, string.format("需要等级 %d", pet.evolvingLv)
+    end
+    
+    -- 检查道具
+    if pet.evolvItem > 0 and not hasItem then
+        return false, string.format("需要道具 ID:%d", pet.evolvItem)
+    end
+    
+    -- 检查进化舱
+    if pet.evolveBabin == 1 then
+        return false, "需要在进化舱进化"
+    end
+    
+    return true, pet.evolvesTo
+end
+
+-- 获取精灵的真实ID (用于资源加载)
+function SeerPets.getRealId(petId)
+    local pet = SeerPets.get(petId)
+    if not pet then return petId end
+    return pet.realId > 0 and pet.realId or petId
+end
+
+-- 解析努力值字符串
+function SeerPets.parseYieldingEV(evString)
+    local ev = {hp = 0, atk = 0, def = 0, spAtk = 0, spDef = 0, spd = 0}
+    local values = {}
+    for num in string.gmatch(evString, "([^,]+)") do
+        table.insert(values, tonumber(num) or 0)
+    end
+    if #values >= 6 then
+        ev.hp, ev.atk, ev.def, ev.spAtk, ev.spDef, ev.spd = 
+            values[1], values[2], values[3], values[4], values[5], values[6]
+    end
+    return ev
+end
+
+-- 打印精灵信息 (调试用)
+function SeerPets.printInfo(petId)
+    local pet = SeerPets.get(petId)
+    if not pet then
+        print(string.format("\27[31m精灵 ID:%d 不存在\27[0m", petId))
+        return
+    end
+    
+    print(string.format("\27[36m========== 精灵信息: %s (ID:%d) ==========\27[0m", pet.defName, pet.id))
+    print(string.format("属性: %d%s", pet.type, pet.type2 > 0 and ("/" .. pet.type2) or ""))
+    print(string.format("种族值: HP:%d 攻:%d 防:%d 特攻:%d 特防:%d 速度:%d", 
+        pet.hp, pet.atk, pet.def, pet.spAtk, pet.spDef, pet.spd))
+    print(string.format("进化: 来自:%d 进化为:%d (Lv%d)", 
+        pet.evolvesFrom, pet.evolvesTo, pet.evolvingLv))
+    print(string.format("捕获率: %d", pet.catchRate))
+    print(string.format("可学习技能数: %d", #pet.learnableMoves))
+    print("\27[36m" .. string.rep("=", 50) .. "\27[0m")
 end
 
 -- 获取精灵名称
-function Pets.getName(petId)
-    local pet = petsMap[petId]
+function SeerPets.getName(petId)
+    if not SeerPets.loaded then
+        SeerPets.load()
+    end
+    local pet = SeerPets.get(petId)
     if pet then
-        return pet.name
+        return pet.defName
     end
-    local data = Pets.BASE_STATS[petId]
-    return data and data.name or ("精灵#" .. petId)
+    -- 返回默认名称
+    return string.format("精灵#%d", petId or 0)
 end
 
--- 获取精灵属性类型
-function Pets.getElement(petId)
-    local pet = petsMap[petId]
-    if pet then
-        return pet.element
-    end
-    local data = Pets.BASE_STATS[petId]
-    return data and data.element or Elements.TYPE.NORMAL
+-- 获取精灵数据 (别名，兼容旧代码)
+function SeerPets.getData(petId)
+    return SeerPets.get(petId)
 end
 
--- 获取精灵种族值
-function Pets.getBaseStats(petId)
-    local pet = petsMap[petId]
-    if pet then
-        return pet.stats
-    end
-    local data = Pets.BASE_STATS[petId]
-    if data then
-        return data.stats
-    end
-    -- 默认种族值
-    return {hp=50, atk=50, def=50, spa=50, spd=50, spe=50}
-end
-
--- 获取精灵默认技能（根据等级）
-function Pets.getDefaultSkills(petId, level)
-    level = level or 100
-    local pet = petsMap[petId]
-    if pet and pet.learnableMoves then
-        local skills = {}
-        for _, move in ipairs(pet.learnableMoves) do
-            if move.level <= level then
-                table.insert(skills, move.id)
-            end
-        end
-        -- Return last 4
-        local result = {}
-        local len = #skills
-        for i = math.max(1, len - 3), len do
-            table.insert(result, skills[i])
-        end
-        -- Pad with 0
-        while #result < 4 do
-            table.insert(result, 0)
-        end
-        return result
-    end
-    local data = Pets.BASE_STATS[petId]
-    if data and data.skills then
-        return data.skills
-    end
-    return {10001, 0, 0, 0}  -- 默认只有撞击
-end
-
--- 检查精灵是否存在
-function Pets.exists(petId)
-    return petsMap[petId] ~= nil
-end
-
--- 获取指定等级的属性 (适配 SeerMonsters API)
-function Pets.getStats(petId, level, iv)
-    local baseStats = Pets.getBaseStats(petId)
-    local ev = {hp=0, atk=0, def=0, spa=0, spd=0, spe=0}
-    local natureId = 0 -- 平衡
-    return Algorithm.calculateStats(baseStats, level, iv or 31, ev, natureId)
-end
-
--- 获取指定等级的可学技能
-function Pets.getSkillsForLevel(petId, level)
-    return Pets.getDefaultSkills(petId, level)
-end
-
--- ==================== 精灵实例创建 ====================
-
--- 创建一个精灵实例（用于新手宠物、野生精灵等）
--- petId: 精灵ID
--- level: 等级
--- iv: 个体值 (0-31)，nil则随机
--- ev: 学习力，nil则为0
--- natureId: 性格ID，nil则随机
-function Pets.createInstance(petId, level, iv, ev, natureId)
-    local baseStats = Pets.getBaseStats(petId)
-    local name = Pets.getName(petId)
-    local element = Pets.getElement(petId)
-    local skills = Pets.getDefaultSkills(petId, level)
-    
-    -- 随机个体值 (0-31)
-    if iv == nil then
-        iv = math.random(0, 31)
+-- 计算精灵属性值
+-- 公式: HP = floor((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 等级 + 10
+--      其他 = floor((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 5
+function SeerPets.getStats(petId, level, dv, ev)
+    local pet = SeerPets.get(petId)
+    if not pet then
+        return {hp = 20, maxHp = 20, attack = 10, defence = 10, spAtk = 10, spDef = 10, speed = 10}
     end
     
-    -- 默认无学习力
-    if ev == nil then
-        ev = {hp=0, atk=0, def=0, spa=0, spd=0, spe=0}
+    level = level or 1
+    dv = dv or 31
+    ev = ev or {hp = 0, atk = 0, def = 0, spAtk = 0, spDef = 0, spd = 0}
+    
+    -- 如果ev是数字，转换为表
+    if type(ev) == "number" then
+        local evValue = ev
+        ev = {hp = evValue, atk = evValue, def = evValue, spAtk = evValue, spDef = evValue, spd = evValue}
     end
     
-    -- 随机性格
-    if natureId == nil then
-        natureId = Natures.random()
-    end
-    
-    -- 计算实际属性
-    local stats = Algorithm.calculateStats(baseStats, level, iv, ev, natureId)
+    -- 计算各项属性
+    local hp = math.floor((pet.hp * 2 + dv + (ev.hp or 0) / 4) * level / 100) + level + 10
+    local attack = math.floor((pet.atk * 2 + dv + (ev.atk or 0) / 4) * level / 100) + 5
+    local defence = math.floor((pet.def * 2 + dv + (ev.def or 0) / 4) * level / 100) + 5
+    local spAtk = math.floor((pet.spAtk * 2 + dv + (ev.spAtk or 0) / 4) * level / 100) + 5
+    local spDef = math.floor((pet.spDef * 2 + dv + (ev.spDef or 0) / 4) * level / 100) + 5
+    local speed = math.floor((pet.spd * 2 + dv + (ev.spd or 0) / 4) * level / 100) + 5
     
     return {
-        id = petId,
-        name = name,
-        element = element,
-        level = level,
-        iv = iv,  -- 个体值
-        nature = natureId,
-        ev = ev,
-        -- 六维属性
+        hp = hp,
+        maxHp = hp,
+        attack = attack,
+        defence = defence,
+        spAtk = spAtk,
+        spDef = spDef,
+        speed = speed
+    }
+end
+
+-- 获取精灵在指定等级可以学会的技能
+function SeerPets.getSkillsForLevel(petId, level)
+    local pet = SeerPets.get(petId)
+    if not pet then return {} end
+    
+    local skills = {}
+    for _, move in ipairs(pet.learnableMoves) do
+        if move.level <= level then
+            table.insert(skills, move.id)
+        end
+    end
+    
+    -- 最多返回4个技能（最新学会的4个）
+    local result = {}
+    local startIdx = math.max(1, #skills - 3)
+    for i = startIdx, #skills do
+        table.insert(result, skills[i])
+    end
+    
+    -- 补齐到4个
+    while #result < 4 do
+        table.insert(result, 0)
+    end
+    
+    return result
+end
+
+-- 获取经验信息
+-- 返回: {currentLevelExp, nextLevelExp, totalExp}
+function SeerPets.getExpInfo(petId, level, currentLevelExp)
+    local pet = SeerPets.get(petId)
+    if not pet then
+        return {currentLevelExp = 0, nextLevelExp = 100, totalExp = 0}
+    end
+    
+    -- 经验计算公式（简化版）
+    -- 不同成长类型有不同的经验曲线
+    local growthType = pet.growthType or 0
+    
+    -- 计算升到下一级所需经验
+    local nextLevelExp = 0
+    if growthType == 0 then
+        -- 快速成长
+        nextLevelExp = math.floor(level * level * level * 0.8)
+    elseif growthType == 1 then
+        -- 中速成长
+        nextLevelExp = math.floor(level * level * level)
+    elseif growthType == 2 then
+        -- 慢速成长
+        nextLevelExp = math.floor(level * level * level * 1.2)
+    elseif growthType == 3 then
+        -- 极慢成长
+        nextLevelExp = math.floor(level * level * level * 1.5)
+    else
+        -- 默认
+        nextLevelExp = math.floor(level * level * level)
+    end
+    
+    -- 计算总经验
+    local totalExp = 0
+    for lv = 1, level - 1 do
+        if growthType == 0 then
+            totalExp = totalExp + math.floor(lv * lv * lv * 0.8)
+        elseif growthType == 1 then
+            totalExp = totalExp + math.floor(lv * lv * lv)
+        elseif growthType == 2 then
+            totalExp = totalExp + math.floor(lv * lv * lv * 1.2)
+        elseif growthType == 3 then
+            totalExp = totalExp + math.floor(lv * lv * lv * 1.5)
+        else
+            totalExp = totalExp + math.floor(lv * lv * lv)
+        end
+    end
+    totalExp = totalExp + (currentLevelExp or 0)
+    
+    return {
+        currentLevelExp = currentLevelExp or 0,
+        nextLevelExp = nextLevelExp,
+        totalExp = totalExp
+    }
+end
+
+--- 创建新手精灵实例
+--- 返回一个包含完整属性的精灵对象
+function SeerPets.createStarterPet(petId, level)
+    level = level or 5
+    local pet = SeerPets.get(petId)
+    
+    -- 如果数据库加载失败，返回默认值
+    if not pet then
+        print(string.format("\27[31m[SeerPets] 警告: 精灵 %d 数据不存在，使用默认值\27[0m", petId))
+        return {
+            name = "",  -- 空名字（野生精灵）
+            iv = 31,
+            nature = math.random(0, 24),
+            exp = 0,
+            hp = 100,
+            maxHp = 100,
+            attack = 20,
+            defence = 20,
+            s_a = 20,
+            s_d = 20,
+            speed = 20,
+            ev = {hp = 0, atk = 0, def = 0, spa = 0, spd = 0, spe = 0},
+            skills = {10001, 0, 0, 0},  -- 默认技能：撞击
+            catchMap = 301,
+            catchLevel = level
+        }
+    end
+    
+    -- 生成随机个体值和性格
+    local iv = math.random(0, 31)
+    local nature = math.random(0, 24)
+    
+    -- 计算属性
+    local stats = SeerPets.getStats(petId, level, iv, {hp=0, atk=0, def=0, spAtk=0, spDef=0, spd=0})
+    
+    -- 获取技能
+    local skills = SeerPets.getSkillsForLevel(petId, level)
+    
+    return {
+        name = "",  -- 野生精灵名字为空
+        iv = iv,
+        nature = nature,
+        exp = 0,
         hp = stats.hp,
         maxHp = stats.hp,
         attack = stats.atk,
         defence = stats.def,
-        s_a = stats.spa,
-        s_d = stats.spd,
-        speed = stats.spe,
-        -- 技能
+        s_a = stats.spAtk,
+        s_d = stats.spDef,
+        speed = stats.spd,
+        ev = {hp = 0, atk = 0, def = 0, spa = 0, spd = 0, spe = 0},
         skills = skills,
-        -- 经验
-        exp = 0,
-        -- 捕获信息
-        catchTime = os.time(),
         catchMap = 301,
-        catchLevel = level,
+        catchLevel = level
     }
 end
 
--- 创建新手精灵（满个体值31，平衡性格）
--- 创建新手精灵（满个体值31，平衡性格）
-function Pets.createStarterPet(petId, level)
-    level = level or 5
-    return Pets.createInstance(petId, level, 31, nil, 21)  -- 31个体，害羞性格
+--- 检查精灵是否存在
+function SeerPets.exists(petId)
+    return SeerPets.pets[petId] ~= nil
 end
 
--- 创建野生精灵（随机个体值和性格）
-function Pets.createWildPet(petId, level)
-    return Pets.createInstance(petId, level, nil, nil, nil)
-end
-
--- ==================== 调试函数 ====================
-
--- 打印精灵信息
-function Pets.printInfo(pet)
-    print(string.format("========== %s (ID:%d) ==========", pet.name, pet.id))
-    print(string.format("等级: %d  属性: %s", pet.level, Elements.getTypeName(pet.element)))
-    print(string.format("个体值: %d  性格: %s", pet.iv, Natures.getName(pet.nature)))
-    print(string.format("HP: %d/%d", pet.hp, pet.maxHp))
-    print(string.format("攻击: %d  防御: %d", pet.attack, pet.defence))
-    print(string.format("特攻: %d  特防: %d", pet.s_a, pet.s_d))
-    print(string.format("速度: %d", pet.speed))
-    print("================================")
-end
-
--- 测试三只新手精灵
-function Pets.testStarters()
-    print("\n===== 新手精灵属性测试 (Lv5, 满个体31, 平衡性格) =====\n")
-    
-    local starters = {1, 7, 4}  -- 布布种子, 小火猴, 伊优
-    for _, petId in ipairs(starters) do
-        local pet = Pets.createStarterPet(petId, 5)
-        Pets.printInfo(pet)
-        print()
-    end
-end
-
--- ==================== 经验计算系统 ====================
-
--- 经验曲线类型 (GrowthType)
--- 1: 快速, 2: 较快, 3: 中等, 4: 较慢, 5: 慢速, 6: 极慢
-local expCurves = {
-    [1] = function(lv) return math.floor(0.8 * lv * lv * lv) end,           -- 快速
-    [2] = function(lv) return math.floor(lv * lv * lv) end,                  -- 较快
-    [3] = function(lv) return math.floor(1.25 * lv * lv * lv) end,          -- 中等
-    [4] = function(lv) return math.floor(1.5 * lv * lv * lv) end,           -- 较慢
-    [5] = function(lv) return math.floor(2 * lv * lv * lv) end,             -- 慢速
-    [6] = function(lv) return math.floor(2.5 * lv * lv * lv) end,           -- 极慢
-}
-
--- 计算升到指定等级所需的总经验
-function Pets.getTotalExpForLevel(petId, level)
-    local pet = petsMap[petId]
-    local growthType = pet and pet.growthType or 3
-    local curve = expCurves[growthType] or expCurves[3]
-    return curve(level)
-end
-
--- 计算当前等级所需经验和下一级所需经验
-function Pets.getExpInfo(petId, level, currentLevelExp)
-    local expForCurrentLevel = Pets.getTotalExpForLevel(petId, level)
-    local expForNextLevel = Pets.getTotalExpForLevel(petId, level + 1)
-    
-    currentLevelExp = currentLevelExp or 0
-    if currentLevelExp < 0 then currentLevelExp = 0 end
-    
-    local nextLvExp = expForNextLevel - expForCurrentLevel
-    
-    return {
-        lvExp = currentLevelExp,
-        nextLvExp = nextLvExp,
-        exp = currentLevelExp,
-        totalExp = expForCurrentLevel + currentLevelExp
-    }
-end
-
-return Pets
+return SeerPets
