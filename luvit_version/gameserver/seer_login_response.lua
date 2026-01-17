@@ -74,7 +74,13 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 4
     
     -- energy (4 bytes)
-    basic:wuint(pos, user.energy or 100)
+    -- Battery functional usually powered by nono energy or daily limit?
+    -- Official server uses nono energy here if available?
+    local energy = 100
+    if user.nono and user.nono.energy then energy = user.nono.energy end
+    if user.energy then energy = user.energy end
+    
+    basic:wuint(pos, energy)
     pos = pos + 4
     
     -- fireBuff (1 byte)
@@ -141,16 +147,18 @@ function SeerLoginResponse.makeLoginResponse(user)
     basic:wuint(pos, user.posY or 300)
     pos = pos + 4
     
-    -- timeToday (4 bytes)
-    basic:wuint(pos, os.time())
+    -- timeToday (4 bytes) - 今天已使用的游戏时间（秒）
+    -- 设为0表示今天尚未使用任何时间
+    basic:wuint(pos, 0)
     pos = pos + 4
     
     -- lastLoginTime (4 bytes)
     basic:wuint(pos, os.time() - 3600)
     pos = pos + 4
     
-    -- timeLimit (4 bytes)
-    basic:wuint(pos, 0)
+    -- timeLimit (4 bytes) - 每日游戏时间限制（秒）
+    -- 设为0xFFFFFFFF表示无限制，否则客户端会计算剩余时间并触发电量耗尽提示
+    basic:wuint(pos, 0xFFFFFFFF)
     pos = pos + 4
     
     -- logintimeThisTime (4 bytes)
@@ -263,23 +271,25 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 4
     
     -- petAllNum (4 bytes)
-    buf:wuint(pos, 10)
+    buf:wuint(pos, user.petAllNum or 10)
     pos = pos + 4
     
+    local ach = user.achievements or {total=0, rank=0}
+    
     -- totalAchieve (4 bytes)
-    buf:wuint(pos, 0)
+    buf:wuint(pos, ach.total or 0)
     pos = pos + 4
     
     -- curTitle (4 bytes)
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.curTitle or 0)
     pos = pos + 4
     
     -- achieRank (4 bytes)
-    buf:wuint(pos, 0)
+    buf:wuint(pos, ach.rank or 0)
     pos = pos + 4
     
     -- monKingWin (4 bytes)
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.monKingWin or 0)
     pos = pos + 4
     
     -- teamBoss (4 bytes)
@@ -440,16 +450,20 @@ function SeerLoginResponse.makeLoginResponse(user)
     -- ========== superNono ~ nonoNick (UserInfo 961-970) ==========
     local nonoBuf = buffer.Buffer:new(28)
     pos = 1
-    nonoBuf:wuint(pos, user.superNono and 1 or 0)
+    
+    local nono = user.nono or {}
+    local isSuper = nono.isSuper or user.superNono
+    
+    nonoBuf:wuint(pos, isSuper and 1 or 0)
     pos = pos + 4
     
-    nonoBuf:wuint(pos, 0) -- nonoState (flags)
+    nonoBuf:wuint(pos, nono.flag or 0) -- nonoState (flags)
     pos = pos + 4
     
-    nonoBuf:wuint(pos, user.nonoColor or 0)
+    nonoBuf:wuint(pos, nono.color or user.nonoColor or 0)
     pos = pos + 4
     
-    nonoBuf:write(pos, user.nonoNick or "NoNo", 16)
+    nonoBuf:write(pos, nono.nick or user.nonoNick or "NoNo", 16)
     pos = pos + 16
     
     parts[#parts+1] = tostring(nonoBuf)
@@ -491,9 +505,29 @@ function SeerLoginResponse.makeLoginResponse(user)
     parts[#parts+1] = string.rep("\0", 20)
     
     -- ========== TasksManager (UserInfo 980-1003) ==========
-    -- Loop 1000 times: readUnsignedByte.
-    -- Total 1000 bytes.
-    parts[#parts+1] = string.rep("\0", 1000)
+    -- Loop 1000 times: readUnsignedByte. Total 1000 bytes.
+    local taskBuf = buffer.Buffer:new(1000)
+    -- 初始化全0
+    for i = 1, 1000 do
+        taskBuf:wbyte(i, 0)
+    end
+    
+    -- 从数据库填充任务状态
+    if user.tasks then
+        for taskIdStr, taskData in pairs(user.tasks) do
+            local tid = tonumber(taskIdStr)
+            if tid and tid >= 1 and tid <= 1000 then
+                local status = 0
+                if taskData.status == "accepted" then
+                    status = 1 -- ALR_ACCEPT
+                elseif taskData.status == "completed" then
+                    status = 3 -- COMPLETE
+                end
+                taskBuf:wbyte(tid, status)
+            end
+        end
+    end
+    parts[#parts+1] = tostring(taskBuf)
     
     -- ========== PetManager (UserInfo 1005+) ==========
     local petBuf = buffer.Buffer:new(8)
@@ -557,8 +591,9 @@ function SeerLoginResponse.makeLoginResponse(user)
     -- 如果UserInfo不多读，MainEntry读取第一个KeySeed，忽略第二个。
     -- 如果UserInfo多读（吞掉第一个），MainEntry读取第二个KeySeed。
     -- 两个KeySeed相同，保证Key一致。
+    -- 两个KeySeed相同，保证Key一致。
     local keySeed = buffer.Buffer:new(8)
-    local randomNum = math.random(1, 0x7FFFFFFF)
+    local randomNum = 0 -- math.random(1, 0x7FFFFFFF) -- 使用0关闭客户端加密
     keySeed:wuint(1, randomNum)
     keySeed:wuint(5, randomNum)
     parts[#parts+1] = tostring(keySeed)

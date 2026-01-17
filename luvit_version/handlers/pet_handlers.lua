@@ -3,7 +3,9 @@
 
 local Utils = require('./utils')
 local Pets = require('../seer_pets')
-local Monsters = require('../seer_monsters')
+local Pets = require('../seer_pets')
+-- local Monsters = require('../seer_monsters') -- Not used for skills anymore
+local Skills = require('../seer_skills')
 local writeUInt32BE = Utils.writeUInt32BE
 local writeUInt16BE = Utils.writeUInt16BE
 local readUInt32BE = Utils.readUInt32BE
@@ -13,7 +15,10 @@ local buildResponse = Utils.buildResponse
 local PetHandlers = {}
 
 -- 初始化时加载精灵数据库
-Monsters.load()
+-- 初始化时加载数据库
+-- Monsters.load()
+Skills.load()
+Pets.load()
 
 -- ==================== 精灵数据构建 ====================
 
@@ -31,9 +36,10 @@ local function buildFullPetInfo(petId, catchTime, level)
     body = body .. writeUInt32BE(pet.iv)         -- dv (个体值)
     body = body .. writeUInt32BE(pet.nature)     -- nature (性格)
     body = body .. writeUInt32BE(level)          -- level
-    body = body .. writeUInt32BE(pet.exp)        -- exp
-    body = body .. writeUInt32BE(0)              -- lvExp
-    body = body .. writeUInt32BE(1000)           -- nextLvExp
+    local expInfo = Pets.getExpInfo(petId, level, pet.exp)
+    body = body .. writeUInt32BE(expInfo.exp)        -- exp
+    body = body .. writeUInt32BE(expInfo.lvExp)      -- lvExp
+    body = body .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp
     body = body .. writeUInt32BE(pet.hp)         -- hp
     body = body .. writeUInt32BE(pet.maxHp)      -- maxHp
     body = body .. writeUInt32BE(pet.attack)     -- attack
@@ -49,13 +55,24 @@ local function buildFullPetInfo(petId, catchTime, level)
     body = body .. writeUInt32BE(pet.ev.spa)     -- ev_sa
     body = body .. writeUInt32BE(pet.ev.spd)     -- ev_sd
     body = body .. writeUInt32BE(pet.ev.spe)     -- ev_sp
-    body = body .. writeUInt32BE(4)              -- skillNum
-    -- 4个技能槽 (id + pp)
-    local skills = pet.skills or {10001, 0, 0, 0}
-    body = body .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(30)
-    body = body .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(25)
-    body = body .. writeUInt32BE(skills[3] or 0) .. writeUInt32BE(20)
-    body = body .. writeUInt32BE(skills[4] or 0) .. writeUInt32BE(15)
+    -- 过滤有效技能
+    local validSkills = {}
+    local rawSkills = pet.skills or {10001, 0, 0, 0}
+    for i = 1, 4 do
+        local sid = rawSkills[i] or 0
+        if sid > 0 then
+            table.insert(validSkills, sid)
+        end
+    end
+    
+    body = body .. writeUInt32BE(#validSkills)   -- skillNum
+    
+    -- 写入有效技能
+    for _, sid in ipairs(validSkills) do
+        local skill = Skills.get(sid) -- 获取技能信息
+        local pp = skill and skill.pp or 20
+        body = body .. writeUInt32BE(sid) .. writeUInt32BE(pp)
+    end
     body = body .. writeUInt32BE(catchTime)      -- catchTime
     body = body .. writeUInt32BE(pet.catchMap)   -- catchMap
     body = body .. writeUInt32BE(0)              -- catchRect
@@ -84,13 +101,23 @@ local function buildSimplePetInfo(petId, level, hp, maxHp, catchTime)
     body = body .. writeUInt32BE(level)          -- level (4)
     body = body .. writeUInt32BE(hp)             -- hp (4)
     body = body .. writeUInt32BE(maxHp)          -- maxHp (4)
-    body = body .. writeUInt32BE(4)              -- skillNum (4)
-    -- 4个技能槽 (id + pp) = 32字节
-    local skills = pet.skills or {10001, 0, 0, 0}
-    body = body .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(30)
-    body = body .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(25)
-    body = body .. writeUInt32BE(skills[3] or 0) .. writeUInt32BE(20)
-    body = body .. writeUInt32BE(skills[4] or 0) .. writeUInt32BE(15)
+    -- 过滤有效技能
+    local validSkills = {}
+    local rawSkills = pet.skills or {10001, 0, 0, 0}
+    for i = 1, 4 do
+        local sid = rawSkills[i] or 0
+        if sid > 0 then
+            table.insert(validSkills, sid)
+        end
+    end
+
+    body = body .. writeUInt32BE(#validSkills)   -- skillNum
+    
+    -- 写入有效技能
+    for _, sid in ipairs(validSkills) do
+        -- 简化版我们也尽量给个合理PP
+        body = body .. writeUInt32BE(sid) .. writeUInt32BE(20) 
+    end
     body = body .. writeUInt32BE(catchTime)      -- catchTime (4)
     body = body .. writeUInt32BE(301)            -- catchMap (4)
     body = body .. writeUInt32BE(0)              -- catchRect (4)
@@ -226,7 +253,15 @@ local function handlePetBargeList(ctx)
     end
     
     -- 获取所有精灵ID（从数据库）
-    local allPetIds = Monsters.getAllIds()
+    -- local allPetIds = Monsters.getAllIds()
+    -- Use raw loop or implement getAllIds in SeerPets (which relies on petsMap)
+    -- As a temporary fix, iterate 1 to 2000 checking existence
+    local allPetIds = {}
+    for i=1, 2000 do
+        if Pets.exists(i) then
+            table.insert(allPetIds, i)
+        end
+    end
     
     -- 构建图鉴列表
     -- 只返回用户有记录的精灵（遭遇过、捕获过或击败过）

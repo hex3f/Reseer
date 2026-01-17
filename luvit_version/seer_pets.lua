@@ -2,18 +2,77 @@
 -- 包含精灵种族值、属性、进化链等信息
 -- 优先从 data/monsters.json 加载，回退到内置数据
 
+local fs = require('fs')
 local Elements = require('./seer_elements')
 local Algorithm = require('./seer_algorithm')
 local Natures = require('./seer_natures')
+-- Try to load xml_parser from gameserver directory
+local xml_parser = require('./gameserver/xml_parser')
 
 local Pets = {}
+local petsMap = {}
 
--- 尝试加载 monsters.json 数据
-local Monsters = nil
-pcall(function()
-    Monsters = require('./seer_monsters')
-    Monsters.load()
-end)
+function Pets.load()
+    print("Loading pets from data/pets.xml...")
+    local data = fs.readFileSync("data/pets.xml")
+    if not data then 
+        print("Error: data/pets.xml not found")
+        return 
+    end
+    
+    local parser = xml_parser:new()
+    local tree = parser:parse(data)
+    
+    if not tree or tree.name ~= "Monsters" then
+        print("Error: Invalid pets.xml format")
+        return
+    end
+    
+    local count = 0
+    for _, node in ipairs(tree.children) do
+        if node.name == "Monster" and node.attributes then
+            local id = tonumber(node.attributes.ID)
+            if id then
+                local pet = {
+                    id = id,
+                    name = node.attributes.DefName,
+                    element = tonumber(node.attributes.Type),
+                    growthType = tonumber(node.attributes.GrowthType) or 3,  -- Add GrowthType
+                    stats = {
+                        hp = tonumber(node.attributes.HP),
+                        atk = tonumber(node.attributes.Atk),
+                        def = tonumber(node.attributes.Def),
+                        spa = tonumber(node.attributes.SpAtk),
+                        spd = tonumber(node.attributes.SpDef),
+                        spe = tonumber(node.attributes.Spd)
+                    },
+                    learnableMoves = {}
+                }
+                
+                -- Parse moves
+                for _, child in ipairs(node.children) do
+                    if child.name == "LearnableMoves" then
+                        for _, moveNode in ipairs(child.children) do
+                            if moveNode.name == "Move" then
+                                table.insert(pet.learnableMoves, {
+                                    id = tonumber(moveNode.attributes.ID),
+                                    level = tonumber(moveNode.attributes.LearningLv)
+                                })
+                            end
+                        end
+                    end
+                end
+                
+                -- Sort moves by level
+                table.sort(pet.learnableMoves, function(a, b) return a.level < b.level end)
+                
+                petsMap[id] = pet
+                count = count + 1
+            end
+        end
+    end
+    print("Loaded " .. count .. " pets from XML.")
+end
 
 -- ==================== 精灵种族值数据 (内置备份) ====================
 -- 格式: {hp, atk, def, spa, spd, spe}
@@ -105,18 +164,21 @@ Pets.BASE_STATS = {
 -- ==================== 精灵数据获取 ====================
 
 -- 获取精灵基础数据（优先从 monsters.json）
+-- 获取精灵基础数据
 function Pets.getData(petId)
-    -- 优先从 monsters.json 获取
-    if Monsters then
-        local monsterData = Monsters.get(petId)
-        if monsterData then
-            return {
-                name = monsterData.name,
-                element = monsterData.type,
-                stats = monsterData.baseStats,
-                skills = Monsters.getMovesAtLevel(petId, 100),  -- 获取所有可学技能
-            }
+    local pet = petsMap[petId]
+    if pet then
+        -- Return skills as list of IDs for compatibility
+        local skillIds = {}
+        for _, m in ipairs(pet.learnableMoves) do
+            table.insert(skillIds, m.id)
         end
+        return {
+            name = pet.name,
+            element = pet.element,
+            stats = pet.stats,
+            skills = skillIds
+        }
     end
     -- 回退到内置数据
     return Pets.BASE_STATS[petId]
@@ -124,11 +186,9 @@ end
 
 -- 获取精灵名称
 function Pets.getName(petId)
-    if Monsters then
-        local name = Monsters.getName(petId)
-        if name ~= "未知精灵" then
-            return name
-        end
+    local pet = petsMap[petId]
+    if pet then
+        return pet.name
     end
     local data = Pets.BASE_STATS[petId]
     return data and data.name or ("精灵#" .. petId)
@@ -136,11 +196,9 @@ end
 
 -- 获取精灵属性类型
 function Pets.getElement(petId)
-    if Monsters then
-        local monsterData = Monsters.get(petId)
-        if monsterData then
-            return monsterData.type
-        end
+    local pet = petsMap[petId]
+    if pet then
+        return pet.element
     end
     local data = Pets.BASE_STATS[petId]
     return data and data.element or Elements.TYPE.NORMAL
@@ -148,11 +206,9 @@ end
 
 -- 获取精灵种族值
 function Pets.getBaseStats(petId)
-    if Monsters then
-        local stats = Monsters.getBaseStats(petId)
-        if stats then
-            return stats
-        end
+    local pet = petsMap[petId]
+    if pet then
+        return pet.stats
     end
     local data = Pets.BASE_STATS[petId]
     if data then
@@ -165,11 +221,25 @@ end
 -- 获取精灵默认技能（根据等级）
 function Pets.getDefaultSkills(petId, level)
     level = level or 100
-    if Monsters then
-        local moves = Monsters.getMovesAtLevel(petId, level)
-        if #moves > 0 then
-            return moves
+    local pet = petsMap[petId]
+    if pet and pet.learnableMoves then
+        local skills = {}
+        for _, move in ipairs(pet.learnableMoves) do
+            if move.level <= level then
+                table.insert(skills, move.id)
+            end
         end
+        -- Return last 4
+        local result = {}
+        local len = #skills
+        for i = math.max(1, len - 3), len do
+            table.insert(result, skills[i])
+        end
+        -- Pad with 0
+        while #result < 4 do
+            table.insert(result, 0)
+        end
+        return result
     end
     local data = Pets.BASE_STATS[petId]
     if data and data.skills then
@@ -180,10 +250,20 @@ end
 
 -- 检查精灵是否存在
 function Pets.exists(petId)
-    if Monsters and Monsters.exists(petId) then
-        return true
-    end
-    return Pets.BASE_STATS[petId] ~= nil
+    return petsMap[petId] ~= nil
+end
+
+-- 获取指定等级的属性 (适配 SeerMonsters API)
+function Pets.getStats(petId, level, iv)
+    local baseStats = Pets.getBaseStats(petId)
+    local ev = {hp=0, atk=0, def=0, spa=0, spd=0, spe=0}
+    local natureId = 0 -- 平衡
+    return Algorithm.calculateStats(baseStats, level, iv or 31, ev, natureId)
+end
+
+-- 获取指定等级的可学技能
+function Pets.getSkillsForLevel(petId, level)
+    return Pets.getDefaultSkills(petId, level)
 end
 
 -- ==================== 精灵实例创建 ====================
@@ -246,6 +326,7 @@ function Pets.createInstance(petId, level, iv, ev, natureId)
 end
 
 -- 创建新手精灵（满个体值31，平衡性格）
+-- 创建新手精灵（满个体值31，平衡性格）
 function Pets.createStarterPet(petId, level)
     level = level or 5
     return Pets.createInstance(petId, level, 31, nil, 21)  -- 31个体，害羞性格
@@ -280,6 +361,45 @@ function Pets.testStarters()
         Pets.printInfo(pet)
         print()
     end
+end
+
+-- ==================== 经验计算系统 ====================
+
+-- 经验曲线类型 (GrowthType)
+-- 1: 快速, 2: 较快, 3: 中等, 4: 较慢, 5: 慢速, 6: 极慢
+local expCurves = {
+    [1] = function(lv) return math.floor(0.8 * lv * lv * lv) end,           -- 快速
+    [2] = function(lv) return math.floor(lv * lv * lv) end,                  -- 较快
+    [3] = function(lv) return math.floor(1.25 * lv * lv * lv) end,          -- 中等
+    [4] = function(lv) return math.floor(1.5 * lv * lv * lv) end,           -- 较慢
+    [5] = function(lv) return math.floor(2 * lv * lv * lv) end,             -- 慢速
+    [6] = function(lv) return math.floor(2.5 * lv * lv * lv) end,           -- 极慢
+}
+
+-- 计算升到指定等级所需的总经验
+function Pets.getTotalExpForLevel(petId, level)
+    local pet = petsMap[petId]
+    local growthType = pet and pet.growthType or 3
+    local curve = expCurves[growthType] or expCurves[3]
+    return curve(level)
+end
+
+-- 计算当前等级所需经验和下一级所需经验
+function Pets.getExpInfo(petId, level, currentLevelExp)
+    local expForCurrentLevel = Pets.getTotalExpForLevel(petId, level)
+    local expForNextLevel = Pets.getTotalExpForLevel(petId, level + 1)
+    
+    currentLevelExp = currentLevelExp or 0
+    if currentLevelExp < 0 then currentLevelExp = 0 end
+    
+    local nextLvExp = expForNextLevel - expForCurrentLevel
+    
+    return {
+        lvExp = currentLevelExp,
+        nextLvExp = nextLvExp,
+        exp = currentLevelExp,
+        totalExp = expForCurrentLevel + currentLevelExp
+    }
 end
 
 return Pets

@@ -1,4 +1,4 @@
-﻿<!-- Type of Moves: 1 草, 2 水, 3 火, 4 飞行, 5 电, 6 机械, 7 地面, 8 普通, 9 冰, 10 超能, 11 战斗, 12 光, 13 暗影, 14 神秘, 15 龙, 16 圣灵-->
+<!-- Type of Moves: 1 草, 2 水, 3 火, 4 飞行, 5 电, 6 机械, 7 地面, 8 普通, 9 冰, 10 超能, 11 战斗, 12 光, 13 暗影, 14 神秘, 15 龙, 16 圣灵-->
 <!-- Category of Moves: 1 Physical, 2 Special, 4 Status -->
 <!-- MaxPP: 技能最大PP值。Power: 威力。Accuracy: 准确度。CritRate: 致命一击的概率，2表示2/16，默认是1。-->
 <!-- Battle_lv: atk(0), def(1), sp_atk(2), sp_def(3), spd(4), accuracy(5) -->
@@ -6650,4 +6650,3 @@
         <SideEffect ID="1001635" def="立刻恢复自身n点体力，k回合后恢复自身全部体力"/>
     </SideEffects>
 </MovesTbl>
-

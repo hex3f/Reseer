@@ -2,7 +2,7 @@
 -- 赛尔号战斗系统 - 完整实现
 -- 基于前端 PetFightDLL 代码分析
 
-local SeerMonsters = require('./seer_monsters')
+-- local SeerMonsters = require('./seer_monsters') -- Deprecated
 local SeerSkills = require('./seer_skills')
 local SkillEffects = require('./seer_skill_effects')
 
@@ -597,8 +597,26 @@ function SeerBattle.executeTurn(battle, playerSkillId)
     end
     
     local playerSkill = SeerSkills.get(playerSkillId) or {power = 40, type = 8, category = 1}
+    
+    -- 扣除玩家PP
+    for i, sid in ipairs(battle.player.skills) do
+        if sid == playerSkillId then
+            battle.player.skillPP[i] = math.max(0, (battle.player.skillPP[i] or 0) - 1)
+            -- if battle.player.skillPP[i] <= 0 then ... end (Assume client checks 0 PP)
+            break
+        end
+    end
+    
     local enemySkillId = SeerBattle.aiSelectSkill(battle.enemy, battle.player, battle.enemy.skills)
     local enemySkill = SeerSkills.get(enemySkillId) or {power = 40, type = 8, category = 1}
+    
+    -- 扣除敌人PP
+    for i, sid in ipairs(battle.enemy.skills) do
+        if sid == enemySkillId then
+            battle.enemy.skillPP[i] = math.max(0, (battle.enemy.skillPP[i] or 0) - 1)
+            break
+        end
+    end
     
     -- 处理回合开始时的状态效果
     local playerStatusDamage = SeerBattle.processStatusEffects(battle.player)

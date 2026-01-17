@@ -11,37 +11,20 @@ local buildResponse = Utils.buildResponse
 
 local FightHandlers = {}
 
--- ==================== 精灵属性数据 ====================
--- 精灵ID -> 属性ID (可扩展)
-local PET_ELEMENTS = {
-    [1] = Elements.TYPE.GRASS,      -- 布布种子 - 草
-    [2] = Elements.TYPE.GRASS,      -- 布布草 - 草
-    [3] = Elements.TYPE.GRASS,      -- 布布花 - 草
-    [4] = Elements.TYPE.WATER,      -- 伊优 - 水
-    [5] = Elements.TYPE.WATER,      -- 尤里安 - 水
-    [6] = Elements.TYPE.WATER,      -- 巴鲁斯 - 水
-    [7] = Elements.TYPE.FIRE,       -- 小火猴 - 火
-    [8] = Elements.TYPE.FIRE,       -- 烈火猴 - 火
-    [9] = Elements.TYPE.FIRE,       -- 烈焰猩猩 - 火
-    [58] = Elements.TYPE.NORMAL,    -- 新手BOSS - 普通
-}
-
--- 技能ID -> {属性ID, 威力} (可扩展)
-local SKILL_DATA = {
-    [1] = {type = Elements.TYPE.NORMAL, power = 40},    -- 撞击
-    [2] = {type = Elements.TYPE.GRASS, power = 50},     -- 藤鞭
-    [3] = {type = Elements.TYPE.WATER, power = 50},     -- 水枪
-    [4] = {type = Elements.TYPE.FIRE, power = 50},      -- 火花
-}
+local SeerPets = require('../seer_pets')
+local SeerSkills = require('../seer_skills')
+local SeerBattle = require('../seer_battle')
 
 -- 获取精灵属性
 function FightHandlers.getPetElement(petId)
-    return PET_ELEMENTS[petId] or Elements.TYPE.NORMAL
+    local pet = SeerPets.getData(petId)
+    return pet and pet.element or Elements.TYPE.NORMAL
 end
 
 -- 获取技能数据
 function FightHandlers.getSkillData(skillId)
-    return SKILL_DATA[skillId] or {type = Elements.TYPE.NORMAL, power = 40}
+    local skill = SeerSkills.get(skillId)
+    return skill or {type = Elements.TYPE.NORMAL, power = 40}
 end
 
 -- 计算伤害（包含属性克制和本系加成）
@@ -189,87 +172,73 @@ local function handleUseSkill(ctx)
     end
     
     local user = ctx.getOrCreateUser(ctx.userId)
-    local petId = user.currentPetId or 7
-    local bossId = user.currentBossId or NOVICE_BOSS_ID
     
-    -- 初始化战斗状态
-    user.fightState = user.fightState or {}
-    user.fightState.playerHp = user.fightState.playerHp or 100
-    user.fightState.playerMaxHp = user.fightState.playerMaxHp or 100
-    user.fightState.enemyHp = user.fightState.enemyHp or 50
-    user.fightState.enemyMaxHp = user.fightState.enemyMaxHp or 50
+    -- 尝试使用 localgameserver 创建的战斗实例
+    local battle = user.battle
     
-    -- 计算玩家对敌人的伤害（使用属性系统）
-    local baseDamage = 25
-    local playerDamage, effectiveness, stab = FightHandlers.calculateDamage(petId, bossId, skillId, baseDamage)
-    
-    -- 敌人反击伤害（简化：固定10点）
-    local enemyDamage = 10
-    
-    -- 更新HP
-    user.fightState.enemyHp = math.max(0, user.fightState.enemyHp - playerDamage)
-    user.fightState.playerHp = math.max(0, user.fightState.playerHp - enemyDamage)
-    
-    -- 判断暴击（10%几率）
-    local isCrit = math.random() < 0.1 and 1 or 0
-    if isCrit == 1 then
-        playerDamage = math.floor(playerDamage * 1.5)
-        user.fightState.enemyHp = math.max(0, user.fightState.enemyHp - math.floor(baseDamage * 0.5))
-    end
-    
-    -- 发送技能确认
+    -- 响应 CMD 2405 确认
     ctx.sendResponse(buildResponse(2405, ctx.userId, 0, ""))
     
-    -- 发送 NOTE_USE_SKILL (2505)
-    local body2505 = ""
-    body2505 = body2505 .. buildAttackValue(ctx.userId, skillId, 1, 0, 0, 
-        user.fightState.playerHp, user.fightState.playerMaxHp, isCrit)
-    body2505 = body2505 .. buildAttackValue(0, 0, 0, playerDamage, 0, 
-        user.fightState.enemyHp, user.fightState.enemyMaxHp, 0)
-    
-    ctx.sendResponse(buildResponse(2505, ctx.userId, 0, body2505))
-    
-    -- 检查战斗是否结束
-    local fightOver = false
-    local winnerId = 0
-    local reason = 0
-    
-    if user.fightState.enemyHp <= 0 then
-        fightOver = true
-        winnerId = ctx.userId
-        print("\27[32m[战斗] 玩家胜利!\27[0m")
-    elseif user.fightState.playerHp <= 0 then
-        fightOver = true
-        winnerId = 0
-        print("\27[31m[战斗] 玩家失败!\27[0m")
-    end
-    
-    if fightOver then
-        -- 记录击败 (玩家胜利时)
-        if winnerId == ctx.userId and ctx.userDB and ctx.userDB.recordKill then
-            ctx.userDB:recordKill(ctx.userId, bossId)
+    if battle and not battle.isOver then
+        print(string.format("\27[36m[Handler] USE_SKILL: 使用 SeerBattle 引擎 (Turn %d)\27[0m", battle.turn + 1))
+        
+        -- 执行回合
+        local result = SeerBattle.executeTurn(battle, skillId)
+        
+        -- 构建响应 NOTE_USE_SKILL (2505)
+        local body2505 = ""
+        
+        -- 第一次攻击 (通常是先手)
+        if result.firstAttack then
+            local atk1 = result.firstAttack
+            body2505 = body2505 .. buildAttackValue(atk1.userId, atk1.skillId, 1, 
+                atk1.damage, 0, atk1.attackerRemainHp, atk1.attackerMaxHp, atk1.isCrit and 1 or 0)
         end
         
-        -- 发送 FIGHT_OVER (2506)
-        local body2506 = ""
-        body2506 = body2506 .. writeUInt32BE(reason)
-        body2506 = body2506 .. writeUInt32BE(winnerId)
-        body2506 = body2506 .. writeUInt32BE(0)  -- twoTimes
-        body2506 = body2506 .. writeUInt32BE(0)  -- threeTimes
-        body2506 = body2506 .. writeUInt32BE(0)  -- autoFightTimes
-        body2506 = body2506 .. writeUInt32BE(0)  -- energyTimes
-        body2506 = body2506 .. writeUInt32BE(0)  -- learnTimes
+        -- 第二次攻击 (反击)
+        if result.secondAttack then
+            local atk2 = result.secondAttack
+            body2505 = body2505 .. buildAttackValue(atk2.userId, atk2.skillId, 1, 
+                atk2.damage, 0, atk2.attackerRemainHp, atk2.attackerMaxHp, atk2.isCrit and 1 or 0)
+        end
         
+        ctx.sendResponse(buildResponse(2505, ctx.userId, 0, body2505))
+        
+        -- 检查战斗结束
+        if result.isOver then
+            local winnerId = result.winner or 0
+            local reason = result.reason or 0
+            
+            -- 记录击败
+            if winnerId == ctx.userId and ctx.userDB and ctx.userDB.recordKill then
+                 local bossId = user.currentBossId or 0
+                 ctx.userDB:recordKill(ctx.userId, bossId)
+            end
+            
+            -- 发送 FIGHT_OVER (2506)
+            local body2506 = ""
+            body2506 = body2506 .. writeUInt32BE(reason)
+            body2506 = body2506 .. writeUInt32BE(winnerId)
+            body2506 = body2506 .. string.rep("\0", 20) -- unused fields
+            
+            ctx.sendResponse(buildResponse(2506, ctx.userId, 0, body2506))
+            
+            -- 清除战斗
+            user.battle = nil
+            user.inFight = false
+            print(string.format("\27[32m[Handler] 战斗结束: Winner=%d Reason=%d\27[0m", winnerId, reason))
+        end
+        
+    else
+        -- Fallback to simplified logic if no battle instance (Legacy/Safety)
+        print("\27[33m[Handler] USE_SKILL: 未找到战斗实例，使用简易逻辑\27[0m")
+        -- ... (Legacy logic could go here, but omitted to enforce correct flow)
+        -- Just end the fight to prevent stuck state
+        local body2506 = writeUInt32BE(0) .. writeUInt32BE(0) .. string.rep("\0", 20)
         ctx.sendResponse(buildResponse(2506, ctx.userId, 0, body2506))
-        
-        -- 清除战斗状态
-        user.fightState = nil
     end
-    
+
     ctx.saveUserDB()
-    
-    print(string.format("\27[32m[Handler] → USE_SKILL %d (伤害=%d 克制=x%.2f STAB=x%.1f)\27[0m", 
-        skillId, playerDamage, effectiveness, stab))
     return true
 end
 

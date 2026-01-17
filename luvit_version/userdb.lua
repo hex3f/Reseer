@@ -207,7 +207,31 @@ function UserDB:getOrCreateGameData(userId)
             -- allFitments: 所有拥有的家具 (仓库)
             allFitments = {
                 {id = 500001, usedCount = 1, allCount = 1}  -- 默认房间风格
-            }
+            },
+            
+            -- NoNo信息
+            nono = {
+                flag = 0,
+                color = 0,
+                nick = "NoNo",
+                chip = 0,
+                grow = 0,     -- 成长值
+                expire = 0,   -- SuperNoNo过期时间
+                isSuper = false,
+                energy = 100, -- 电池能量
+                mate = 0,
+                ai = 0
+            },
+            
+            -- 成就信息
+            achievements = {
+                total = 0,
+                rank = 0,
+                list = {} -- ID list
+            },
+            
+            -- 精灵仓库 (不在背包的精灵)
+            storagePets = {}
         }
         self:save()
         print(string.format("\27[32m[UserDB] 创建游戏数据: userId=%d (含默认家具)\27[0m", userId))
@@ -220,6 +244,18 @@ function UserDB:updateUserCoins(userId, coins)
     data.coins = coins
     self:saveGameData(userId, data)
     return true
+end
+
+function UserDB:consumeCoins(userId, amount)
+    local data = self:getOrCreateGameData(userId)
+    local currentCoins = data.coins or 0
+    if currentCoins >= amount then
+        data.coins = currentCoins - amount
+        self:saveGameData(userId, data)
+        return true, data.coins
+    else
+        return false, currentCoins
+    end
 end
 
 -- ==================== 物品管理 ====================
@@ -557,6 +593,36 @@ function UserDB:getFriendsOnServers(userId)
     end
     
     return serverCounts
+end
+
+-- ==================== NoNo & 仓库管理 ====================
+
+function UserDB:getNonoData(userId)
+    local data = self:getOrCreateGameData(userId)
+    return data.nono or {flag=0, color=0, nick="NoNo", chip=0, energy=100}
+end
+
+function UserDB:updateNonoData(userId, nonoData)
+    local data = self:getOrCreateGameData(userId)
+    data.nono = data.nono or {}
+    for k, v in pairs(nonoData) do
+        data.nono[k] = v
+    end
+    self:saveGameData(userId, data)
+    return data.nono
+end
+
+function UserDB:getStoragePets(userId)
+    local data = self:getOrCreateGameData(userId)
+    return data.storagePets or {}
+end
+
+function UserDB:addStoragePet(userId, pet)
+    local data = self:getOrCreateGameData(userId)
+    data.storagePets = data.storagePets or {}
+    table.insert(data.storagePets, pet)
+    self:saveGameData(userId, data)
+    return true
 end
 
 return UserDB

@@ -16,14 +16,24 @@ LocalGameServer.__index = LocalGameServer
 -- 加载命令映射
 local SeerCommands = require('../seer_commands')
 
--- 加载精灵数据
-local SeerMonsters = require('../seer_monsters')
+-- 加载精灵数据 (Pets via SeerPets)
+-- SeerMonsters logic moved to SeerPets/SeerSkills
+-- local SeerMonsters = require('../seer_monsters')
+-- if SeerMonsters.load then SeerMonsters.load() end
+
+local SeerPets = require('../seer_pets')
+if SeerPets.load then SeerPets.load() end
 
 -- 加载技能数据
 local SeerSkills = require('../seer_skills')
 
 -- 加载物品数据
 local SeerItems = require('../seer_items')
+if SeerItems.load then SeerItems.load() end
+
+-- 加载技能效果数据
+local SeerSkillEffects = require('../seer_skill_effects')
+if SeerSkillEffects.load then SeerSkillEffects.load() end
 
 -- 加载战斗系统
 local SeerBattle = require('../seer_battle')
@@ -36,7 +46,9 @@ local SharedHandlers = require('../handlers/shared_handlers')
 
 -- 加载配置
 local GameConfig = require('../game_config')
+local GameConfig = require('../game_config')
 local SeerLoginResponse = require('./seer_login_response')
+local SeerTaskConfig = require('../data/seer_task_config')
 
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
@@ -62,6 +74,7 @@ function LocalGameServer:new()
         users = {},     -- userId -> user data
         serverList = {},
         nextSeqId = 1,
+        cryptoMap = {}, -- map<client, crypto>
     }
     setmetatable(obj, LocalGameServer)
     obj:loadUserData()
@@ -277,11 +290,15 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2401] = self.handleInviteToFight,     -- 邀请战斗
         [2404] = self.handleReadyToFight,      -- 准备战斗
         [2405] = self.handleUseSkillEnhanced,  -- 使用技能 (增强版)
+        [2150] = self.handleGetRelationList,   -- 获取好友列表
+        [2354] = self.handleGetSoulBeadList,   -- 获取灵魂珠列表
         [2406] = self.handleUsePetItem,        -- 使用精灵道具
         [2407] = self.handleChangePet,         -- 更换精灵
         [2408] = self.handleFightNpcMonster,   -- 战斗NPC怪物
         [2409] = self.handleCatchMonster,      -- 捕捉精灵
         [2410] = self.handleEscapeFight,       -- 逃跑
+        [2305] = self.handleGetStorageList,    -- 获取仓库精灵列表
+        [2306] = self.handlePetCure,           -- 精灵恢复
         [2411] = self.handleChallengeBoss,     -- 挑战BOSS
         [2601] = self.handleItemBuy,           -- 购买物品
         [2604] = self.handleChangeCloth,       -- 更换服装
@@ -291,6 +308,7 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2757] = self.handleMailGetUnread,     -- 获取未读邮件
         [8001] = self.handleInform,            -- 通知
         [8004] = self.handleGetBossMonster,    -- 获取BOSS怪物
+        [9003] = self.handleNonoInfo,          -- NoNo信息
         -- 家园系统
         [10001] = self.handleRoomLogin,        -- 家园登录
         [10002] = self.handleGetRoomAddress,   -- 获取房间地址
@@ -300,7 +318,7 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [10008] = self.handleSetFitment,       -- 设置家具
         [50004] = self.handleCmd50004,         -- 客户端信息上报
         [50008] = self.handleCmd50008,         -- 获取四倍经验时间
-        [70001] = self.handleCmd70001,         -- 未知命令70001
+        [70001] = self.handleCmd70001,         -- 兑换信息
         [80008] = self.handleNieoHeart,        -- 心跳包
     }
     
@@ -497,6 +515,8 @@ function LocalGameServer:handleRangeOnline(clientData, cmdId, userId, seqId, bod
 end
 
 -- CMD 1001: 登录游戏服务器
+local SeerLoginResponse = require("./seer_login_response")
+
 -- 响应结构完全按照 UserInfo.setForLoginInfo 解析顺序
 -- 所有数据从用户数据读取
 function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
@@ -507,342 +527,45 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     if #body >= 16 then
         session = body:sub(1, 16)
     end
-    
-    -- 查找或创建用户数据
-    local userData = self:getOrCreateUser(userId)
     clientData.session = session
     
-    local nickname = userData.nick or userData.nickname or userData.username or tostring(userId)
-    local nonoData = userData.nono or {}
-    local teamInfo = userData.teamInfo or {}
-    local teamPKInfo = userData.teamPKInfo or {}
-    local teamPKInfo = userData.teamPKInfo or {}
-    local pets = userData.pets or {}
-    if not userData.pets then userData.pets = pets end
-    
-    -- [GameConfig] 初始精灵发放 (如果用户没有任何精灵且配置了初始精灵)
-    if #pets == 0 and GameConfig.InitialPets and #GameConfig.InitialPets > 0 then
-        for _, petConfig in ipairs(GameConfig.InitialPets) do
-            if petConfig.id then
-                local newPet = {
-                    id = petConfig.id,
-                    level = petConfig.level or getConfigValue(GameConfig.PetDefaults.level) or 5,
-                    name = petConfig.name or "",
-                    dv = getConfigValue(GameConfig.PetDefaults.dv) or 31,      -- 使用配置的默认个体值
-                    nature = getConfigValue(GameConfig.PetDefaults.nature) or 0, -- 使用配置的默认性格
-                    exp = 0,
-                    catchTime = os.time(),
-                    catchMap = 1,
-                    catchRect = 0,
-                    catchLevel = petConfig.level or 5,
-                    skinID = 0
-                }
-                table.insert(pets, newPet)
-                tprint(string.format("\27[36m[LocalGame] [GameConfig] 发放初始精灵: %d (Lv.%d)\27[0m", newPet.id, newPet.level))
-            end
-        end
-        -- 保存数据以确保精灵不丢失 (虽然 handleLoginIn 通常不负责保存，但这对新用户很重要)
-         if self.userdb then
-             -- 简单触发一次保存 (依赖于定时保存或 logout 保存也行，但明确更新内存引用)
-             -- self:saveUser(userId, userData) -- saveUser 不是 LocalGameServer 的直接方法，需检查
-         end
-    end
-    local clothes = userData.clothes or {}
-    
-    -- 构建响应 (按 UserInfo.setForLoginInfo 解析顺序)
-    local responseBody = ""
-    
-    -- 1. 基本信息
-    responseBody = responseBody .. writeUInt32BE(userId)                              -- userID
-    -- 使用2009年的时间戳，让 checkIsNovice() 返回 false，跳过新手任务检查
-    -- 2009-01-01 00:00:00 UTC = 1230768000
-    -- 使用配置的注册时间
-    responseBody = responseBody .. writeUInt32BE(GameConfig.InitialPlayer.regTime)    -- regTime
-    responseBody = responseBody .. writeFixedString(nickname, 16)                     -- nick (16字节)
-    
-    -- vipFlags: bit0=vip, bit1=viped
-    local vipFlags = 0
-    -- 如果用户数据中没有设置VIP状态，使用配置文件的默认值
-    if userData.vip == nil then userData.vip = GameConfig.InitialPlayer.isVIP end
-    if userData.vipLevel == nil then userData.vipLevel = GameConfig.InitialPlayer.vipLevel end
-    
-    if userData.vip then vipFlags = vipFlags + 1 end
-    if userData.viped or (userData.vip and GameConfig.InitialPlayer.isVIP) then vipFlags = vipFlags + 2 end
-    
-    responseBody = responseBody .. writeUInt32BE(vipFlags)                            -- vipFlags
-    responseBody = responseBody .. writeUInt32BE(userData.dsFlag or GameConfig.InitialPlayer.dsFlag) -- dsFlag
-    responseBody = responseBody .. writeUInt32BE(userData.color or GameConfig.InitialPlayer.color) -- color
-    responseBody = responseBody .. writeUInt32BE(userData.texture or GameConfig.InitialPlayer.texture) -- texture
-    responseBody = responseBody .. writeUInt32BE(userData.energy or GameConfig.InitialPlayer.energy) -- energy
-    responseBody = responseBody .. writeUInt32BE(userData.coins or GameConfig.InitialPlayer.coins)   -- coins
-    responseBody = responseBody .. writeUInt32BE(userData.fightBadge or GameConfig.InitialPlayer.fightBadge) -- fightBadge
-    
-    -- 登录时默认地图: 如果新手任务完成则进地图1，否则进515
-    -- 检查任务88是否完成来判断新手任务是否完成
-    local defaultMapId = GameConfig.InitialPlayer.mapID
+    -- 获取完整用户数据 (账号 + 游戏数据)
+    local user = {}
     if self.userdb then
         local db = self.userdb:new()
+        
+        -- 1. 账号数据 (Account)
+        local account = db:findByUserId(userId)
+        if account then
+            for k, v in pairs(account) do user[k] = v end
+        end
+        
+        -- 2. 游戏数据 (GameData)
         local gameData = db:getOrCreateGameData(userId)
-        if gameData.tasks and gameData.tasks["88"] and gameData.tasks["88"].status == "completed" then
-            defaultMapId = gameData.mapId or GameConfig.InitialPlayer.mapID
-        else
-            defaultMapId = 515  -- 新手任务未完成，进新手地图 (这里可能也需要配置，暂时保留)
-        end
-    end
-    responseBody = responseBody .. writeUInt32BE(defaultMapId)                        -- mapID
-    responseBody = responseBody .. writeUInt32BE(GameConfig.InitialPlayer.posX)       -- posX
-    responseBody = responseBody .. writeUInt32BE(GameConfig.InitialPlayer.posY)       -- posY
-    responseBody = responseBody .. writeUInt32BE(userData.timeToday or GameConfig.InitialPlayer.timeToday) -- timeToday
-    responseBody = responseBody .. writeUInt32BE(userData.timeLimit or GameConfig.InitialPlayer.timeLimit) -- timeLimit
-    
-    -- 2. halfDayFlags (4个byte)
-    responseBody = responseBody .. string.char(
-        userData.isClothHalfDay or GameConfig.InitialPlayer.isClothHalfDay,
-        userData.isRoomHalfDay or GameConfig.InitialPlayer.isRoomHalfDay,
-        userData.iFortressHalfDay or GameConfig.InitialPlayer.iFortressHalfDay,
-        userData.isHQHalfDay or GameConfig.InitialPlayer.isHQHalfDay
-    )
-    
-    -- 3. 登录/邀请信息
-    responseBody = responseBody .. writeUInt32BE(userData.loginCnt or GameConfig.InitialPlayer.loginCnt)        -- loginCnt
-    responseBody = responseBody .. writeUInt32BE(userData.inviter or GameConfig.InitialPlayer.inviter)          -- inviter
-    responseBody = responseBody .. writeUInt32BE(userData.newInviteeCnt or GameConfig.InitialPlayer.newInviteeCnt) -- newInviteeCnt
-    
-    -- 4. VIP信息
-    responseBody = responseBody .. writeUInt32BE(userData.vipLevel or 0)                                        -- vipLevel
-    responseBody = responseBody .. writeUInt32BE(userData.vipValue or 0)                                        -- vipValue
-    responseBody = responseBody .. writeUInt32BE(userData.vipStage or GameConfig.InitialPlayer.vipStage)        -- vipStage
-    responseBody = responseBody .. writeUInt32BE(userData.autoCharge or GameConfig.InitialPlayer.autoCharge)    -- autoCharge
-    responseBody = responseBody .. writeUInt32BE(userData.vipEndTime or GameConfig.InitialPlayer.vipEndTime)    -- vipEndTime
-    responseBody = responseBody .. writeUInt32BE(userData.freshManBonus or 0)                                   -- freshManBonus
-    
-    -- 5. nonoChipList (80 bytes)
-    responseBody = responseBody .. string.rep("\0", 80)
-    
-    -- 6. dailyResArr (50 bytes)
-    responseBody = responseBody .. string.rep("\0", 50)
-    
-    -- 7. 师徒系统
-    responseBody = responseBody .. writeUInt32BE(userData.teacherID or GameConfig.InitialPlayer.teacherID)             -- teacherID
-    responseBody = responseBody .. writeUInt32BE(userData.studentID or GameConfig.InitialPlayer.studentID)             -- studentID
-    responseBody = responseBody .. writeUInt32BE(userData.graduationCount or GameConfig.InitialPlayer.graduationCount) -- graduationCount
-    responseBody = responseBody .. writeUInt32BE(userData.maxPuniLv or GameConfig.InitialPlayer.maxPuniLv)             -- maxPuniLv
-    
-    -- 8. 精灵相关
-    responseBody = responseBody .. writeUInt32BE(userData.petMaxLev or GameConfig.InitialPlayer.petMaxLev)   -- petMaxLev
-    responseBody = responseBody .. writeUInt32BE(userData.petAllNum or GameConfig.InitialPlayer.petAllNum)   -- petAllNum
-    responseBody = responseBody .. writeUInt32BE(userData.monKingWin or GameConfig.InitialPlayer.monKingWin) -- monKingWin
-    
-    -- 9. 关卡进度
-    responseBody = responseBody .. writeUInt32BE(userData.curStage or GameConfig.InitialPlayer.curStage)           -- curStage
-    responseBody = responseBody .. writeUInt32BE(userData.maxStage or GameConfig.InitialPlayer.maxStage)           -- maxStage
-    responseBody = responseBody .. writeUInt32BE(userData.curFreshStage or GameConfig.InitialPlayer.curFreshStage) -- curFreshStage
-    responseBody = responseBody .. writeUInt32BE(userData.maxFreshStage or GameConfig.InitialPlayer.maxFreshStage) -- maxFreshStage
-    responseBody = responseBody .. writeUInt32BE(userData.maxArenaWins or GameConfig.InitialPlayer.maxArenaWins)   -- maxArenaWins
-    
-    -- 10. 战斗加成
-    responseBody = responseBody .. writeUInt32BE(userData.twoTimes or GameConfig.InitialPlayer.twoTimes)            -- twoTimes
-    responseBody = responseBody .. writeUInt32BE(userData.threeTimes or GameConfig.InitialPlayer.threeTimes)        -- threeTimes
-    responseBody = responseBody .. writeUInt32BE(userData.autoFight or GameConfig.InitialPlayer.autoFight)          -- autoFight
-    responseBody = responseBody .. writeUInt32BE(userData.autoFightTimes or GameConfig.InitialPlayer.autoFightTimes)-- autoFightTimes
-    responseBody = responseBody .. writeUInt32BE(userData.energyTimes or GameConfig.InitialPlayer.energyTimes)      -- energyTimes
-    responseBody = responseBody .. writeUInt32BE(userData.learnTimes or GameConfig.InitialPlayer.learnTimes)        -- learnTimes
-    
-    -- 11. 其他
-    responseBody = responseBody .. writeUInt32BE(userData.monBtlMedal or GameConfig.InitialPlayer.monBtlMedal)      -- monBtlMedal
-    responseBody = responseBody .. writeUInt32BE(userData.recordCnt or 0)             -- recordCnt
-    responseBody = responseBody .. writeUInt32BE(userData.obtainTm or 0)              -- obtainTm
-    responseBody = responseBody .. writeUInt32BE(userData.soulBeadItemID or 0)        -- soulBeadItemID
-    responseBody = responseBody .. writeUInt32BE(userData.expireTm or 0)              -- expireTm
-    responseBody = responseBody .. writeUInt32BE(userData.fuseTimes or 0)             -- fuseTimes
-    
-    -- 12. NONO信息
-    -- 优先使用 NoNo data, 其次 User data, 最后 GameConfig
-    local nonoFlag = userData.hasNono or nonoData.flag or GameConfig.InitialPlayer.nono.flag
-    local superNono = userData.superNono or nonoData.superNono or GameConfig.InitialPlayer.nono.superNono
-    local nonoState = userData.nonoState or nonoData.state or GameConfig.InitialPlayer.nono.state
-    local nonoColor = userData.nonoColor or nonoData.color or GameConfig.InitialPlayer.nono.color
-    local nonoNick = userData.nonoNick or nonoData.nick or GameConfig.InitialPlayer.nono.nick
-    
-    responseBody = responseBody .. writeUInt32BE(nonoFlag)                           -- hasNono
-    responseBody = responseBody .. writeUInt32BE(superNono)                          -- superNono
-    responseBody = responseBody .. writeUInt32BE(nonoState)                          -- nonoState
-    responseBody = responseBody .. writeUInt32BE(nonoColor)                          -- nonoColor
-    responseBody = responseBody .. writeFixedString(nonoNick, 16)                    -- nonoNick
-    
-    -- 13. TeamInfo: id(4) + priv(4) + superCore(4) + isShow(4) + allContribution(4) + canExContribution(4) = 24字节
-    responseBody = responseBody .. writeUInt32BE(teamInfo.id or 0)                    -- team.id
-    responseBody = responseBody .. writeUInt32BE(teamInfo.priv or 0)                  -- team.priv
-    responseBody = responseBody .. writeUInt32BE(teamInfo.superCore or 0)             -- team.superCore
-    responseBody = responseBody .. writeUInt32BE(teamInfo.isShow and 1 or 0)          -- team.isShow
-    responseBody = responseBody .. writeUInt32BE(teamInfo.allContribution or 0)       -- team.allContribution
-    responseBody = responseBody .. writeUInt32BE(teamInfo.canExContribution or 0)     -- team.canExContribution
-    
-    -- 14. TeamPKInfo: groupID(4) + homeTeamID(4) = 8字节
-    responseBody = responseBody .. writeUInt32BE(teamPKInfo.groupID or 0)             -- teamPK.groupID
-    responseBody = responseBody .. writeUInt32BE(teamPKInfo.homeTeamID or 0)          -- teamPK.homeTeamID
-    
-    -- 15. 保留字段
-    responseBody = responseBody .. string.char(0)                                                   -- reserved (1 byte)
-    responseBody = responseBody .. writeUInt32BE(userData.badge or GameConfig.InitialPlayer.badge)  -- badge
-    responseBody = responseBody .. string.rep("\0", 27)                                             -- reserved (27 bytes)
-    
-    -- 16. taskList (500 bytes) - 任务状态
-    -- 每个字节代表一个任务的状态: 0=未接受, 1=已接受, 3=已完成
-    -- 任务ID从1开始，所以任务N的状态在taskList[N-1]
-    local taskListBytes = {}
-    for i = 1, 500 do
-        taskListBytes[i] = 0  -- 默认未接受
-    end
-    
-    -- 从数据库读取任务状态
-    if self.userdb then
-        local db = self.userdb:new()
-        local gameData = db:getOrCreateGameData(userId)
-        if gameData.tasks then
-            local taskCount = 0
-            for taskIdStr, task in pairs(gameData.tasks) do
-                local taskId = tonumber(taskIdStr)
-                if taskId and taskId >= 1 and taskId <= 500 then
-                    if task.status == "completed" then
-                        taskListBytes[taskId] = 3  -- COMPLETE
-                        taskCount = taskCount + 1
-                    elseif task.status == "accepted" then
-                        taskListBytes[taskId] = 1  -- ALR_ACCEPT
-                        taskCount = taskCount + 1
-                    end
-                end
-            end
-            -- 调试: 打印关键任务状态
-            tprint(string.format("\27[35m[LocalGame] 登录任务状态: 任务85=%d, 任务86=%d, 任务87=%d, 任务88=%d (共%d个任务)\27[0m",
-                taskListBytes[85], taskListBytes[86], taskListBytes[87], taskListBytes[88], taskCount))
-        else
-            tprint("\27[33m[LocalGame] 警告: 用户没有任务数据\27[0m")
+        if gameData then
+            for k, v in pairs(gameData) do user[k] = v end
         end
     end
     
-    -- 写入taskList
-    for i = 1, 500 do
-        responseBody = responseBody .. string.char(taskListBytes[i])
+    -- 确保基本字段存在
+    user.userid = userId
+    user.nick = user.nick or user.nickname or ("Seer" .. userId)
+    user.coins = user.coins or 99999
+    user.mapID = user.mapID or GameConfig.InitialPlayer.mapID or 1
+    
+    -- 生成完整响应
+    local responseBody, keySeed = SeerLoginResponse.makeLoginResponse(user)
+    
+    -- 更新密钥
+    if self.cryptoMap[clientData] then
+        local crypto = self.cryptoMap[clientData]
+        crypto:setKey(keySeed)
+        tprint(string.format("\27[32m[LocalGame] 密钥已更新: userId=%d, keySeed=%d\27[0m", userId, keySeed))
     end
-    
-    -- 调试: 打印任务列表的前100个字节的HEX
-    local taskHex = ""
-    for i = 1, 100 do
-        taskHex = taskHex .. string.format("%02X ", taskListBytes[i])
-    end
-    tprint(string.format("\27[35m[LocalGame] taskList[1-100]: %s\27[0m", taskHex))
-    
-    -- 17. petNum + PetInfo[]
-    responseBody = responseBody .. writeUInt32BE(#pets)                               -- petNum
-    
-    -- 写入每个精灵的 PetInfo 数据
-    for _, pet in ipairs(pets) do
-        local petId = pet.id or 7
-        local petLevel = pet.level or 1
-        local petDv = pet.dv or 31
-        local petNature = pet.nature or 1
-        local petExp = pet.exp or 0
-        local catchTime = pet.catchTime or os.time()
-        
-        -- 计算精灵属性
-        local stats = SeerMonsters.calculateStats(petId, petLevel, petDv) or {
-            hp = 20, maxHp = 20, attack = 12, defence = 12, spAtk = 11, spDef = 10, speed = 12
-        }
-        
-        -- 获取经验信息
-        local expInfo = SeerMonsters.getExpInfo(petId, petLevel, petExp)
-        
-        -- 获取精灵技能
-        local skills = SeerMonsters.getSkillsForLevel(petId, petLevel) or {}
-        
-        -- PetInfo 结构
-        responseBody = responseBody .. writeUInt32BE(petId)                           -- id
-        responseBody = responseBody .. writeFixedString(pet.name or "", 16)           -- name (16字节)
-        responseBody = responseBody .. writeUInt32BE(petDv)                           -- dv
-        responseBody = responseBody .. writeUInt32BE(petNature)                       -- nature
-        responseBody = responseBody .. writeUInt32BE(petLevel)                        -- level
-        responseBody = responseBody .. writeUInt32BE(petExp)                          -- exp
-        responseBody = responseBody .. writeUInt32BE(expInfo.lvExp or 0)              -- lvExp
-        responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp or 100)        -- nextLvExp
-        responseBody = responseBody .. writeUInt32BE(stats.hp or stats.maxHp)         -- hp
-        responseBody = responseBody .. writeUInt32BE(stats.maxHp)                     -- maxHp
-        responseBody = responseBody .. writeUInt32BE(stats.attack)                    -- attack
-        responseBody = responseBody .. writeUInt32BE(stats.defence)                   -- defence
-        responseBody = responseBody .. writeUInt32BE(stats.spAtk)                     -- s_a
-        responseBody = responseBody .. writeUInt32BE(stats.spDef)                     -- s_d
-        responseBody = responseBody .. writeUInt32BE(stats.speed)                     -- speed
-        responseBody = responseBody .. writeUInt32BE(pet.ev_hp or 0)                  -- ev_hp
-        responseBody = responseBody .. writeUInt32BE(pet.ev_attack or 0)              -- ev_attack
-        responseBody = responseBody .. writeUInt32BE(pet.ev_defence or 0)             -- ev_defence
-        responseBody = responseBody .. writeUInt32BE(pet.ev_sa or 0)                  -- ev_sa
-        responseBody = responseBody .. writeUInt32BE(pet.ev_sd or 0)                  -- ev_sd
-        responseBody = responseBody .. writeUInt32BE(pet.ev_sp or 0)                  -- ev_sp
-        
-        -- 技能数量和技能列表 (固定4个槽位)
-        local skillCount = math.min(#skills, 4)
-        responseBody = responseBody .. writeUInt32BE(skillCount)                      -- skillNum
-        
-        for i = 1, 4 do
-            local skillId = skills[#skills - 4 + i]  -- 取最后学会的4个技能
-            if skillId and skillId > 0 then
-                responseBody = responseBody .. writeUInt32BE(skillId)                 -- skill id
-                responseBody = responseBody .. writeUInt32BE(30)                      -- skill pp (默认30)
-            else
-                responseBody = responseBody .. writeUInt32BE(0)                       -- skill id = 0
-                responseBody = responseBody .. writeUInt32BE(0)                       -- skill pp = 0
-            end
-        end
-        
-        responseBody = responseBody .. writeUInt32BE(catchTime)                       -- catchTime
-        responseBody = responseBody .. writeUInt32BE(pet.catchMap or 515)             -- catchMap
-        responseBody = responseBody .. writeUInt32BE(pet.catchRect or 0)              -- catchRect
-        responseBody = responseBody .. writeUInt32BE(pet.catchLevel or petLevel)      -- catchLevel
-        responseBody = responseBody .. writeUInt16BE(0)                               -- effectCount
-        responseBody = responseBody .. writeUInt32BE(pet.skinID or 0)                 -- skinID
-    end
-    
-    -- 18. clothCount + clothes[]
-    responseBody = responseBody .. writeUInt32BE(#clothes)                            -- clothCount
-    
-    -- 写入每个服装的数据
-    for _, cloth in ipairs(clothes) do
-        responseBody = responseBody .. writeUInt32BE(cloth.id or cloth[1] or 0)       -- cloth id
-        responseBody = responseBody .. writeUInt32BE(cloth.level or cloth[2] or 0)    -- cloth level
-    end
-    
-    -- 19. curTitle
-    responseBody = responseBody .. writeUInt32BE(userData.curTitle or GameConfig.InitialPlayer.curTitle)              -- curTitle
-    
-    -- 20. bossAchievement (200 bytes)
-    responseBody = responseBody .. string.rep("\0", 200)
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
-    
-    tprint(string.format("\27[32m[LocalGame] ✓ 用户 %d 登录成功，响应大小: %d bytes\27[0m", userId, 17 + #responseBody))
-    
-    -- 记录用户当前所在服务器 (用于好友系统)
-    if self.userdb then
-        local db = self.userdb:new()
-        local serverId = conf.server_id or 1  -- 当前服务器ID
-        db:setUserServer(userId, serverId)
-        tprint(string.format("\27[36m[LocalGame] 用户 %d 登录到服务器 %d\27[0m", userId, serverId))
-    end
-    
-    -- 登录成功后启动心跳定时器 (官服每6秒发送一次心跳)
-    clientData.loggedIn = true
-    self:startHeartbeat(clientData, userId)
-    
-    -- 注册玩家到在线追踪系统
-    OnlineTracker.playerLogin(userId, clientData)
-    
-    -- [GameConfig] 发送系统公告
-    if GameConfig.SystemMessage.enabled and GameConfig.SystemMessage.content then
-        local noticeBody = SeerLoginResponse.makeSystemNotice(nil, 5, GameConfig.SystemMessage.content) -- noticeType=5 (通常用于活动公告)
-        self:sendResponse(clientData, 8002, userId, 0, noticeBody)
-        tprint(string.format("\27[36m[LocalGame] 已发送系统公告给用户 %d\27[0m", userId))
-    end
 end
+
 
 -- CMD 1002: 获取系统时间
 -- SystemTimeInfo 结构: timestamp(4) 只有一个字段
@@ -1004,11 +727,21 @@ function LocalGameServer:handleGetMoreUserInfo(clientData, cmdId, userId, seqId,
     responseBody = responseBody .. writeUInt32BE(targetUserId)                      -- userID (4)
     responseBody = responseBody .. writeFixedString(nickname, 16)                   -- nick (16)
     responseBody = responseBody .. writeUInt32BE(userData.regTime or os.time())     -- regTime (4)
+    local ach = userData.achievements or {total=0, rank=0, list={}}
+    
     responseBody = responseBody .. writeUInt32BE(userData.petAllNum or 0)           -- petAllNum (4)
     responseBody = responseBody .. writeUInt32BE(userData.petMaxLev or 100)         -- petMaxLev (4)
-    -- bossAchievement: 200 bytes (每个字节代表一个BOSS成就)
+    -- bossAchievement: 200 bytes
+    -- TODO: Convert ach.list to 200 bytes bitmap if needed, or just 0s for now
     responseBody = responseBody .. string.rep("\0", 200)                            -- bossAchievement (200)
     responseBody = responseBody .. writeUInt32BE(userData.graduationCount or 0)     -- graduationCount (4)
+    responseBody = responseBody .. writeUInt32BE(ach.total or 0)                    -- monKingWin (reused as achievement total?) - Wait, monKingWin is simple field
+    -- Official fields:
+    -- monKingWin (4)
+    -- messWin (4)
+    -- maxStage (4)
+    -- maxArenaWins (4)
+    -- curTitle (4)
     responseBody = responseBody .. writeUInt32BE(userData.monKingWin or 0)          -- monKingWin (4)
     responseBody = responseBody .. writeUInt32BE(userData.messWin or 0)             -- messWin (4)
     responseBody = responseBody .. writeUInt32BE(userData.maxStage or 0)            -- maxStage (4)
@@ -1156,139 +889,87 @@ function LocalGameServer:handleCompleteTask(clientData, cmdId, userId, seqId, bo
     if #body >= 8 then
         param = readUInt32BE(body, 5)
     end
-    
+
     tprint(string.format("\27[36m[LocalGame] 用户 %d 完成任务 %d (param=%d)\27[0m", userId, taskId, param))
     
-    -- 响应格式 (NoviceFinishInfo):
-    -- taskID (4字节) - 任务ID
-    -- petID (4字节) - 精灵ID (完成任务获得的精灵，0表示无)
-    -- captureTm (4字节) - 捕获时间戳 (精灵的catchId)
-    -- itemCount (4字节) - 奖励物品数量
-    -- [itemID(4) + itemCnt(4)]... - 物品列表
-    
+    local taskConfig = SeerTaskConfig.get(taskId)
     local userData = self:getOrCreateUser(userId)
-    local petId = 0
-    local captureTm = 0
-    local responseBody = ""
+    local db = self.userdb and self.userdb:new()
     
-    if taskId == 85 then  -- 0x55 - 新手任务1 (领取服装)
-        -- 官服给8个物品:
-        -- 100027, 100028 (服装)
-        -- 500001 (1个)
-        -- 300650 (3个)
-        -- 300025 (3个)
-        -- 300035 (3个)
-        -- 500502, 500503 (各1个)
-        
-        -- 保存物品到数据库
-        if self.userdb then
-            local db = self.userdb:new()
-            db:addItem(userId, 100027, 1)   -- 0x0186BB 服装
-            db:addItem(userId, 100028, 1)   -- 0x0186BC 服装
-            db:addItem(userId, 500001, 1)   -- 0x07A121
-            db:addItem(userId, 300650, 3)   -- 0x04966A
-            db:addItem(userId, 300025, 3)   -- 0x0493F9
-            db:addItem(userId, 300035, 3)   -- 0x049403
-            db:addItem(userId, 500502, 1)   -- 0x07A316
-            db:addItem(userId, 500503, 1)   -- 0x07A317
-            tprint(string.format("\27[32m[LocalGame] 任务85: 已保存8个物品到数据库\27[0m"))
+    local responseParts = {}
+    local rewardPetId = 0
+    local rewardCaptureTm = 0
+    local rewardItems = {}
+    
+    -- 处理配置的奖励
+    if taskConfig then
+        -- 1. 精灵奖励 (特殊处理 Task 86)
+        if taskConfig.type == "select_pet" and taskConfig.paramMap then
+            local petId = taskConfig.paramMap[param] or 1
+            -- 生成唯一 catchId
+            local catchTime = os.time()
+            -- 这里只记录选择，实际添加在客户端请求 PET_RELEASE (CMD 2304) 时?
+            -- 不，通常在这里直接添加进背包或暂存
+            -- 模拟 Task 86 的行为: 设置 user.currentPetId
+            userData.currentPetId = petId
+            -- 使用固定的 rewardCaptureTm (0x6969C400) 确保后续 fight_handlers 能获取到正确的 catchTime
+            userData.catchId = 0x6969C400 
+            
+            if db then
+                 -- 这里我们直接给玩家发一只
+                 -- db:addPet(userId, petId, 5) -- 假设5级
+            end
+            
+            rewardPetId = petId
+            rewardCaptureTm = 0x6969C400 -- 硬编码或者随机
         end
         
-        responseBody = writeUInt32BE(taskId) ..
-            writeUInt32BE(0) ..  -- petID: 无精灵奖励
-            writeUInt32BE(0) ..  -- captureTm: 无
-            writeUInt32BE(8) ..  -- itemCount: 8个物品
-            writeUInt32BE(100027) .. writeUInt32BE(1) ..  -- 服装
-            writeUInt32BE(100028) .. writeUInt32BE(1) ..  -- 服装
-            writeUInt32BE(500001) .. writeUInt32BE(1) ..
-            writeUInt32BE(300650) .. writeUInt32BE(3) ..
-            writeUInt32BE(300025) .. writeUInt32BE(3) ..
-            writeUInt32BE(300035) .. writeUInt32BE(3) ..
-            writeUInt32BE(500502) .. writeUInt32BE(1) ..
-            writeUInt32BE(500503) .. writeUInt32BE(1)
-            
-    elseif taskId == 86 then  -- 0x56 - 新手任务2 (选择精灵)
-        -- 官服响应: 00 00 00 56 00 00 00 04 69 69 C4 5E 00 00 00 00
-        -- 选择映射 (基于客户端 DoctorGuideDialog.as):
-        -- grassMC (草系) → choice=1 → petId=1 (布布种子)
-        -- fireMC (火系) → choice=2 → petId=7 (小火猴)
-        -- waterMC (水系) → choice=3 → petId=4 (伊优)
-        local petMapping = {
-            [1] = 1,   -- 布布种子
-            [2] = 7,   -- 小火猴
-            [3] = 4,   -- 伊优
-        }
-        petId = petMapping[param] or param
-        
-        -- 官服的 captureTm 格式: 0x6969XXXX (时间戳相关)
-        -- 使用当前时间戳生成唯一的 catchTime
-        captureTm = 0x6969C400 + os.time() % 0x10000
-        
-        userData.currentPetId = petId
-        userData.catchId = captureTm
-        
-        -- 保存精灵到数据库 (会在 PET_RELEASE 时正式添加到背包)
-        -- 这里只记录选择，实际添加在 handlePetRelease 中
-        
-        tprint(string.format("\27[32m[LocalGame] 任务86完成: 设置 currentPetId=%d, catchId=0x%08X\27[0m", petId, captureTm))
-        
-        responseBody = writeUInt32BE(taskId) ..
-            writeUInt32BE(petId) ..      -- petID: 获得的精灵
-            writeUInt32BE(captureTm) ..  -- captureTm: 精灵的catchId
-            writeUInt32BE(0)             -- itemCount: 无物品奖励
-            
-    elseif taskId == 87 then  -- 0x57 - 新手任务3 (战斗胜利)
-        -- 官服响应: 00 00 00 57 00 00 00 00 00 00 00 00 00 00 00 02 
-        --           00 04 93 E1 00 00 00 05  (300001, 5)
-        --           00 04 93 EB 00 00 00 03  (300011, 3)
-        
-        -- 保存物品到数据库
-        if self.userdb then
-            local db = self.userdb:new()
-            db:addItem(userId, 0x0493E1, 5)  -- 300001 精灵胶囊
-            db:addItem(userId, 0x0493EB, 3)  -- 300011 体力药剂
-            tprint(string.format("\27[32m[LocalGame] 任务87: 已保存2个物品到数据库\27[0m"))
+        -- 2. 物品奖励
+        if taskConfig.rewards and taskConfig.rewards.items then
+            for _, item in ipairs(taskConfig.rewards.items) do
+                table.insert(rewardItems, item)
+                if db then
+                    db:addItem(userId, item.id, item.count)
+                end
+            end
         end
         
-        responseBody = writeUInt32BE(taskId) ..
-            writeUInt32BE(0) ..
-            writeUInt32BE(0) ..
-            writeUInt32BE(2) ..  -- itemCount: 2个物品
-            writeUInt32BE(0x0493E1) .. writeUInt32BE(5) ..  -- 300001 精灵胶囊
-            writeUInt32BE(0x0493EB) .. writeUInt32BE(3)     -- 300011 体力药剂
-            
-    elseif taskId == 88 then  -- 0x58 - 新手任务4 (使用道具)
-        -- 官服响应: 00 00 00 58 00 00 00 00 00 00 00 00 00 00 00 03 
-        --           00 00 00 01 00 00 C3 50  (1=金币, 50000)
-        --           00 00 00 03 00 03 D0 90  (3=?, 250000)
-        --           00 00 00 05 00 00 00 14  (5=?, 20)
-        
-        -- 更新用户金币
-        if self.userdb then
-            local db = self.userdb:new()
-            local gameData = db:getOrCreateGameData(userId)
-            gameData.coins = (gameData.coins or 0) + 50000
-            db:saveGameData(userId, gameData)
-            tprint(string.format("\27[32m[LocalGame] 任务88: 已添加50000金币\27[0m"))
+        -- 3. 金币奖励
+        if taskConfig.rewards and taskConfig.rewards.coins then
+            if db then
+                local gameData = db:getOrCreateGameData(userId)
+                gameData.coins = (gameData.coins or 0) + taskConfig.rewards.coins
+                db:saveGameData(userId, gameData)
+                tprint(string.format("\27[32m[LocalGame] 发放金币奖励: %d\27[0m", taskConfig.rewards.coins))
+            end
+            -- 金币通常作为特殊物品 ID=1 返回
+             table.insert(rewardItems, {id=1, count=taskConfig.rewards.coins})
         end
         
-        responseBody = writeUInt32BE(taskId) ..
-            writeUInt32BE(0) ..
-            writeUInt32BE(0) ..
-            writeUInt32BE(3) ..  -- itemCount: 3个奖励
-            writeUInt32BE(1) .. writeUInt32BE(50000) ..   -- 金币 50000
-            writeUInt32BE(3) .. writeUInt32BE(250000) ..  -- 经验? 250000
-            writeUInt32BE(5) .. writeUInt32BE(20)         -- ? 20
-    else
-        responseBody = writeUInt32BE(taskId) ..
-            writeUInt32BE(0) ..
-            writeUInt32BE(0) ..
-            writeUInt32BE(0)
+        -- 4. 特殊奖励 (SeerTaskConfig 中定义的 special)
+        if taskConfig.rewards and taskConfig.rewards.special then
+             for _, sp in ipairs(taskConfig.rewards.special) do
+                 -- 特殊类型: 1=金币, 3=经验?, 5=?
+                 -- 这里为了响应格式统一，我们把它塞进 rewardItems list 对应的结构里
+                 -- 注意: 协议是 [itemID(4) + itemCnt(4)]，如果 special 的 type 不是物品ID，可能需要特殊处理
+                 -- 但根据 Task 88 的 log: 00 00 00 01 (ID=1) ... 所以特殊奖励也是物品ID格式
+                 table.insert(rewardItems, {id=sp.type, count=sp.value})
+             end
+        end
+    end
+    
+    -- 构建响应体 (NoviceFinishInfo)
+    local responseBody = writeUInt32BE(taskId) ..
+                         writeUInt32BE(rewardPetId) ..
+                         writeUInt32BE(rewardCaptureTm) ..
+                         writeUInt32BE(#rewardItems)
+                         
+    for _, item in ipairs(rewardItems) do
+        responseBody = responseBody .. writeUInt32BE(item.id) .. writeUInt32BE(item.count)
     end
     
     -- 保存任务完成状态到数据库
-    if self.userdb then
-        local db = self.userdb:new()
+    if db then
         local gameData = db:getOrCreateGameData(userId)
         gameData.tasks = gameData.tasks or {}
         gameData.tasks[tostring(taskId)] = {
@@ -1374,16 +1055,16 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     end
     
     -- 计算精灵属性
-    local stats = SeerMonsters.calculateStats(petId, petLevel, petDv) or {
+    local stats = SeerPets.getStats(petId, petLevel, petDv) or {
         hp = 100, maxHp = 100, attack = 39, defence = 35, spAtk = 78, spDef = 36, speed = 39
     }
     
     -- 获取精灵技能
-    local skills = SeerMonsters.getBattleSkills(petId, petLevel) or {}
+    local skills = SeerPets.getSkillsForLevel(petId, petLevel) or {}
     local skillCount = math.min(#skills, 4)
     
     -- 计算经验信息
-    local expInfo = SeerMonsters.getExpInfo(petId, petLevel, petExp)
+    local expInfo = SeerPets.getExpInfo(petId, petLevel, petExp)
     
     local responseBody = ""
     
@@ -1455,12 +1136,12 @@ function LocalGameServer:handleGetPetList(clientData, cmdId, userId, seqId, body
             local level = pet.level or 5
             
             -- 计算精灵属性（如果数据库没有保存）
-            local stats = SeerMonsters.calculateStats(petId, level, pet.dv or 31) or {hp = 100, maxHp = 100}
+            local stats = SeerPets.getStats(petId, level, pet.dv or 31) or {hp = 100, maxHp = 100}
             local hp = pet.hp or stats.hp or 100
             local maxHp = pet.maxHp or stats.maxHp or 100
             
             -- 获取精灵技能
-            local skills = SeerMonsters.getBattleSkills(petId, level) or {}
+            local skills = SeerPets.getSkillsForLevel(petId, level) or {}
             local skillCount = math.min(#skills, 4)
             
             -- PetListInfo: catchTime(4) + id(4) + level(4) + hp(4) + maxHp(4) + skillNum(4) + skills[4]*(id+pp)
@@ -1577,6 +1258,57 @@ function LocalGameServer:handleCmd50008(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 50008: 获取四倍经验时间\27[0m")
     -- 返回四倍经验剩余时间 (0 = 无)
     local responseBody = writeUInt32BE(0)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 70001: 获取兑换信息 (HonourManual)
+-- 用于 HonourManualController
+function LocalGameServer:handleCmd70001(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 70001: 获取兑换信息\27[0m")
+    
+    -- Structure: count(4) + [id(4) + value(4)]...
+    -- 暂时返回空列表 (count=0)
+    local responseBody = writeUInt32BE(0)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2150: 获取好友/黑名单列表
+-- FriendList/BlackList
+function LocalGameServer:handleGetRelationList(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 2150: 获取好友列表\27[0m")
+    
+    -- Structure: count(4) + [FriendInfo...]
+    -- 暂时返回空列表
+    local responseBody = writeUInt32BE(0)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 9003: 获取 NoNo 信息
+function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 9003: 获取NoNo信息\27[0m")
+    
+    -- 返回 NoNoInfo (简化版)
+    -- flag(4) + isChip(4) + name(16) + ...
+    -- 官服数据: 00 00 00 01, 00 00 00 01, "NONO"..., + 82 bytes reserved?
+    -- 为简化，直接按照 LOG 返回大概结构
+    
+    local userData = self:getOrCreateUser(userId)
+    local hasNono = userData.hasNono or false
+    
+    if not hasNono then
+        -- 如果没有NoNo，可能返回空或者特定错误?
+        -- 这里模拟官服返回一个默认的
+    end
+    
+    local responseBody = ""
+    responseBody = responseBody .. writeUInt32BE(1)  -- flag?
+    responseBody = responseBody .. writeUInt32BE(1)  -- isChip?
+    responseBody = responseBody .. writeFixedString("NoNo", 16)
+    
+    -- 填充剩余字节以匹配 LOG (~80 bytes or more)
+    -- NonoInfo.as 读取相当多属性，暂且填充0
+    responseBody = responseBody .. string.rep("\0", 80)
+    
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
@@ -1768,8 +1500,8 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     local petLevel = 5
     local petDv = 31
     local petNature = math.random(0, 24)  -- 随机性格
-    local stats = SeerMonsters.calculateStats(petId, petLevel, petDv) or {hp = 20, maxHp = 20}
-    local skills = SeerMonsters.getBattleSkills(petId, petLevel)
+    local stats = SeerPets.getStats(petId, petLevel, petDv) or {hp = 20, maxHp = 20}
+    local skills = SeerPets.getSkillsForLevel(petId, petLevel)
     local skillCount = 0
     for _, s in ipairs(skills) do
         if s > 0 then skillCount = skillCount + 1 end
@@ -1777,7 +1509,7 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     
     -- 计算经验信息
     -- 新精灵: exp=0 (官服行为), lvExp=0
-    local expInfo = SeerMonsters.getExpInfo(petId, petLevel, 0)
+    local expInfo = SeerPets.getExpInfo(petId, petLevel, 0)
     
     local responseBody = ""
     
@@ -1861,15 +1593,15 @@ function LocalGameServer:initBattle(userId, userData, enemyPetId)
     local petLevel = 5
     local enemyLevel = 1  -- 官服新手教程比比鼠是 level=1
     
-    -- 获取玩家精灵数据
-    local playerStats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 20, maxHp = 20}
-    local playerSkills = SeerMonsters.getBattleSkills(petId, petLevel)
-    local playerMonster = SeerMonsters.get(petId)
+    -- 获取玩家精灵数据 (使用 SeerPets)
+    local playerStats = SeerPets.getStats(petId, petLevel, 31) or {hp = 20, maxHp = 20}
+    local playerSkills = SeerPets.getSkillsForLevel(petId, petLevel)
+    local playerPetData = SeerPets.getData(petId)
     
-    -- 获取敌方精灵数据
-    local enemyStats = SeerMonsters.calculateStats(enemyPetId, enemyLevel, 15) or {hp = 12, maxHp = 12}
-    local enemySkills = SeerMonsters.getBattleSkills(enemyPetId, enemyLevel)
-    local enemyMonster = SeerMonsters.get(enemyPetId)
+    -- 获取敌方精灵数据 (使用 SeerPets)
+    local enemyStats = SeerPets.getStats(enemyPetId, enemyLevel, 15) or {hp = 12, maxHp = 12}
+    local enemySkills = SeerPets.getSkillsForLevel(enemyPetId, enemyLevel)
+    local enemyPetData = SeerPets.getData(enemyPetId)
     
     -- 创建战斗实例
     local battle = SeerBattle.createBattle(userId, {
@@ -1877,26 +1609,30 @@ function LocalGameServer:initBattle(userId, userData, enemyPetId)
         level = petLevel,
         hp = playerStats.hp,
         maxHp = playerStats.maxHp,
-        attack = playerStats.attack,
-        defence = playerStats.defence,
-        spAtk = playerStats.spAtk,
-        spDef = playerStats.spDef,
-        speed = playerStats.speed,
-        type = playerMonster and playerMonster.type or 8,
+        attack = playerStats.atk or 12,
+        defence = playerStats.def or 12,
+        spAtk = playerStats.spa or 11,
+        spDef = playerStats.spd or 10,
+        speed = playerStats.spe or 12,
+        type = playerPetData and playerPetData.element or 8,
         skills = playerSkills,
+        skillPP = {30, 35, 0, 0},  -- 初始PP
+        battleLv = {0, 0, 0, 0, 0, 0},  -- 能力等级变化: atk, def, spa, spd, spe, acc
         catchTime = userData.catchId or 0
     }, {
         id = enemyPetId,
         level = enemyLevel,
         hp = enemyStats.hp,
         maxHp = enemyStats.maxHp,
-        attack = enemyStats.attack,
-        defence = enemyStats.defence,
-        spAtk = enemyStats.spAtk,
-        spDef = enemyStats.spDef,
-        speed = enemyStats.speed,
-        type = enemyMonster and enemyMonster.type or 8,
+        attack = enemyStats.atk or 10,
+        defence = enemyStats.def or 10,
+        spAtk = enemyStats.spa or 8,
+        spDef = enemyStats.spd or 8,
+        speed = enemyStats.spe or 10,
+        type = enemyPetData and enemyPetData.element or 8,
         skills = enemySkills,
+        skillPP = {35, 0, 0, 0},  -- 初始PP
+        battleLv = {0, 0, 0, 0, 0, 0},  -- 能力等级变化: atk, def, spa, spd, spe, acc
         catchTime = userData.enemyCatchTime or 0
     })
     
@@ -1929,17 +1665,17 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     local enemyCatchTime = 0x69690000 + os.time() % 0x10000
     
     -- 从精灵数据库获取技能
-    local skills = SeerMonsters.getBattleSkills(petId, petLevel)
+    local skills = SeerPets.getSkillsForLevel(petId, petLevel)
     local skillCount = 0
     for _, s in ipairs(skills) do
         if s > 0 then skillCount = skillCount + 1 end
     end
     
     -- 计算精灵属性 (玩家 dv=31)
-    local stats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 20, maxHp = 20}
+    local stats = SeerPets.getStats(petId, petLevel, 31) or {hp = 20, maxHp = 20}
     
     tprint(string.format("\27[36m[LocalGame] 精灵 %d (%s) Lv%d, HP=%d, 实际技能=%d个, 发送skillNum=4\27[0m", 
-        petId, SeerMonsters.getName(petId), petLevel, stats.hp, skillCount))
+        petId, SeerPets.getName(petId), petLevel, stats.hp, skillCount))
     tprint(string.format("\27[33m[LocalGame] 玩家 catchTime=0x%08X, 敌人 catchTime=0x%08X\27[0m", 
         catchTime, enemyCatchTime))
     
@@ -1982,10 +1718,11 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     responseBody = responseBody .. writeUInt32BE(1)
     
     -- BOSS精灵 (新手教程=13 比比鼠, 官服 level=1)
-    local enemyPetId = 13
+    local enemyPetId = bossId
+    if not enemyPetId or enemyPetId == 0 then enemyPetId = 13 end
     local enemyLevel = 1  -- 官服比比鼠是 level=1
-    local enemySkills = SeerMonsters.getBattleSkills(enemyPetId, enemyLevel)
-    local enemyStats = SeerMonsters.calculateStats(enemyPetId, enemyLevel, 15) or {hp = 12, maxHp = 12}
+    local enemySkills = SeerPets.getSkillsForLevel(enemyPetId, enemyLevel)
+    local enemyStats = SeerPets.getStats(enemyPetId, enemyLevel, 15) or {hp = 12, maxHp = 12}
     local enemySkillCount = 0
     for _, s in ipairs(enemySkills) do
         if s > 0 then enemySkillCount = enemySkillCount + 1 end
@@ -2080,8 +1817,8 @@ function LocalGameServer:sendNoteStartFight(clientData, userId, userData)
         petId, catchTime, bossId, enemyCatchTime))
     
     -- 从精灵数据库获取属性 (玩家 dv=31, 敌人 dv=15)
-    local myStats = SeerMonsters.calculateStats(petId, petLevel, 31) or {hp = 20, maxHp = 20}
-    local enemyStats = SeerMonsters.calculateStats(bossId, enemyLevel, 15) or {hp = 12, maxHp = 12}
+    local myStats = SeerPets.getStats(petId, petLevel, 31) or {hp = 20, maxHp = 20}
+    local enemyStats = SeerPets.getStats(bossId, enemyLevel, 15) or {hp = 12, maxHp = 12}
     
     local responseBody = ""
     
@@ -2252,7 +1989,7 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
     
     -- 构建 AttackValue 结构
     -- 注意: lostHP 是该用户被对方攻击造成的伤害，不是该用户造成的伤害
-    local function buildAttackValue(attackerUserId, skillId, atkTimes, lostHp, gainHp, remainHp, maxHp, isCrit, skills, battleLv, status)
+    local function buildAttackValue(attackerUserId, skillId, atkTimes, lostHp, gainHp, remainHp, maxHp, isCrit, skills, battleLv, status, petType)
         local data = ""
         data = data .. writeUInt32BE(attackerUserId)          -- userID
         data = data .. writeUInt32BE(skillId or 0)            -- skillID
@@ -2314,7 +2051,7 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
         
         data = data .. writeUInt32BE(0)                       -- maxShield
         data = data .. writeUInt32BE(0)                       -- curShield
-        data = data .. writeUInt32BE(0)                       -- petType
+        data = data .. writeUInt32BE(petType or 0)            -- petType (精灵属性类型)
         
         return data
     end
@@ -2328,6 +2065,7 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
         local isPlayerFirst = first.userId == userId
         local attackerSkills = isPlayerFirst and playerSkills or enemySkills
         local attackerBattleLv = isPlayerFirst and (battle and battle.player.battleLv) or (battle and battle.enemy.battleLv)
+        local attackerPetType = isPlayerFirst and (battle and battle.player.type or 0) or (battle and battle.enemy.type or 0)
         
         -- 先攻方的 lostHP = 后攻方对先攻方造成的伤害
         local firstLostHp = 0
@@ -2346,7 +2084,8 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
             first.isCrit,
             attackerSkills,
             attackerBattleLv,
-            nil
+            nil,
+            attackerPetType
         )
         
         tprint(string.format("\27[33m[LocalGame] 先攻: %s 使用 %s, 造成 %d 伤害%s, 剩余HP=%d\27[0m",
@@ -2362,6 +2101,7 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
         local isPlayerSecond = second.userId == userId
         local attackerSkills = isPlayerSecond and playerSkills or enemySkills
         local attackerBattleLv = isPlayerSecond and (battle and battle.player.battleLv) or (battle and battle.enemy.battleLv)
+        local attackerPetType = isPlayerSecond and (battle and battle.player.type or 0) or (battle and battle.enemy.type or 0)
         
         -- 后攻方的 lostHP = 先攻方对后攻方造成的伤害
         local secondLostHp = first and first.damage or 0
@@ -2377,7 +2117,8 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
             second.isCrit,
             attackerSkills,
             attackerBattleLv,
-            nil
+            nil,
+            attackerPetType
         )
         
         tprint(string.format("\27[33m[LocalGame] 后攻: %s 使用 %s, 造成 %d 伤害%s, 剩余HP=%d\27[0m",
@@ -2391,6 +2132,7 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
         -- 但仍需要保持正确的结构
         local deadUserId = first.userId == userId and 0 or userId
         local deadSkills = deadUserId == userId and playerSkills or enemySkills
+        local deadPetType = deadUserId == userId and (battle and battle.player.type or 0) or (battle and battle.enemy.type or 0)
         
         responseBody = responseBody .. buildAttackValue(
             deadUserId,
@@ -2403,7 +2145,8 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
             false,
             deadSkills,
             nil,
-            nil
+            nil,
+            deadPetType
         )
     end
     
@@ -2559,7 +2302,7 @@ function LocalGameServer:sendNoteUpdateProp(clientData, userId, userData)
     local petDv = 31
     
     -- 计算精灵属性
-    local stats = SeerMonsters.calculateStats(petId, petLevel, petDv) or {
+    local stats = SeerPets.getStats(petId, petLevel, petDv) or {
         hp = 20, maxHp = 20, attack = 12, defence = 12, spAtk = 11, spDef = 10, speed = 12
     }
     
@@ -2578,7 +2321,7 @@ function LocalGameServer:sendNoteUpdateProp(clientData, userId, userData)
     
     -- 计算新的当前等级经验
     local newLevelExp = currentLevelExp + gainedExp
-    local expInfo = SeerMonsters.getExpInfo(petId, petLevel, newLevelExp)
+    local expInfo = SeerPets.getExpInfo(petId, petLevel, newLevelExp)
     
     local responseBody = ""
     
@@ -2590,14 +2333,14 @@ function LocalGameServer:sendNoteUpdateProp(clientData, userId, userData)
     responseBody = responseBody .. writeUInt32BE(petId)      -- id
     responseBody = responseBody .. writeUInt32BE(petLevel)   -- level
     responseBody = responseBody .. writeUInt32BE(gainedExp)  -- exp (本次战斗获得的经验)
-    responseBody = responseBody .. writeUInt32BE(expInfo.lvExp)      -- currentLvExp (累计经验)
-    responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp
-    responseBody = responseBody .. writeUInt32BE(stats.maxHp)        -- maxHp
-    responseBody = responseBody .. writeUInt32BE(stats.attack)       -- attack
-    responseBody = responseBody .. writeUInt32BE(stats.defence)      -- defence
-    responseBody = responseBody .. writeUInt32BE(stats.spAtk)        -- sa
-    responseBody = responseBody .. writeUInt32BE(stats.spDef)        -- sd
-    responseBody = responseBody .. writeUInt32BE(stats.speed)        -- sp
+    responseBody = responseBody .. writeUInt32BE(expInfo.lvExp or 0)      -- currentLvExp (累计经验)
+    responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp or 100)  -- nextLvExp
+    responseBody = responseBody .. writeUInt32BE(stats.maxHp or 20)        -- maxHp
+    responseBody = responseBody .. writeUInt32BE(stats.atk or 12)          -- attack (注: Algorithm返回atk)
+    responseBody = responseBody .. writeUInt32BE(stats.def or 12)          -- defence (注: Algorithm返回def)
+    responseBody = responseBody .. writeUInt32BE(stats.spa or 11)          -- sa (注: Algorithm返回spa)
+    responseBody = responseBody .. writeUInt32BE(stats.spd or 10)          -- sd (注: Algorithm返回spd)
+    responseBody = responseBody .. writeUInt32BE(stats.spe or 12)          -- sp (注: Algorithm返回spe)
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_hp
     responseBody = responseBody .. writeUInt32BE(1)          -- ev_a (官服=1)
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_d
@@ -3014,21 +2757,17 @@ function LocalGameServer:handleItemBuy(clientData, cmdId, userId, seqId, body)
             if currentCount + count > maxCount then
                 tprint(string.format("\27[31m[LocalGame] 购买失败: 物品 %d 拥有上限 %d, 当前 %d, 欲购 %d\27[0m", 
                     itemId, maxCount, currentCount, count))
-                -- 错误码 103203: 物品上限
                 self:sendResponse(clientData, cmdId, userId, 103203, "")
                 return
             end
-            
-            if coins < totalCost then
-                tprint(string.format("\27[31m[LocalGame] 金币不足! 需要: %d, 拥有: %d\27[0m", totalCost, coins))
-                -- 错误码 10016: 金币不足
+
+            -- 扣除金币 (Atomic consume)
+            local success, newCoins = db:consumeCoins(userId, totalCost)
+            if not success then
+                tprint(string.format("\27[31m[LocalGame] 金币不足! 需要: %d, 拥有: %d\27[0m", totalCost, newCoins)) -- newCoins is current coins here
                 self:sendResponse(clientData, cmdId, userId, 10016, "")
                 return
             end
-
-            -- 扣除金币
-            local newCoins = coins - totalCost
-            db:updateUserCoins(userId, newCoins)
             
             -- 添加物品
             db:addItem(userId, itemId, count)
@@ -3096,11 +2835,27 @@ function LocalGameServer:handleMultiItemBuy(clientData, cmdId, userId, seqId, bo
     
     if self.userdb then
         local db = self.userdb:new()
+        
+        -- 计算总价格
+        local totalCost = 0
         for _, id in ipairs(itemIds) do
-            db:addItem(userId, id, 1)
+            local price = SeerItems.getPrice(id)
+            totalCost = totalCost + price
         end
-        local user = db:findByUserId(userId)
-        if user then coins = user.coins or 0 end
+        
+        -- 尝试扣款
+        local success, newCoins = db:consumeCoins(userId, totalCost)
+        if success then
+            for _, id in ipairs(itemIds) do
+                db:addItem(userId, id, 1)
+            end
+            coins = newCoins
+            tprint(string.format("\27[32m[LocalGame] 批量购买成功! 花费: %d, 剩余: %d\27[0m", totalCost, coins))
+        else
+            tprint(string.format("\27[31m[LocalGame] 批量购买失败: 金币不足! 需要: %d, 拥有: %d\27[0m", totalCost, newCoins))
+            local user = db:findByUserId(userId)
+            coins = user and user.coins or 0
+        end
     end
     
     local responseBody = writeUInt32BE(coins)
@@ -3429,6 +3184,93 @@ function LocalGameServer:handleCmd70001(clientData, cmdId, userId, seqId, body)
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
+
+-- CMD 9003: 获取NoNo信息
+-- 响应: userID(4) + nonoType(4) + nonoColor(4) + nonoNick(16) + ...
+function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 9003: 获取NoNo信息\27[0m")
+    
+    local targetUserId = userId
+    if #body >= 4 then
+         targetUserId = readUInt32BE(body, 1)
+    end
+
+    local nono = {}
+    if self.userdb then
+        local db = self.userdb:new()
+        nono = db:getNonoData(targetUserId)
+    end
+    
+    local responseBody = writeUInt32BE(targetUserId) ..
+                         writeUInt32BE(nono.isSuper and 1 or 0) .. -- type/flag
+                         writeUInt32BE(nono.color or 0) ..
+                         writeFixedString(nono.nick or "NoNo", 16) ..
+                         writeUInt32BE(nono.energy or 100) ..       -- energy/battery
+                         writeUInt32BE(nono.mate or 0) ..
+                         writeUInt32BE(nono.chip or 0) ..           -- chip ID
+                         writeUInt32BE(nono.grow or 0) ..           -- growth
+                         writeUInt32BE(0) -- func (4)
+                         
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2305: 获取仓库精灵列表
+function LocalGameServer:handleGetStorageList(clientData, cmdId, userId, seqId, body)
+    -- ... (existing code) ...
+    local storagePets = {}
+    if self.userdb then
+        local db = self.userdb:new()
+        storagePets = db:getStoragePets(userId)
+    end
+    
+    local responseBody = writeUInt32BE(#storagePets)
+    for _, pet in ipairs(storagePets) do
+        responseBody = responseBody .. writeUInt32BE(pet.id or 1)
+        responseBody = responseBody .. writeUInt32BE(pet.catchTime or 0)
+        responseBody = responseBody .. writeUInt32BE(pet.level or 1)
+        responseBody = responseBody .. writeUInt32BE(pet.nature or 0)
+        responseBody = responseBody .. writeUInt32BE(0) -- flag/status
+    end
+    
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2306: 精灵恢复 (消耗NoNo能量)
+function LocalGameServer:handlePetCure(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 2306: 精灵恢复\27[0m")
+    
+    local db = self.userdb:new()
+    local nono = db:getNonoData(userId)
+    
+    -- 检查能量
+    if (nono.energy or 0) < 10 then
+        -- 能量不足
+        -- Send standard error? Or custom?
+        -- For now, just fail silently or return 0
+        -- Client might expect specific error code
+    end
+    
+    -- 扣除能量
+    nono.energy = math.max(0, (nono.energy or 100) - 10)
+    db:updateNonoData(userId, {energy = nono.energy})
+    
+    -- 恢复所有背包精灵
+    local userData = self:getOrCreateUser(userId)
+    -- We don't track HP in simple userData, it's calculated dynamically or stored in DB if complex.
+    -- Assuming client just needs "OK" response to update UI.
+    -- But we should update DB if we were tracking currentHP.
+    -- Currently we generate HP on fly or don't persist damaged state fully for wild/starter?
+    -- Actually we need to make sure subsequent 'getPetInfo' returns full HP.
+    -- But since we use 'SeerPets.getStats' and don't seem to persist 'currentHp' in DB yet (only IV/EV/Level),
+    -- they always spawn full HP on login/get info unless handled.
+    -- Wait, if they always spawn full HP, then cure is visual?
+    -- No, battle logic might cache it.
+    
+    -- For now, just acknowledge the cure.
+    local responseBody = writeUInt32BE(nono.energy)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
 
 -- CMD 80008: 心跳包 (NIEO_HEART)
 -- 官服主动发送心跳，客户端收到后回复相同命令
