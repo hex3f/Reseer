@@ -22,6 +22,9 @@ local SeerMonsters = require('../seer_monsters')
 -- 加载技能数据
 local SeerSkills = require('../seer_skills')
 
+-- 加载物品数据
+local SeerItems = require('../seer_items')
+
 -- 加载战斗系统
 local SeerBattle = require('../seer_battle')
 
@@ -31,6 +34,10 @@ local OnlineTracker = require('../handlers/online_tracker')
 -- 加载共享处理器
 local SharedHandlers = require('../handlers/shared_handlers')
 
+-- 加载配置
+local GameConfig = require('../game_config')
+local SeerLoginResponse = require('./seer_login_response')
+
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
 end
@@ -38,6 +45,14 @@ end
 -- 数据包结构:
 -- 17 字节头部: length(4) + version(1) + cmdId(4) + userId(4) + result(4)
 -- 然后是数据体
+
+-- 辅助函数：获取配置值 (可能是常量也可能是函数)
+local function getConfigValue(val)
+    if type(val) == "function" then
+        return val()
+    end
+    return val
+end
 
 function LocalGameServer:new()
     local obj = {
@@ -271,6 +286,7 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2601] = self.handleItemBuy,           -- 购买物品
         [2604] = self.handleChangeCloth,       -- 更换服装
         [2605] = self.handleItemList,          -- 物品列表
+        [2606] = self.handleMultiItemBuy,      -- 批量购买物品
         [2751] = self.handleMailGetList,       -- 获取邮件列表
         [2757] = self.handleMailGetUnread,     -- 获取未读邮件
         [8001] = self.handleInform,            -- 通知
@@ -500,7 +516,37 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     local nonoData = userData.nono or {}
     local teamInfo = userData.teamInfo or {}
     local teamPKInfo = userData.teamPKInfo or {}
+    local teamPKInfo = userData.teamPKInfo or {}
     local pets = userData.pets or {}
+    if not userData.pets then userData.pets = pets end
+    
+    -- [GameConfig] 初始精灵发放 (如果用户没有任何精灵且配置了初始精灵)
+    if #pets == 0 and GameConfig.InitialPets and #GameConfig.InitialPets > 0 then
+        for _, petConfig in ipairs(GameConfig.InitialPets) do
+            if petConfig.id then
+                local newPet = {
+                    id = petConfig.id,
+                    level = petConfig.level or getConfigValue(GameConfig.PetDefaults.level) or 5,
+                    name = petConfig.name or "",
+                    dv = getConfigValue(GameConfig.PetDefaults.dv) or 31,      -- 使用配置的默认个体值
+                    nature = getConfigValue(GameConfig.PetDefaults.nature) or 0, -- 使用配置的默认性格
+                    exp = 0,
+                    catchTime = os.time(),
+                    catchMap = 1,
+                    catchRect = 0,
+                    catchLevel = petConfig.level or 5,
+                    skinID = 0
+                }
+                table.insert(pets, newPet)
+                tprint(string.format("\27[36m[LocalGame] [GameConfig] 发放初始精灵: %d (Lv.%d)\27[0m", newPet.id, newPet.level))
+            end
+        end
+        -- 保存数据以确保精灵不丢失 (虽然 handleLoginIn 通常不负责保存，但这对新用户很重要)
+         if self.userdb then
+             -- 简单触发一次保存 (依赖于定时保存或 logout 保存也行，但明确更新内存引用)
+             -- self:saveUser(userId, userData) -- saveUser 不是 LocalGameServer 的直接方法，需检查
+         end
+    end
     local clothes = userData.clothes or {}
     
     -- 构建响应 (按 UserInfo.setForLoginInfo 解析顺序)
@@ -510,59 +556,65 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(userId)                              -- userID
     -- 使用2009年的时间戳，让 checkIsNovice() 返回 false，跳过新手任务检查
     -- 2009-01-01 00:00:00 UTC = 1230768000
-    responseBody = responseBody .. writeUInt32BE(1230768000)                          -- regTime (固定为2009年)
+    -- 使用配置的注册时间
+    responseBody = responseBody .. writeUInt32BE(GameConfig.InitialPlayer.regTime)    -- regTime
     responseBody = responseBody .. writeFixedString(nickname, 16)                     -- nick (16字节)
     
     -- vipFlags: bit0=vip, bit1=viped
     local vipFlags = 0
+    -- 如果用户数据中没有设置VIP状态，使用配置文件的默认值
+    if userData.vip == nil then userData.vip = GameConfig.InitialPlayer.isVIP end
+    if userData.vipLevel == nil then userData.vipLevel = GameConfig.InitialPlayer.vipLevel end
+    
     if userData.vip then vipFlags = vipFlags + 1 end
-    if userData.viped then vipFlags = vipFlags + 2 end
+    if userData.viped or (userData.vip and GameConfig.InitialPlayer.isVIP) then vipFlags = vipFlags + 2 end
+    
     responseBody = responseBody .. writeUInt32BE(vipFlags)                            -- vipFlags
-    responseBody = responseBody .. writeUInt32BE(userData.dsFlag or 0)                -- dsFlag
-    responseBody = responseBody .. writeUInt32BE(userData.color or 1)                 -- color
-    responseBody = responseBody .. writeUInt32BE(userData.texture or 1)               -- texture
-    responseBody = responseBody .. writeUInt32BE(userData.energy or 100)              -- energy
-    responseBody = responseBody .. writeUInt32BE(userData.coins or 1000)              -- coins
-    responseBody = responseBody .. writeUInt32BE(userData.fightBadge or 0)            -- fightBadge
+    responseBody = responseBody .. writeUInt32BE(userData.dsFlag or GameConfig.InitialPlayer.dsFlag) -- dsFlag
+    responseBody = responseBody .. writeUInt32BE(userData.color or GameConfig.InitialPlayer.color) -- color
+    responseBody = responseBody .. writeUInt32BE(userData.texture or GameConfig.InitialPlayer.texture) -- texture
+    responseBody = responseBody .. writeUInt32BE(userData.energy or GameConfig.InitialPlayer.energy) -- energy
+    responseBody = responseBody .. writeUInt32BE(userData.coins or GameConfig.InitialPlayer.coins)   -- coins
+    responseBody = responseBody .. writeUInt32BE(userData.fightBadge or GameConfig.InitialPlayer.fightBadge) -- fightBadge
     
     -- 登录时默认地图: 如果新手任务完成则进地图1，否则进515
     -- 检查任务88是否完成来判断新手任务是否完成
-    local defaultMapId = 1  -- 默认进地图1（克洛斯星）
+    local defaultMapId = GameConfig.InitialPlayer.mapID
     if self.userdb then
         local db = self.userdb:new()
         local gameData = db:getOrCreateGameData(userId)
         if gameData.tasks and gameData.tasks["88"] and gameData.tasks["88"].status == "completed" then
-            defaultMapId = gameData.mapId or 1  -- 新手任务完成，进保存的地图或地图1
+            defaultMapId = gameData.mapId or GameConfig.InitialPlayer.mapID
         else
-            defaultMapId = 515  -- 新手任务未完成，进新手地图
+            defaultMapId = 515  -- 新手任务未完成，进新手地图 (这里可能也需要配置，暂时保留)
         end
     end
     responseBody = responseBody .. writeUInt32BE(defaultMapId)                        -- mapID
-    responseBody = responseBody .. writeUInt32BE(300)                                 -- posX
-    responseBody = responseBody .. writeUInt32BE(200)                                 -- posY
-    responseBody = responseBody .. writeUInt32BE(userData.timeToday or 0)             -- timeToday
-    responseBody = responseBody .. writeUInt32BE(userData.timeLimit or 86400)         -- timeLimit (24小时=86400秒)
+    responseBody = responseBody .. writeUInt32BE(GameConfig.InitialPlayer.posX)       -- posX
+    responseBody = responseBody .. writeUInt32BE(GameConfig.InitialPlayer.posY)       -- posY
+    responseBody = responseBody .. writeUInt32BE(userData.timeToday or GameConfig.InitialPlayer.timeToday) -- timeToday
+    responseBody = responseBody .. writeUInt32BE(userData.timeLimit or GameConfig.InitialPlayer.timeLimit) -- timeLimit
     
     -- 2. halfDayFlags (4个byte)
     responseBody = responseBody .. string.char(
-        userData.isClothHalfDay and 1 or 0,
-        userData.isRoomHalfDay and 1 or 0,
-        userData.iFortressHalfDay and 1 or 0,
-        userData.isHQHalfDay and 1 or 0
+        userData.isClothHalfDay or GameConfig.InitialPlayer.isClothHalfDay,
+        userData.isRoomHalfDay or GameConfig.InitialPlayer.isRoomHalfDay,
+        userData.iFortressHalfDay or GameConfig.InitialPlayer.iFortressHalfDay,
+        userData.isHQHalfDay or GameConfig.InitialPlayer.isHQHalfDay
     )
     
     -- 3. 登录/邀请信息
-    responseBody = responseBody .. writeUInt32BE(userData.loginCnt or 1)              -- loginCnt
-    responseBody = responseBody .. writeUInt32BE(userData.inviter or 0)               -- inviter
-    responseBody = responseBody .. writeUInt32BE(userData.newInviteeCnt or 0)         -- newInviteeCnt
+    responseBody = responseBody .. writeUInt32BE(userData.loginCnt or GameConfig.InitialPlayer.loginCnt)        -- loginCnt
+    responseBody = responseBody .. writeUInt32BE(userData.inviter or GameConfig.InitialPlayer.inviter)          -- inviter
+    responseBody = responseBody .. writeUInt32BE(userData.newInviteeCnt or GameConfig.InitialPlayer.newInviteeCnt) -- newInviteeCnt
     
     -- 4. VIP信息
-    responseBody = responseBody .. writeUInt32BE(userData.vipLevel or 0)              -- vipLevel
-    responseBody = responseBody .. writeUInt32BE(userData.vipValue or 0)              -- vipValue
-    responseBody = responseBody .. writeUInt32BE(userData.vipStage or 1)              -- vipStage
-    responseBody = responseBody .. writeUInt32BE(userData.autoCharge or 0)            -- autoCharge
-    responseBody = responseBody .. writeUInt32BE(userData.vipEndTime or 0)            -- vipEndTime
-    responseBody = responseBody .. writeUInt32BE(userData.freshManBonus or 0)         -- freshManBonus
+    responseBody = responseBody .. writeUInt32BE(userData.vipLevel or 0)                                        -- vipLevel
+    responseBody = responseBody .. writeUInt32BE(userData.vipValue or 0)                                        -- vipValue
+    responseBody = responseBody .. writeUInt32BE(userData.vipStage or GameConfig.InitialPlayer.vipStage)        -- vipStage
+    responseBody = responseBody .. writeUInt32BE(userData.autoCharge or GameConfig.InitialPlayer.autoCharge)    -- autoCharge
+    responseBody = responseBody .. writeUInt32BE(userData.vipEndTime or GameConfig.InitialPlayer.vipEndTime)    -- vipEndTime
+    responseBody = responseBody .. writeUInt32BE(userData.freshManBonus or 0)                                   -- freshManBonus
     
     -- 5. nonoChipList (80 bytes)
     responseBody = responseBody .. string.rep("\0", 80)
@@ -571,33 +623,33 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. string.rep("\0", 50)
     
     -- 7. 师徒系统
-    responseBody = responseBody .. writeUInt32BE(userData.teacherID or 0)             -- teacherID
-    responseBody = responseBody .. writeUInt32BE(userData.studentID or 0)             -- studentID
-    responseBody = responseBody .. writeUInt32BE(userData.graduationCount or 0)       -- graduationCount
-    responseBody = responseBody .. writeUInt32BE(userData.maxPuniLv or 100)           -- maxPuniLv
+    responseBody = responseBody .. writeUInt32BE(userData.teacherID or GameConfig.InitialPlayer.teacherID)             -- teacherID
+    responseBody = responseBody .. writeUInt32BE(userData.studentID or GameConfig.InitialPlayer.studentID)             -- studentID
+    responseBody = responseBody .. writeUInt32BE(userData.graduationCount or GameConfig.InitialPlayer.graduationCount) -- graduationCount
+    responseBody = responseBody .. writeUInt32BE(userData.maxPuniLv or GameConfig.InitialPlayer.maxPuniLv)             -- maxPuniLv
     
     -- 8. 精灵相关
-    responseBody = responseBody .. writeUInt32BE(userData.petMaxLev or 100)           -- petMaxLev
-    responseBody = responseBody .. writeUInt32BE(userData.petAllNum or 0)             -- petAllNum
-    responseBody = responseBody .. writeUInt32BE(userData.monKingWin or 0)            -- monKingWin
+    responseBody = responseBody .. writeUInt32BE(userData.petMaxLev or GameConfig.InitialPlayer.petMaxLev)   -- petMaxLev
+    responseBody = responseBody .. writeUInt32BE(userData.petAllNum or GameConfig.InitialPlayer.petAllNum)   -- petAllNum
+    responseBody = responseBody .. writeUInt32BE(userData.monKingWin or GameConfig.InitialPlayer.monKingWin) -- monKingWin
     
     -- 9. 关卡进度
-    responseBody = responseBody .. writeUInt32BE(userData.curStage or 0)              -- curStage
-    responseBody = responseBody .. writeUInt32BE(userData.maxStage or 0)              -- maxStage
-    responseBody = responseBody .. writeUInt32BE(userData.curFreshStage or 0)         -- curFreshStage
-    responseBody = responseBody .. writeUInt32BE(userData.maxFreshStage or 0)         -- maxFreshStage
-    responseBody = responseBody .. writeUInt32BE(userData.maxArenaWins or 0)          -- maxArenaWins
+    responseBody = responseBody .. writeUInt32BE(userData.curStage or GameConfig.InitialPlayer.curStage)           -- curStage
+    responseBody = responseBody .. writeUInt32BE(userData.maxStage or GameConfig.InitialPlayer.maxStage)           -- maxStage
+    responseBody = responseBody .. writeUInt32BE(userData.curFreshStage or GameConfig.InitialPlayer.curFreshStage) -- curFreshStage
+    responseBody = responseBody .. writeUInt32BE(userData.maxFreshStage or GameConfig.InitialPlayer.maxFreshStage) -- maxFreshStage
+    responseBody = responseBody .. writeUInt32BE(userData.maxArenaWins or GameConfig.InitialPlayer.maxArenaWins)   -- maxArenaWins
     
     -- 10. 战斗加成
-    responseBody = responseBody .. writeUInt32BE(userData.twoTimes or 0)              -- twoTimes
-    responseBody = responseBody .. writeUInt32BE(userData.threeTimes or 0)            -- threeTimes
-    responseBody = responseBody .. writeUInt32BE(userData.autoFight or 0)             -- autoFight
-    responseBody = responseBody .. writeUInt32BE(userData.autoFightTimes or 0)        -- autoFightTimes
-    responseBody = responseBody .. writeUInt32BE(userData.energyTimes or 0)           -- energyTimes
-    responseBody = responseBody .. writeUInt32BE(userData.learnTimes or 0)            -- learnTimes
+    responseBody = responseBody .. writeUInt32BE(userData.twoTimes or GameConfig.InitialPlayer.twoTimes)            -- twoTimes
+    responseBody = responseBody .. writeUInt32BE(userData.threeTimes or GameConfig.InitialPlayer.threeTimes)        -- threeTimes
+    responseBody = responseBody .. writeUInt32BE(userData.autoFight or GameConfig.InitialPlayer.autoFight)          -- autoFight
+    responseBody = responseBody .. writeUInt32BE(userData.autoFightTimes or GameConfig.InitialPlayer.autoFightTimes)-- autoFightTimes
+    responseBody = responseBody .. writeUInt32BE(userData.energyTimes or GameConfig.InitialPlayer.energyTimes)      -- energyTimes
+    responseBody = responseBody .. writeUInt32BE(userData.learnTimes or GameConfig.InitialPlayer.learnTimes)        -- learnTimes
     
     -- 11. 其他
-    responseBody = responseBody .. writeUInt32BE(userData.monBtlMedal or 0)           -- monBtlMedal
+    responseBody = responseBody .. writeUInt32BE(userData.monBtlMedal or GameConfig.InitialPlayer.monBtlMedal)      -- monBtlMedal
     responseBody = responseBody .. writeUInt32BE(userData.recordCnt or 0)             -- recordCnt
     responseBody = responseBody .. writeUInt32BE(userData.obtainTm or 0)              -- obtainTm
     responseBody = responseBody .. writeUInt32BE(userData.soulBeadItemID or 0)        -- soulBeadItemID
@@ -605,11 +657,18 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(userData.fuseTimes or 0)             -- fuseTimes
     
     -- 12. NONO信息
-    responseBody = responseBody .. writeUInt32BE(userData.hasNono or nonoData.flag or 1)  -- hasNono
-    responseBody = responseBody .. writeUInt32BE(userData.superNono or nonoData.superNono or 0)  -- superNono
-    responseBody = responseBody .. writeUInt32BE(userData.nonoState or nonoData.state or 0)      -- nonoState
-    responseBody = responseBody .. writeUInt32BE(userData.nonoColor or nonoData.color or 1)      -- nonoColor
-    responseBody = responseBody .. writeFixedString(userData.nonoNick or nonoData.nick or "", 16) -- nonoNick
+    -- 优先使用 NoNo data, 其次 User data, 最后 GameConfig
+    local nonoFlag = userData.hasNono or nonoData.flag or GameConfig.InitialPlayer.nono.flag
+    local superNono = userData.superNono or nonoData.superNono or GameConfig.InitialPlayer.nono.superNono
+    local nonoState = userData.nonoState or nonoData.state or GameConfig.InitialPlayer.nono.state
+    local nonoColor = userData.nonoColor or nonoData.color or GameConfig.InitialPlayer.nono.color
+    local nonoNick = userData.nonoNick or nonoData.nick or GameConfig.InitialPlayer.nono.nick
+    
+    responseBody = responseBody .. writeUInt32BE(nonoFlag)                           -- hasNono
+    responseBody = responseBody .. writeUInt32BE(superNono)                          -- superNono
+    responseBody = responseBody .. writeUInt32BE(nonoState)                          -- nonoState
+    responseBody = responseBody .. writeUInt32BE(nonoColor)                          -- nonoColor
+    responseBody = responseBody .. writeFixedString(nonoNick, 16)                    -- nonoNick
     
     -- 13. TeamInfo: id(4) + priv(4) + superCore(4) + isShow(4) + allContribution(4) + canExContribution(4) = 24字节
     responseBody = responseBody .. writeUInt32BE(teamInfo.id or 0)                    -- team.id
@@ -624,9 +683,9 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(teamPKInfo.homeTeamID or 0)          -- teamPK.homeTeamID
     
     -- 15. 保留字段
-    responseBody = responseBody .. string.char(0)                                     -- reserved (1 byte)
-    responseBody = responseBody .. writeUInt32BE(userData.badge or 0)                 -- badge
-    responseBody = responseBody .. string.rep("\0", 27)                               -- reserved (27 bytes)
+    responseBody = responseBody .. string.char(0)                                                   -- reserved (1 byte)
+    responseBody = responseBody .. writeUInt32BE(userData.badge or GameConfig.InitialPlayer.badge)  -- badge
+    responseBody = responseBody .. string.rep("\0", 27)                                             -- reserved (27 bytes)
     
     -- 16. taskList (500 bytes) - 任务状态
     -- 每个字节代表一个任务的状态: 0=未接受, 1=已接受, 3=已完成
@@ -753,7 +812,7 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     end
     
     -- 19. curTitle
-    responseBody = responseBody .. writeUInt32BE(userData.curTitle or 0)              -- curTitle
+    responseBody = responseBody .. writeUInt32BE(userData.curTitle or GameConfig.InitialPlayer.curTitle)              -- curTitle
     
     -- 20. bossAchievement (200 bytes)
     responseBody = responseBody .. string.rep("\0", 200)
@@ -776,6 +835,13 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     
     -- 注册玩家到在线追踪系统
     OnlineTracker.playerLogin(userId, clientData)
+    
+    -- [GameConfig] 发送系统公告
+    if GameConfig.SystemMessage.enabled and GameConfig.SystemMessage.content then
+        local noticeBody = SeerLoginResponse.makeSystemNotice(nil, 5, GameConfig.SystemMessage.content) -- noticeType=5 (通常用于活动公告)
+        self:sendResponse(clientData, 8002, userId, 0, noticeBody)
+        tprint(string.format("\27[36m[LocalGame] 已发送系统公告给用户 %d\27[0m", userId))
+    end
 end
 
 -- CMD 1002: 获取系统时间
@@ -1284,10 +1350,10 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     -- 从数据库读取精灵数据
     local pet = nil
     local petId = 0
-    local petLevel = 5
+    local petLevel = getConfigValue(GameConfig.PetDefaults.level) or 5
     local petExp = 0
-    local petDv = 31
-    local petNature = 0
+    local petDv = getConfigValue(GameConfig.PetDefaults.dv) or 31
+    local petNature = getConfigValue(GameConfig.PetDefaults.nature) or 0
     
     if self.userdb then
         local db = self.userdb:new()
@@ -2916,10 +2982,129 @@ function LocalGameServer:handleCatchMonster(clientData, cmdId, userId, seqId, bo
 end
 
 -- CMD 2601: 购买物品
--- BuyItemInfo: 简单响应
+-- CMD 2601: 购买物品
+-- BuyItemInfo: 购买响应 (包含最新金币数)
 function LocalGameServer:handleItemBuy(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2601: 购买物品\27[0m")
-    self:sendResponse(clientData, cmdId, userId, 0, "")
+    
+    local itemId = 0
+    local count = 0
+    if #body >= 8 then
+        itemId = readUInt32BE(body, 1)
+        count = readUInt32BE(body, 5)
+    end
+    
+    local coins = 0  -- 默认金币为0，后面会从数据库读取
+    
+    -- 简单的数据库处理
+    if self.userdb then
+        local db = self.userdb:new()
+        local user = db:findByUserId(userId)
+        
+        if user then
+            coins = user.coins or 0
+            
+            -- 获取物品价格和最大持有数
+            local price = SeerItems.getPrice(itemId)
+            local maxCount = SeerItems.getMax(itemId)
+            local currentCount = db:getItemCount(userId, itemId)
+            
+            local totalCost = price * count
+            
+            if currentCount + count > maxCount then
+                tprint(string.format("\27[31m[LocalGame] 购买失败: 物品 %d 拥有上限 %d, 当前 %d, 欲购 %d\27[0m", 
+                    itemId, maxCount, currentCount, count))
+                -- 错误码 103203: 物品上限
+                self:sendResponse(clientData, cmdId, userId, 103203, "")
+                return
+            end
+            
+            if coins < totalCost then
+                tprint(string.format("\27[31m[LocalGame] 金币不足! 需要: %d, 拥有: %d\27[0m", totalCost, coins))
+                -- 错误码 10016: 金币不足
+                self:sendResponse(clientData, cmdId, userId, 10016, "")
+                return
+            end
+
+            -- 扣除金币
+            local newCoins = coins - totalCost
+            db:updateUserCoins(userId, newCoins)
+            
+            -- 添加物品
+            db:addItem(userId, itemId, count)
+            
+            -- 更新返回的金币数
+            coins = newCoins
+            tprint(string.format("\27[32m[LocalGame] 购买成功! 剩余金币: %d\27[0m", coins))
+        end
+    end
+    
+    -- 官服响应格式: Coins(4) + ItemID(4) + Count(4) + Padding(4)
+    local responseBody = writeUInt32BE(coins) .. 
+                        writeUInt32BE(itemId) .. 
+                        writeUInt32BE(count) .. 
+                        writeUInt32BE(0)
+                        
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2605: 获取物品列表
+-- 响应: count(4) + [itemID(4) + count(4) + expireTime(4) + padding(4)]...
+-- 官服ItemInfo 16字节
+function LocalGameServer:handleItemList(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 2605: 获取物品列表\27[0m")
+    
+    local items = {}
+    if self.userdb then
+        local db = self.userdb:new()
+        items = db:getItemList(userId)
+    end
+    
+    local responseBody = writeUInt32BE(#items)
+    for _, item in ipairs(items) do
+        responseBody = responseBody .. writeUInt32BE(item.itemId or 0)
+        responseBody = responseBody .. writeUInt32BE(item.count or 0)
+        responseBody = responseBody .. writeUInt32BE(item.expireTime or 0) -- 0x00057E40? 官服似乎发这个
+        responseBody = responseBody .. writeUInt32BE(0) -- Padding
+    end
+    
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+end
+
+-- CMD 2606: 批量购买物品
+-- 请求: count(4) + [itemID(4)]...
+-- 响应: coins(4)
+function LocalGameServer:handleMultiItemBuy(clientData, cmdId, userId, seqId, body)
+    tprint("\27[36m[LocalGame] 处理 CMD 2606: 批量购买物品\27[0m")
+    
+    local count = 0
+    local itemIds = {}
+    
+    if #body >= 4 then
+        count = readUInt32BE(body, 1)
+        for i = 1, count do
+            if #body >= 4 + i * 4 then
+                local id = readUInt32BE(body, 1 + i * 4)
+                table.insert(itemIds, id)
+            end
+        end
+    end
+    
+    tprint(string.format("\27[36m[LocalGame] 批量购买 %d 个物品\27[0m", #itemIds))
+    
+    local coins = 0 -- 默认金币为0
+    
+    if self.userdb then
+        local db = self.userdb:new()
+        for _, id in ipairs(itemIds) do
+            db:addItem(userId, id, 1)
+        end
+        local user = db:findByUserId(userId)
+        if user then coins = user.coins or 0 end
+    end
+    
+    local responseBody = writeUInt32BE(coins)
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
 -- CMD 2604: 更换服装

@@ -583,7 +583,7 @@ function SeerLoginResponse.makePetBagResponse(user)
 end
 
 -- 生成系统通知 (CMD 8002)
-function SeerLoginResponse.makeSystemNotice(user, noticeType)
+function SeerLoginResponse.makeSystemNotice(user, noticeType, content)
     -- 系统消息格式
     local buf = buffer.Buffer:new(4096)
     local pos = 1
@@ -593,7 +593,7 @@ function SeerLoginResponse.makeSystemNotice(user, noticeType)
     pos = pos + 4
     
     -- 消息内容长度
-    local msg = ""
+    local msg = content or ""
     buf:wuint(pos, #msg)
     pos = pos + 4
     

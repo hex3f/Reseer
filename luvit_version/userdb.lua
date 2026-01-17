@@ -215,6 +215,13 @@ function UserDB:getOrCreateGameData(userId)
     return self.gameData[key]
 end
 
+function UserDB:updateUserCoins(userId, coins)
+    local data = self:getOrCreateGameData(userId)
+    data.coins = coins
+    self:saveGameData(userId, data)
+    return true
+end
+
 -- ==================== 物品管理 ====================
 
 function UserDB:addItem(userId, itemId, count)
@@ -254,6 +261,23 @@ function UserDB:getItemCount(userId, itemId)
         return data.items[key].count or 0
     end
     return 0
+end
+
+function UserDB:getItemList(userId)
+    local data = self:getOrCreateGameData(userId)
+    local list = {}
+    
+    if data.items then
+        for itemId, itemData in pairs(data.items) do
+            table.insert(list, {
+                itemId = tonumber(itemId),
+                count = itemData.count or 0,
+                expireTime = itemData.expireTime or 360000 -- 默认给个过期时间，或者无限制
+            })
+        end
+    end
+    
+    return list
 end
 
 -- ==================== 精灵图鉴 ====================

@@ -39,7 +39,7 @@ function SeerMonsters.load()
         return true
     end
     
-    local xmlPath = "../data/spt.xml"
+    local xmlPath = "./data/spt.xml"
     local content, err = fs.readFileSync(xmlPath)
     
     if not content then

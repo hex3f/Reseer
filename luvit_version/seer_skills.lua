@@ -13,7 +13,7 @@ function SeerSkills.load()
     local fs = require('fs')
     local path = require('path')
     
-    local skillsPath = path.join(path.dirname(module.path), '..', 'data', 'skills.xml')
+    local skillsPath = path.join(path.dirname(module.path), 'data', 'skills.xml')
     local content = fs.readFileSync(skillsPath)
     
     if not content then
