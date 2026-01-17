@@ -962,28 +962,32 @@ function LocalGameServer:handleCompleteTask(clientData, cmdId, userId, seqId, bo
     local rewardPetId = 0
     local rewardCaptureTm = 0
     local rewardItems = {}
+    local shouldGiveRewards = true
     
-    -- 处理配置的奖励
-    if taskConfig then
+    -- 检查任务是否已经完成过
+    if db then
+        local gameData = db:getOrCreateGameData(userId)
+        gameData.tasks = gameData.tasks or {}
+        local existingTask = gameData.tasks[tostring(taskId)]
+        
+        if existingTask and existingTask.status == "completed" then
+            tprint(string.format("\27[33m[LocalGame] 任务 %d 已完成过，不再发放奖励\27[0m", taskId))
+            shouldGiveRewards = false
+        end
+    end
+    
+    -- 只有首次完成才发放奖励
+    if shouldGiveRewards and taskConfig then
         -- 1. 精灵奖励 (特殊处理 Task 86)
         if taskConfig.type == "select_pet" and taskConfig.paramMap then
             local petId = taskConfig.paramMap[param] or 1
-            -- 生成唯一 catchId
             local catchTime = os.time()
-            -- 这里只记录选择，实际添加在客户端请求 PET_RELEASE (CMD 2304) 时?
-            -- 不，通常在这里直接添加进背包或暂存
-            -- 模拟 Task 86 的行为: 设置 user.currentPetId
             userData.currentPetId = petId
-            -- 使用固定的 rewardCaptureTm (0x6969C400) 确保后续 fight_handlers 能获取到正确的 catchTime
             userData.catchId = 0x6969C400 
             
-            if db then
-                 -- 这里我们直接给玩家发一只
-                 -- db:addPet(userId, petId, 5) -- 假设5级
-            end
-            
             rewardPetId = petId
-            rewardCaptureTm = 0x6969C400 -- 硬编码或者随机
+            rewardCaptureTm = 0x6969C400
+            tprint(string.format("\27[32m[LocalGame] 发放精灵奖励: petId=%d\27[0m", petId))
         end
         
         -- 2. 物品奖励
@@ -992,6 +996,7 @@ function LocalGameServer:handleCompleteTask(clientData, cmdId, userId, seqId, bo
                 table.insert(rewardItems, item)
                 if db then
                     db:addItem(userId, item.id, item.count)
+                    tprint(string.format("\27[32m[LocalGame] 发放物品奖励: itemId=%d, count=%d\27[0m", item.id, item.count))
                 end
             end
         end
@@ -1004,18 +1009,14 @@ function LocalGameServer:handleCompleteTask(clientData, cmdId, userId, seqId, bo
                 db:saveGameData(userId, gameData)
                 tprint(string.format("\27[32m[LocalGame] 发放金币奖励: %d\27[0m", taskConfig.rewards.coins))
             end
-            -- 金币通常作为特殊物品 ID=1 返回
-             table.insert(rewardItems, {id=1, count=taskConfig.rewards.coins})
+            table.insert(rewardItems, {id=1, count=taskConfig.rewards.coins})
         end
         
-        -- 4. 特殊奖励 (SeerTaskConfig 中定义的 special)
+        -- 4. 特殊奖励
         if taskConfig.rewards and taskConfig.rewards.special then
              for _, sp in ipairs(taskConfig.rewards.special) do
-                 -- 特殊类型: 1=金币, 3=经验?, 5=?
-                 -- 这里为了响应格式统一，我们把它塞进 rewardItems list 对应的结构里
-                 -- 注意: 协议是 [itemID(4) + itemCnt(4)]，如果 special 的 type 不是物品ID，可能需要特殊处理
-                 -- 但根据 Task 88 的 log: 00 00 00 01 (ID=1) ... 所以特殊奖励也是物品ID格式
                  table.insert(rewardItems, {id=sp.type, count=sp.value})
+                 tprint(string.format("\27[32m[LocalGame] 发放特殊奖励: type=%d, value=%d\27[0m", sp.type, sp.value))
              end
         end
     end
@@ -1180,6 +1181,9 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
 end
 
 -- CMD 2303: 获取精灵列表
+-- CMD 2303: 获取精灵列表
+-- 响应格式: petCount(4) + [PetListInfo * petCount]
+-- PetListInfo: id(4) + catchTime(4) + skinID(4) = 12 bytes
 function LocalGameServer:handleGetPetList(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2303: 获取精灵列表\27[0m")
     
@@ -1194,41 +1198,22 @@ function LocalGameServer:handleGetPetList(clientData, cmdId, userId, seqId, body
         for _, pet in ipairs(pets) do
             petCount = petCount + 1
             local petId = pet.id or 0
-            local catchTime = pet.catchTime or 0
-            local level = pet.level or 5
+            local catchTime = pet.catchTime or os.time()
+            local skinID = pet.skinID or 0
             
-            -- 计算精灵属性（如果数据库没有保存）
-            local stats = SeerPets.getStats(petId, level, pet.dv or 31) or {hp = 100, maxHp = 100}
-            local hp = pet.hp or stats.hp or 100
-            local maxHp = pet.maxHp or stats.maxHp or 100
-            
-            -- 获取精灵技能
-            local skills = SeerPets.getSkillsForLevel(petId, level) or {}
-            local skillCount = math.min(#skills, 4)
-            
-            -- PetListInfo: catchTime(4) + id(4) + level(4) + hp(4) + maxHp(4) + skillNum(4) + skills[4]*(id+pp)
+            -- PetListInfo: id(4) + catchTime(4) + skinID(4)
             petData = petData ..
-                writeUInt32BE(catchTime) ..
                 writeUInt32BE(petId) ..
-                writeUInt32BE(level) ..
-                writeUInt32BE(hp) ..
-                writeUInt32BE(maxHp) ..
-                writeUInt32BE(skillCount)
+                writeUInt32BE(catchTime) ..
+                writeUInt32BE(skinID)
             
-            -- 写入技能 (最多4个)
-            for i = 1, 4 do
-                local skillId = skills[i] or 0
-                if type(skillId) == "table" then
-                    skillId = skillId.id or 0
-                end
-                petData = petData .. writeUInt32BE(skillId) .. writeUInt32BE(30)  -- pp 默认30
-            end
-            
-            tprint(string.format("\27[36m[LocalGame] 返回精灵: id=%d, catchTime=0x%08X, level=%d\27[0m", petId, catchTime, level))
+            tprint(string.format("\27[36m[LocalGame] 返回精灵: id=%d, catchTime=%d, skinID=%d\27[0m", 
+                petId, catchTime, skinID))
         end
     end
     
     local responseBody = writeUInt32BE(petCount) .. petData
+    tprint(string.format("\27[32m[LocalGame] 返回 %d 只精灵\27[0m", petCount))
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
 end
 
@@ -2522,21 +2507,10 @@ function LocalGameServer:getOrCreateUser(userId)
                 end
             end
             
-            -- 检查服装数量
-            local clothesCount = 0
-            if self.users[userId].clothes and type(self.users[userId].clothes) == "table" then
-                for _ in pairs(self.users[userId].clothes) do clothesCount = clothesCount + 1 end
-            end
-            
-            -- 从 items 中提取服装 (100xxx) - 只在 clothes 为空时
-            if gameData.items and clothesCount == 0 then
+            -- 检查服装数量（不再自动从 items 提取服装）
+            -- 服装应该由玩家手动穿戴，而不是自动穿上
+            if not self.users[userId].clothes then
                 self.users[userId].clothes = {}
-                for itemIdStr, itemData in pairs(gameData.items) do
-                    local itemId = tonumber(itemIdStr)
-                    if itemId and itemId >= 100000 and itemId < 200000 then
-                        table.insert(self.users[userId].clothes, {id = itemId, level = 1})
-                    end
-                end
             end
             
             self.users[userId].id = userId

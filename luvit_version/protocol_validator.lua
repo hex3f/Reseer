@@ -104,7 +104,7 @@ ProtocolValidator.protocols = {
     
     [2303] = {
         name = "GET_PET_LIST",
-        minSize = 4,  -- 至少包含精灵数量
+        minSize = 4,  -- petCount(4)
         maxSize = nil,
         calculateSize = function(body)
             if #body < 4 then return 4 end
@@ -112,9 +112,10 @@ ProtocolValidator.protocols = {
                            string.byte(body, 2) * 0x10000 + 
                            string.byte(body, 3) * 0x100 + 
                            string.byte(body, 4)
-            -- 每个精灵: id(4) + level(4) + hp(4) + maxHp(4) + catchTime(4) = 20字节
-            return 4 + petCount * 20
-        end
+            -- 每个精灵: id(4) + catchTime(4) + skinID(4) = 12字节
+            return 4 + petCount * 12
+        end,
+        description = "获取精灵列表（每只精灵12字节）"
     },
     
     [2304] = {
@@ -199,9 +200,25 @@ ProtocolValidator.protocols = {
     -- ========== 其他 ==========
     [1001] = {
         name = "LOGIN_IN",
-        minSize = 1230,
-        maxSize = 1230,
-        description = "登录响应完整信息"
+        minSize = 1142,  -- 基础大小(clothes=0时)
+        maxSize = nil,   -- 动态大小(取决于clothes数量)
+        description = "登录响应完整信息",
+        calculateSize = function(body)
+            -- 基础部分: 1138 bytes (到clothes count之前)
+            -- clothes count: 4 bytes
+            -- curTitle: 4 bytes  
+            -- bossAchievement: 200 bytes
+            if #body < 1142 then return 1142 end
+            
+            -- 读取clothes count (在第1135-1138字节位置)
+            local clothesCount = string.byte(body, 1135) * 0x1000000 + 
+                               string.byte(body, 1136) * 0x10000 + 
+                               string.byte(body, 1137) * 0x100 + 
+                               string.byte(body, 1138)
+            
+            -- 每个cloth: id(4) + expireTime(4) = 8 bytes
+            return 1142 + clothesCount * 8
+        end
     },
     
     [1002] = {

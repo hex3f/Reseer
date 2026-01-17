@@ -159,25 +159,28 @@ end
 function UserDB:getOrCreateGameData(userId)
     local key = tostring(userId)
     if not self.gameData[key] then
+        -- 加载游戏配置
+        local GameConfig = require("./game_config")
+        
         -- 从账号数据获取昵称和颜色
         local loginUser = self:findByUserId(userId)
         local nickname = tostring(userId)
-        local color = 0x3399FF
+        local color = GameConfig.InitialPlayer.color or 0x66CCFF
         
         if loginUser then
             nickname = loginUser.nickname or nickname
             color = loginUser.color or color
         end
         
-        -- 游戏数据 (仅游戏内需要的字段)
+        -- 游戏数据 (仅游戏内需要的字段) - 使用 game_config 的初始值
         self.gameData[key] = {
             -- 基础信息
             nick = nickname,
             color = color,
             
-            -- 货币
-            coins = 999999,
-            energy = 100,
+            -- 货币 (从配置读取)
+            coins = GameConfig.InitialPlayer.coins or 2000,
+            energy = GameConfig.InitialPlayer.energy or 100,
             
             -- 精灵背包
             pets = {},
@@ -194,10 +197,10 @@ function UserDB:getOrCreateGameData(userId)
             -- 精灵图鉴
             petBook = {},
             
-            -- 位置
-            mapId = 515,
-            posX = 300,
-            posY = 300,
+            -- 位置 (从配置读取)
+            mapId = GameConfig.InitialPlayer.mapID or 1,
+            posX = GameConfig.InitialPlayer.posX or 300,
+            posY = GameConfig.InitialPlayer.posY or 300,
             
             -- 家园系统 - 默认家具
             -- fitments: 正在使用的家具 (摆放在房间里的)

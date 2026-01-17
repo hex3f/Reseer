@@ -353,37 +353,33 @@ function SeerLoginResponse.makeLoginResponse(user)
     parts[#parts+1] = tostring(taskBuf)
     
     -- ========== PetManager (lines 891-893) ==========
-    local petBuf = buffer.Buffer:new(8)
-    petBuf:wuint(1, 0) -- petNum
-    petBuf:wuint(5, 0) -- 2nd count
-    parts[#parts+1] = tostring(petBuf)
+    -- 客户端只读取 petNum (4 bytes)，然后根据 petNum 读取对应数量的 PetInfo
+    -- 当 petNum=0 时，不读取任何额外数据
+    local petBuf = buffer.Buffer:new(4)
+    petBuf:wuint(1, 0) -- petNum = 0
+    parts[#parts+1] = tostring(petBuf):sub(1, 4)
     
     -- ========== Clothes (lines 894-900) ==========
     local clothBuf = buffer.Buffer:new(4)
     clothBuf:wuint(1, 0) -- clothes count
-    parts[#parts+1] = tostring(clothBuf)
+    parts[#parts+1] = tostring(clothBuf):sub(1, 4)
     
     -- ========== curTitle (line 901) ==========
     local titleBuf = buffer.Buffer:new(4)
     titleBuf:wuint(1, user.curTitle or 0)
-    parts[#parts+1] = tostring(titleBuf)
+    parts[#parts+1] = tostring(titleBuf):sub(1, 4)
     
     -- ========== bossAchievement (lines 902-906) ==========
     parts[#parts+1] = string.rep("\0", 200)
     
-    -- ========== 密钥种子 ==========
-    local keySeed = buffer.Buffer:new(4)
-    local randomNum = 0 -- 使用0关闭客户端加密
-    keySeed:wuint(1, randomNum)
-    parts[#parts+1] = tostring(keySeed)
-    
-    user.keySeed = randomNum
+    -- 注意: 客户端 UserInfo.setForLoginInfo 在读取 bossAchievement 后就结束了
+    -- 不会读取密钥种子，所以不要发送密钥种子
     
     local result = table.concat(parts)
     
     print(string.format("\27[33m[LOGIN] 响应包大小: %d bytes\27[0m", #result))
     
-    return result, randomNum
+    return result
 end
 
 -- 生成精灵背包响应 (CMD 2001)
