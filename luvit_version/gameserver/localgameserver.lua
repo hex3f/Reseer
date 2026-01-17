@@ -408,6 +408,37 @@ function LocalGameServer:sendResponse(clientData, cmdId, userId, result, body)
     if not shouldHideCmd(cmdId) then
         tprint(string.format("\27[32m[LocalGame] 发送 CMD=%d (%s) RESULT=%d LEN=%d\27[0m", 
             cmdId, getCmdName(cmdId), result, length))
+        
+        -- 详细包体输出 (完整十六进制)
+        if #body > 0 then
+            tprint(string.format("\27[36m[PACKET] CMD=%d 包体详情 (%d bytes):\27[0m", cmdId, #body))
+            
+            -- 十六进制格式输出 (每行16字节)
+            local hexLines = {}
+            for i = 1, #body, 16 do
+                local hexPart = ""
+                local asciiPart = ""
+                for j = i, math.min(i + 15, #body) do
+                    local byte = body:byte(j)
+                    hexPart = hexPart .. string.format("%02X ", byte)
+                    if byte >= 32 and byte < 127 then
+                        asciiPart = asciiPart .. string.char(byte)
+                    else
+                        asciiPart = asciiPart .. "."
+                    end
+                end
+                -- 补齐不足16字节的行
+                local padding = 16 - ((#body - i + 1) < 16 and (#body - i + 1) or 16)
+                hexPart = hexPart .. string.rep("   ", padding)
+                
+                table.insert(hexLines, string.format("  %04X: %s |%s|", i - 1, hexPart, asciiPart))
+            end
+            
+            for _, line in ipairs(hexLines) do
+                tprint(string.format("\27[90m%s\27[0m", line))
+            end
+            tprint(string.format("\27[36m[PACKET] --- 包体结束 ---\27[0m"))
+        end
     end
 end
 
@@ -1092,7 +1123,7 @@ function LocalGameServer:handleGetPetInfo(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sa
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sd
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sp
-    responseBody = responseBody .. writeUInt32BE(skillCount) -- skillNum
+    responseBody = responseBody .. writeUInt32BE(4) -- skillNum (Always 4 slots written)
     
     -- 4个技能槽 (id + pp) - 官服 PP: 30, 35, 0, 0
     local ppValues = {30, 35, 0, 0}
@@ -1514,7 +1545,7 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     local responseBody = ""
     
     -- PetTakeOutInfo 结构 (官服格式)
-    responseBody = responseBody .. writeUInt32BE(0)          -- homeEnergy (官服=0)
+    responseBody = responseBody .. writeUInt32BE(100000)     -- homeEnergy (Max=100000, 100 was likely too low)
     responseBody = responseBody .. writeUInt32BE(catchId)    -- firstPetTime (官服=catchId)
     responseBody = responseBody .. writeUInt32BE(1)          -- flag (有精灵信息)
     
@@ -1527,6 +1558,7 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- exp (官服新精灵=0)
     responseBody = responseBody .. writeUInt32BE(0)          -- lvExp (官服新精灵=0)
     responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp (官服=114)
+    responseBody = responseBody .. writeUInt32BE(expInfo.nextLvExp)  -- padding/learningExp? (官服重复了114)
     responseBody = responseBody .. writeUInt32BE(stats.hp)   -- hp
     responseBody = responseBody .. writeUInt32BE(stats.maxHp) -- maxHp
     responseBody = responseBody .. writeUInt32BE(stats.attack or 12)   -- attack
@@ -1542,7 +1574,7 @@ function LocalGameServer:handlePetRelease(clientData, cmdId, userId, seqId, body
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sa
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sd
     responseBody = responseBody .. writeUInt32BE(0)          -- ev_sp
-    responseBody = responseBody .. writeUInt32BE(skillCount) -- skillNum (官服=实际技能数)
+    responseBody = responseBody .. writeUInt32BE(4) -- skillNum (Always 4 slots written)
     -- 4个技能槽 (id + pp) - 官服 PP: 30, 35
     responseBody = responseBody .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(30)
     responseBody = responseBody .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(35)
@@ -1699,13 +1731,18 @@ function LocalGameServer:sendNoteReadyToFight(clientData, userId, bossId, userDa
     responseBody = responseBody .. writeUInt32BE(stats.maxHp)
     -- 官服始终发送 skillNum=4，即使精灵只有2个技能
     responseBody = responseBody .. writeUInt32BE(4)
-    -- 4个技能槽 (id + pp) - 官服 PP 值: 30, 35, 0, 0
-    responseBody = responseBody .. writeUInt32BE(skills[1] or 0) .. writeUInt32BE(30)
-    responseBody = responseBody .. writeUInt32BE(skills[2] or 0) .. writeUInt32BE(35)
-    responseBody = responseBody .. writeUInt32BE(skills[3] or 0) .. writeUInt32BE(0)
-    responseBody = responseBody .. writeUInt32BE(skills[4] or 0) .. writeUInt32BE(0)
+    -- 4个技能槽 (id + pp)
+    for i = 1, 4 do
+        local skillId = skills[i] or 0
+        local pp = 0
+        if skillId > 0 then
+            local skillData = SeerSkills.get(skillId)
+            pp = skillData and skillData.pp or 20
+        end
+        responseBody = responseBody .. writeUInt32BE(skillId) .. writeUInt32BE(pp)
+    end
     responseBody = responseBody .. writeUInt32BE(catchTime)
-    responseBody = responseBody .. writeUInt32BE(0)  -- catchMap=0 (官服)
+    responseBody = responseBody .. writeUInt32BE(301)  -- catchMap=301 (Safe default)
     responseBody = responseBody .. writeUInt32BE(0)
     responseBody = responseBody .. writeUInt32BE(petLevel)
     responseBody = responseBody .. writeUInt32BE(0)
@@ -2022,7 +2059,20 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
         -- 写入技能信息 (id + pp)
         for i = 1, skillCount do
             local sid = skills[i] or 0
-            local pp = 30  -- 默认PP
+            -- 从 battle.player.skillPP 或 battle.enemy.skillPP 获取实际PP
+            local pp = 30
+            if battle then
+               -- 尝试查找 PP
+               -- 这里的 skills 只是 id array，我们不知道 index。
+               -- 但是 caller 传递的 skills 应该是 battle.player.skills
+               -- 我们可以假设 index 一致
+               if battle.player.skills == skills then
+                   pp = battle.player.skillPP[i] or 30
+               elseif battle.enemy.skills == skills then
+                   pp = battle.enemy.skillPP[i] or 30
+               end
+            end
+            
             data = data .. writeUInt32BE(sid)
             data = data .. writeUInt32BE(pp)
         end
@@ -2067,11 +2117,8 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
         local attackerBattleLv = isPlayerFirst and (battle and battle.player.battleLv) or (battle and battle.enemy.battleLv)
         local attackerPetType = isPlayerFirst and (battle and battle.player.type or 0) or (battle and battle.enemy.type or 0)
         
-        -- 先攻方的 lostHP = 后攻方对先攻方造成的伤害
-        local firstLostHp = 0
-        if second and not result.isOver then
-            firstLostHp = second.damage or 0
-        end
+        -- 先攻方的 lostHP = 先攻方造成的伤害 (Damage Dealt)
+        local firstLostHp = first.damage or 0
         
         responseBody = responseBody .. buildAttackValue(
             first.userId,
@@ -2103,8 +2150,8 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
         local attackerBattleLv = isPlayerSecond and (battle and battle.player.battleLv) or (battle and battle.enemy.battleLv)
         local attackerPetType = isPlayerSecond and (battle and battle.player.type or 0) or (battle and battle.enemy.type or 0)
         
-        -- 后攻方的 lostHP = 先攻方对后攻方造成的伤害
-        local secondLostHp = first and first.damage or 0
+        -- 后攻方的 lostHP = 后攻方造成的伤害 (Damage Dealt)
+        local secondLostHp = second.damage or 0
         
         responseBody = responseBody .. buildAttackValue(
             second.userId,
@@ -2128,20 +2175,23 @@ function LocalGameServer:sendNoteUseSkillWithResult(clientData, userId, result)
             second.isCrit and " (暴击!)" or "",
             second.attackerRemainHp or 0))
     else
+        tprint(string.format("\27[35m[LocalGame] DEBUG: 敌方已死亡，发送空AttackValue (secondAttack=%s, result.isOver=%s)\27[0m",
+            tostring(second), tostring(result.isOver)))
         -- 如果没有第二次攻击（对方已死），发送空的攻击信息
         -- 但仍需要保持正确的结构
         local deadUserId = first.userId == userId and 0 or userId
         local deadSkills = deadUserId == userId and playerSkills or enemySkills
         local deadPetType = deadUserId == userId and (battle and battle.player.type or 0) or (battle and battle.enemy.type or 0)
+        local deadMaxHp = deadUserId == userId and (battle and battle.player.maxHp or 100) or (battle and battle.enemy.maxHp or 100)
         
         responseBody = responseBody .. buildAttackValue(
             deadUserId,
             0,  -- 无技能
             0,  -- atkTimes=0 表示无法行动
-            first.damage or 0,  -- 被先攻方造成的伤害
+            0,  -- lostHP=0 (阵亡方未造成伤害)
             0,
             0,  -- 剩余HP=0 (已死亡)
-            100,
+            deadMaxHp,
             false,
             deadSkills,
             nil,
@@ -2793,14 +2843,38 @@ end
 function LocalGameServer:handleItemList(clientData, cmdId, userId, seqId, body)
     tprint("\27[36m[LocalGame] 处理 CMD 2605: 获取物品列表\27[0m")
     
-    local items = {}
-    if self.userdb then
-        local db = self.userdb:new()
-        items = db:getItemList(userId)
+    -- 解析请求的物品类型范围
+    local itemType1, itemType2, itemType3 = 0, 0, 0
+    if #body >= 12 then
+        itemType1 = readUInt32BE(body, 1)
+        itemType2 = readUInt32BE(body, 5)
+        itemType3 = readUInt32BE(body, 9)
     end
     
-    local responseBody = writeUInt32BE(#items)
-    for _, item in ipairs(items) do
+    tprint(string.format("\27[36m[LocalGame] ITEM_LIST 查询范围: %d-%d, %d\27[0m", itemType1, itemType2, itemType3))
+    
+    local allItems = {}
+    if self.userdb then
+        local db = self.userdb:new()
+        allItems = db:getItemList(userId)
+    end
+    
+    -- 过滤物品
+    local filteredItems = {}
+    for _, item in ipairs(allItems) do
+        local id = item.itemId or 0
+        local inRange = (id >= itemType1 and id <= itemType2) or (id == itemType3)
+        -- 特殊处理: 如果范围全为0，可能是不通过Item_List获取所有? 
+        -- 不，通常 Item_List 必须带范围。全0可能是特定逻辑，暂时视为不返回或返回所有。
+        -- 官服日志显示都有范围。
+        
+        if inRange then
+            table.insert(filteredItems, item)
+        end
+    end
+    
+    local responseBody = writeUInt32BE(#filteredItems)
+    for _, item in ipairs(filteredItems) do
         responseBody = responseBody .. writeUInt32BE(item.itemId or 0)
         responseBody = responseBody .. writeUInt32BE(item.count or 0)
         responseBody = responseBody .. writeUInt32BE(item.expireTime or 0) -- 0x00057E40? 官服似乎发这个
@@ -2808,6 +2882,7 @@ function LocalGameServer:handleItemList(clientData, cmdId, userId, seqId, body)
     end
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+    tprint(string.format("\27[32m[LocalGame] 返回物品 %d 个 (总拥有的 %d 个)\27[0m", #filteredItems, #allItems))
 end
 
 -- CMD 2606: 批量购买物品

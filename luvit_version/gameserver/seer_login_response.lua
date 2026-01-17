@@ -157,8 +157,9 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 4
     
     -- timeLimit (4 bytes) - 每日游戏时间限制（秒）
-    -- 设为0xFFFFFFFF表示无限制，否则客户端会计算剩余时间并触发电量耗尽提示
-    basic:wuint(pos, 0xFFFFFFFF)
+    -- 注意：客户端 leftTime 是 signed int，0xFFFFFFFF 会溢出为 -1！
+    -- 使用 0x7FFFFFFF (2147483647秒 ≈ 68年) 作为安全的最大值
+    basic:wuint(pos, 0x7FFFFFFF)
     pos = pos + 4
     
     -- logintimeThisTime (4 bytes)
@@ -602,7 +603,28 @@ function SeerLoginResponse.makeLoginResponse(user)
     user.keySeed = randomNum
     
     local result = table.concat(parts)
-    print(string.format("\27[33m[LOGIN] Generated login response: %d bytes, keySeed=%d\27[0m", #result, randomNum))
+    
+    -- 详细字段日志 (便于调试数据准确性)
+    print(string.format("\27[33m[LOGIN] ============ 登录响应详细信息 ============\27[0m"))
+    print(string.format("\27[33m[LOGIN] userID: %d\27[0m", user.userid or 0))
+    print(string.format("\27[33m[LOGIN] nick: %s\27[0m", user.nick or "赛尔"))
+    print(string.format("\27[33m[LOGIN] coins: %d\27[0m", user.coins or 99999))
+    print(string.format("\27[33m[LOGIN] energy: %d\27[0m", user.energy or (user.nono and user.nono.energy) or 100))
+    print(string.format("\27[33m[LOGIN] mapID: %d\27[0m", user.mapID or 1))
+    print(string.format("\27[33m[LOGIN] posX: %d, posY: %d\27[0m", user.posX or 300, user.posY or 300))
+    print(string.format("\27[33m[LOGIN] timeToday: 0 (无使用时间)\27[0m"))
+    print(string.format("\27[33m[LOGIN] timeLimit: 0xFFFFFFFF (无限制)\27[0m"))
+    print(string.format("\27[33m[LOGIN] vip: %s\27[0m", user.vip ~= false and "是" or "否"))
+    if user.nono then
+        print(string.format("\27[33m[LOGIN] NoNo: isSuper=%s, energy=%d\27[0m", 
+            user.nono.isSuper and "是" or "否", user.nono.energy or 0))
+    end
+    if user.achievements then
+        print(string.format("\27[33m[LOGIN] 成就: total=%d, rank=%d\27[0m", 
+            user.achievements.total or 0, user.achievements.rank or 0))
+    end
+    print(string.format("\27[33m[LOGIN] 响应包大小: %d bytes, keySeed=%d\27[0m", #result, randomNum))
+    print(string.format("\27[33m[LOGIN] ================================================\27[0m"))
     
     return result, randomNum
 end

@@ -40,6 +40,7 @@ local function buildFullPetInfo(petId, catchTime, level)
     body = body .. writeUInt32BE(expInfo.exp)        -- exp
     body = body .. writeUInt32BE(expInfo.lvExp)      -- lvExp
     body = body .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp
+    body = body .. writeUInt32BE(expInfo.nextLvExp)  -- padding (match official log)
     body = body .. writeUInt32BE(pet.hp)         -- hp
     body = body .. writeUInt32BE(pet.maxHp)      -- maxHp
     body = body .. writeUInt32BE(pet.attack)     -- attack
