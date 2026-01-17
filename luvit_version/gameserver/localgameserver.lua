@@ -2841,24 +2841,14 @@ function LocalGameServer:handleItemBuy(clientData, cmdId, userId, seqId, body)
         if user then
             coins = user.coins or 0
             
-            -- 获取物品价格和最大持有数
+            -- 获取物品价格
             local price = SeerItems.getPrice(itemId)
-            local maxCount = SeerItems.getMax(itemId)
-            local currentCount = db:getItemCount(userId, itemId)
-            
             local totalCost = price * count
             
-            if currentCount + count > maxCount then
-                tprint(string.format("\27[31m[LocalGame] 购买失败: 物品 %d 拥有上限 %d, 当前 %d, 欲购 %d\27[0m", 
-                    itemId, maxCount, currentCount, count))
-                self:sendResponse(clientData, cmdId, userId, 103203, "")
-                return
-            end
-
             -- 扣除金币 (Atomic consume)
             local success, newCoins = db:consumeCoins(userId, totalCost)
             if not success then
-                tprint(string.format("\27[31m[LocalGame] 金币不足! 需要: %d, 拥有: %d\27[0m", totalCost, newCoins)) -- newCoins is current coins here
+                tprint(string.format("\27[31m[LocalGame] 金币不足! 需要: %d, 拥有: %d\27[0m", totalCost, newCoins))
                 self:sendResponse(clientData, cmdId, userId, 10016, "")
                 return
             end
@@ -2868,7 +2858,7 @@ function LocalGameServer:handleItemBuy(clientData, cmdId, userId, seqId, body)
             
             -- 更新返回的金币数
             coins = newCoins
-            tprint(string.format("\27[32m[LocalGame] 购买成功! 剩余金币: %d\27[0m", coins))
+            tprint(string.format("\27[32m[LocalGame] 购买成功! 物品ID=%d, 数量=%d, 剩余金币: %d\27[0m", itemId, count, coins))
         end
     end
     

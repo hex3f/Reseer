@@ -287,9 +287,9 @@ ProtocolValidator.protocols = {
     -- ========== 物品相关 ==========
     [2601] = {
         name = "ITEM_BUY",
-        minSize = 0,
-        maxSize = 0,
-        description = "空包体（购买确认）"
+        minSize = 16,
+        maxSize = 16,
+        description = "购买响应: Coins(4) + ItemID(4) + Count(4) + Padding(4)"
     },
     
     [2605] = {

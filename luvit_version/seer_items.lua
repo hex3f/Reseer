@@ -81,7 +81,10 @@ end
 
 function SeerItems.getMax(id)
     local item = itemsMap[id]
-    return item and item.max or 99999
+    if not item then return 99999 end
+    -- 如果 max 为 0 或 nil，返回默认值 99999
+    if not item.max or item.max == 0 then return 99999 end
+    return item.max
 end
 
 function SeerItems.getName(id)
