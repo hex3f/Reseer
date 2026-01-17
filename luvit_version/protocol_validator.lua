@@ -199,8 +199,8 @@ ProtocolValidator.protocols = {
     -- ========== 其他 ==========
     [1001] = {
         name = "LOGIN_IN",
-        minSize = 2230,
-        maxSize = 2230,
+        minSize = 1230,
+        maxSize = 1230,
         description = "登录响应完整信息"
     },
     
