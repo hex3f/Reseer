@@ -6,9 +6,47 @@ require "../easybytewrite"
 
 local SeerLoginResponse = {}
 
+-- 可选的初始场景列表（非新手玩家随机进入）
+local INITIAL_MAPS = {
+    1,    -- 赫尔卡星
+    4,    -- 克洛斯星
+    5,    -- 塞西利亚星
+    7,    -- 云霄星
+    10,   -- 火山星
+    107,  -- 赛尔号飞船
+}
+
+-- 检查玩家是否完成新手任务（任务85-88）
+local function hasCompletedTutorial(user)
+    if not user.tasks then return false end
+    
+    -- 检查新手任务 85-88 是否都已完成
+    for taskId = 85, 88 do
+        local task = user.tasks[tostring(taskId)]
+        if not task or task.status ~= "completed" then
+            return false
+        end
+    end
+    
+    return true
+end
+
 -- 生成登录响应 (CMD 1001)
 function SeerLoginResponse.makeLoginResponse(user)
     local parts = {}
+    
+    -- 检查是否完成新手任务，如果完成则随机选择场景
+    local completedTutorial = hasCompletedTutorial(user)
+    if completedTutorial and not user.mapID then
+        -- 随机选择一个场景
+        local randomIndex = math.random(1, #INITIAL_MAPS)
+        user.mapID = INITIAL_MAPS[randomIndex]
+        print(string.format("\27[32m[LOGIN] 玩家已完成新手任务，随机进入场景: %d\27[0m", user.mapID))
+    elseif not user.mapID then
+        -- 新手玩家进入默认场景（新手教程场景）
+        user.mapID = 1
+        print(string.format("\27[33m[LOGIN] 新手玩家进入默认场景: %d\27[0m", user.mapID))
+    end
     
     -- ========== 基本信息 (UserInfo.as 755-826) ==========
     local basic = buffer.Buffer:new(4096)
@@ -285,13 +323,6 @@ function SeerLoginResponse.makeLoginResponse(user)
     -- reserved (27 bytes, line 841) - all zeros
     parts[#parts+1] = tostring(reservedBuf):sub(1, 32)
     
-    -- 计算任务缓冲区之前的数据大小
-    local sizeBeforeTask = 0
-    for i = 1, #parts do
-        sizeBeforeTask = sizeBeforeTask + #parts[i]
-    end
-    print(string.format("\27[33m[LOGIN] 任务缓冲区之前的数据大小: %d 字节 (0x%X)\27[0m", sizeBeforeTask, sizeBeforeTask))
-
     -- ========== TasksManager (lines 842-889) ==========
     -- 客户端读取 500 个任务状态
     local taskBuf = buffer.Buffer:new(500)
@@ -302,7 +333,6 @@ function SeerLoginResponse.makeLoginResponse(user)
     -- 从数据库填充任务状态
     if user.tasks then
         local taskCount = 0
-        print("\27[36m[LOGIN] 开始加载任务状态...\27[0m")
         for taskIdStr, taskData in pairs(user.tasks) do
             local tid = tonumber(taskIdStr)
             if tid and tid >= 1 and tid <= 500 then
@@ -314,10 +344,11 @@ function SeerLoginResponse.makeLoginResponse(user)
                 end
                 taskBuf:wbyte(tid, status)
                 taskCount = taskCount + 1
-                print(string.format("\27[36m[LOGIN]   任务 %d: %s (status=%d)\27[0m", tid, taskData.status, status))
             end
         end
-        print(string.format("\27[32m[LOGIN] 加载了 %d 个任务状态\27[0m", taskCount))
+        if taskCount > 0 then
+            print(string.format("\27[32m[LOGIN] 加载了 %d 个任务状态\27[0m", taskCount))
+        end
     end
     parts[#parts+1] = tostring(taskBuf)
     

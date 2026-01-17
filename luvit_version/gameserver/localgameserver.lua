@@ -49,7 +49,6 @@ local SharedHandlers = require('../handlers/shared_handlers')
 
 -- 加载配置
 local GameConfig = require('../game_config')
-local GameConfig = require('../game_config')
 local SeerLoginResponse = require('./seer_login_response')
 local SeerTaskConfig = require('../data/seer_task_config')
 
@@ -288,20 +287,17 @@ function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2303] = self.handleGetPetList,        -- 获取精灵列表
         [2304] = self.handlePetRelease,        -- 释放精灵
         [2305] = self.handlePetShow,           -- 展示精灵
+        [2306] = self.handlePetCure,           -- 精灵恢复
         [2309] = self.handlePetBargeList,      -- 精灵图鉴列表
         [2354] = self.handleGetSoulBeadList,   -- 获取灵魂珠列表
         [2401] = self.handleInviteToFight,     -- 邀请战斗
         [2404] = self.handleReadyToFight,      -- 准备战斗
         [2405] = self.handleUseSkillEnhanced,  -- 使用技能 (增强版)
-        [2150] = self.handleGetRelationList,   -- 获取好友列表
-        [2354] = self.handleGetSoulBeadList,   -- 获取灵魂珠列表
         [2406] = self.handleUsePetItem,        -- 使用精灵道具
         [2407] = self.handleChangePet,         -- 更换精灵
         [2408] = self.handleFightNpcMonster,   -- 战斗NPC怪物
         [2409] = self.handleCatchMonster,      -- 捕捉精灵
         [2410] = self.handleEscapeFight,       -- 逃跑
-        [2305] = self.handleGetStorageList,    -- 获取仓库精灵列表
-        [2306] = self.handlePetCure,           -- 精灵恢复
         [2411] = self.handleChallengeBoss,     -- 挑战BOSS
         [2601] = self.handleItemBuy,           -- 购买物品
         [2604] = self.handleChangeCloth,       -- 更换服装
@@ -806,7 +802,9 @@ end
 
 -- CMD 2101: 人物移动
 -- 请求格式: walkType(4) + x(4) + y(4) + amfLen(4) + amfData...
--- 响应格式: walkType(4) + userId(4) + x(4) + y(4) + amfLen(4) + amfData...
+-- CMD 2101: 人物移动
+-- 请求格式: walkType(4) + x(4) + y(4) + amfLen(4) + amfData...
+-- 响应格式: walkType(4) + userId(4) + x(4) + y(4) + amfData... (注意：没有 amfLen 字段)
 function LocalGameServer:handlePeopleWalk(clientData, cmdId, userId, seqId, body)
     local walkType = 0
     local x = 0
@@ -838,13 +836,12 @@ function LocalGameServer:handlePeopleWalk(clientData, cmdId, userId, seqId, body
     -- 更新活跃时间
     OnlineTracker.updateActivity(userId)
     
-    -- 构建响应 (包含完整的 AMF 数据)
+    -- 构建响应 (不包含 amfLen，直接拼接 amfData)
     local responseBody = writeUInt32BE(walkType) ..
                 writeUInt32BE(userId) ..
                 writeUInt32BE(x) ..
                 writeUInt32BE(y) ..
-                writeUInt32BE(amfLen) ..
-                amfData
+                amfData  -- 直接拼接路径数据，不包含长度字段
     
     -- 获取当前地图并广播给同地图所有玩家
     local currentMapId = OnlineTracker.getPlayerMap(userId)

@@ -62,9 +62,9 @@ ProtocolValidator.protocols = {
     
     [2101] = {
         name = "PEOPLE_WALK",
-        minSize = 0,
-        maxSize = 0,
-        description = "空包体（移动确认）"
+        minSize = 16,  -- walkType(4) + userId(4) + x(4) + y(4)
+        maxSize = nil, -- 可变大小，后面可能跟随路径数据
+        description = "人物移动（可变大小：基础16字节 + 路径数据）"
     },
     
     -- ========== 任务相关 ==========
