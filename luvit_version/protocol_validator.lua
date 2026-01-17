@@ -32,10 +32,54 @@ ProtocolValidator.protocols = {
     },
     
     [102] = {
-        name = "COMPLETE_TASK", 
+        name = "COMPLETE_TASK",
+        minSize = 4,
+        maxSize = nil,  -- 动态大小
+        description = "taskId(4) + 奖励信息（动态）"
+    },
+    
+    -- ========== 地图相关 ==========
+    [2001] = {
+        name = "ENTER_MAP",
+        minSize = 160,
+        maxSize = 160,
+        description = "玩家信息 + 地图信息"
+    },
+    
+    [2002] = {
+        name = "LEAVE_MAP",
+        minSize = 4,
+        maxSize = 4,
+        description = "userId(4)"
+    },
+    
+    [2003] = {
+        name = "LIST_MAP_PLAYER",
+        minSize = 4,
+        maxSize = nil,
+        description = "playerCount(4) + 玩家列表（动态）"
+    },
+    
+    [2101] = {
+        name = "PEOPLE_WALK",
+        minSize = 0,
+        maxSize = 0,
+        description = "空包体（移动确认）"
+    },
+    
+    -- ========== 任务相关 ==========
+    [2201] = {
+        name = "ACCEPT_TASK",
         minSize = 4,
         maxSize = 4,
         description = "taskId(4)"
+    },
+    
+    [2202] = {
+        name = "COMPLETE_TASK",
+        minSize = 4,
+        maxSize = nil,
+        description = "taskId(4) + 奖励信息（动态）"
     },
     
     -- ========== 精灵相关 ==========
@@ -126,33 +170,111 @@ ProtocolValidator.protocols = {
     
     [2505] = {
         name = "NOTE_USE_SKILL",
+        minSize = 180,
+        maxSize = nil,  -- 动态大小（技能数量可变）
+        description = "firstAttackInfo(AttackValue) + secondAttackInfo(AttackValue), 每个AttackValue约90字节"
+    },
+    
+    [2506] = {
+        name = "FIGHT_OVER",
+        minSize = 28,
+        maxSize = 28,
+        description = "reason(4) + winnerID(4) + twoTimes(4) + threeTimes(4) + autoFightTimes(4) + energyTimes(4) + learnTimes(4)"
+    },
+    
+    [2507] = {
+        name = "NOTE_UPDATE_SKILL",
         minSize = 16,
         maxSize = 16,
         description = "userID(4) + skillID(4) + skillPP(4) + skillMaxPP(4)"
     },
     
-    [2506] = {
-        name = "NOTE_INJURY_HP",
-        minSize = 12,
-        maxSize = 12,
-        description = "userID(4) + hpLost(4) + remainHP(4)"
-    },
-    
-    [2507] = {
-        name = "NOTE_CHANGE_PROP",
-        minSize = 16,
-        maxSize = 16,
-        description = "userID(4) + propType(4) + changeValue(4) + currentValue(4)"
-    },
-    
     [2508] = {
-        name = "NOTE_FIGHT_OVER",
+        name = "NOTE_UPDATE_PROP",
+        minSize = 80,
+        maxSize = 80,
+        description = "catchTime(4) + petID(4) + level(4) + exp(4) + maxExp(4) + hp(4) + maxHp(4) + attack(4) + defence(4) + s_a(4) + s_d(4) + speed(4) + ev_hp(4) + ev_attack(4) + ev_defence(4) + ev_sa(4) + ev_sd(4) + ev_sp(4) + 其他字段"
+    },
+    
+    -- ========== 其他 ==========
+    [1001] = {
+        name = "LOGIN_IN",
+        minSize = 2230,
+        maxSize = 2230,
+        description = "登录响应完整信息"
+    },
+    
+    [1002] = {
+        name = "SYSTEM_TIME",
+        minSize = 4,
+        maxSize = 4,
+        description = "timestamp(4)"
+    },
+    
+    [1106] = {
+        name = "GOLD_ONLINE_CHECK_REMAIN",
+        minSize = 4,
+        maxSize = 4,
+        description = "goldAmount(4)"
+    },
+    
+    [2150] = {
+        name = "GET_RELATION_LIST",
         minSize = 8,
-        maxSize = 8,
-        description = "winnerID(4) + reason(4)"
+        maxSize = nil,
+        description = "friendCount(4) + blackCount(4) + 好友列表 + 黑名单列表（动态）"
+    },
+    
+    [2354] = {
+        name = "GET_SOUL_BEAD_List",
+        minSize = 4,
+        maxSize = nil,
+        description = "count(4) + 灵魂珠列表（动态）"
+    },
+    
+    [2503] = {
+        name = "NOTE_READY_TO_FIGHT",
+        minSize = 196,
+        maxSize = nil,
+        description = "战斗准备通知: userCount(4) + 玩家信息 + 精灵列表（动态）"
+    },
+    
+    [2757] = {
+        name = "MAIL_GET_UNREAD",
+        minSize = 4,
+        maxSize = 4,
+        description = "unreadCount(4)"
+    },
+    
+    [8004] = {
+        name = "GET_BOSS_MONSTER",
+        minSize = 24,
+        maxSize = 24,
+        description = "BOSS战斗奖励信息"
+    },
+    
+    [9003] = {
+        name = "NONO_INFO",
+        minSize = 48,
+        maxSize = 48,
+        description = "NoNo信息"
+    },
+    
+    [70001] = {
+        name = "GET_EXCHANGE_INFO",
+        minSize = 4,
+        maxSize = 4,
+        description = "荣誉值(4)"
     },
     
     -- ========== 物品相关 ==========
+    [2601] = {
+        name = "ITEM_BUY",
+        minSize = 0,
+        maxSize = 0,
+        description = "空包体（购买确认）"
+    },
+    
     [2605] = {
         name = "ITEM_LIST",
         minSize = 4,

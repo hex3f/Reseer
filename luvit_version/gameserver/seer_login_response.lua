@@ -231,19 +231,175 @@ function SeerLoginResponse.makeLoginResponse(user)
     -- ========== nonoChipList (80 bytes) ==========
     parts[#parts+1] = string.rep("\0", 80)
     
-    -- ========== dailyResArr (300 bytes) ==========
-    parts[#parts+1] = string.rep("\0", 300)
-    
-    -- ========== summerHolidaysArr (7 bytes) ==========
-    parts[#parts+1] = string.rep("\0", 7)
-    
-    -- ========== dailyTaskWeekHotArr (23 bytes) ==========
-    parts[#parts+1] = string.rep("\0", 23)
-    
-    -- ========== bufferRecordArr (200 bytes) ==========
-    parts[#parts+1] = string.rep("\0", 200)
+    -- ========== dailyResArr (50 bytes) - 客户端只读取 50 字节！==========
+    parts[#parts+1] = string.rep("\0", 50)
 
-    -- ========== 更多字段 (UserInfo.as 864-1438) ==========
+    -- ========== teacherID ~ fuseTimes (UserInfo.as 827-877) ==========
+    local buf = buffer.Buffer:new(256)
+    pos = 1
+    
+    -- teacherID (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- studentID (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- graduationCount (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- maxPuniLv (4 bytes)
+    buf:wuint(pos, 100)
+    pos = pos + 4
+    
+    -- petMaxLev (4 bytes)
+    buf:wuint(pos, 100)
+    pos = pos + 4
+    
+    -- petAllNum (4 bytes)
+    buf:wuint(pos, user.petAllNum or 10)
+    pos = pos + 4
+    
+    -- monKingWin (4 bytes)
+    buf:wuint(pos, user.monKingWin or 0)
+    pos = pos + 4
+    
+    -- curStage (4 bytes) - 客户端会 +1
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- maxStage (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- curFreshStage (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- maxFreshStage (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- maxArenaWins (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- twoTimes (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- threeTimes (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- autoFight (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- autoFightTimes (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- energyTimes (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- learnTimes (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- monBtlMedal (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- recordCnt (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- obtainTm (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- soulBeadItemID (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- expireTm (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    -- fuseTimes (4 bytes)
+    buf:wuint(pos, 0)
+    pos = pos + 4
+    
+    parts[#parts+1] = tostring(buf):sub(1, pos-1)
+    
+    -- ========== hasNono ~ nonoNick (UserInfo 878-883) ==========
+    local nonoBuf = buffer.Buffer:new(44)
+    pos = 1
+    
+    local nono = user.nono or {}
+    local isSuper = nono.isSuper or user.superNono
+    
+    -- hasNono (4 bytes)
+    nonoBuf:wuint(pos, user.hasNono and 1 or 0)
+    pos = pos + 4
+    
+    -- superNono (4 bytes)
+    nonoBuf:wuint(pos, isSuper and 1 or 0)
+    pos = pos + 4
+    
+    -- nonoState (4 bytes) - flags
+    nonoBuf:wuint(pos, nono.flag or 0)
+    pos = pos + 4
+    
+    -- nonoColor (4 bytes)
+    nonoBuf:wuint(pos, nono.color or user.nonoColor or 0)
+    pos = pos + 4
+    
+    -- nonoNick (16 bytes)
+    nonoBuf:write(pos, nono.nick or user.nonoNick or "NoNo", 16)
+    pos = pos + 16
+    
+    parts[#parts+1] = tostring(nonoBuf):sub(1, pos-1)
+
+    -- ========== TeamInfo (UserInfo 884) ==========
+    -- TeamInfo constructor reads: id(4), priv(4), superCore(4), isShow(4), allContribution(4), canExContribution(4)
+    -- Total: 24 bytes
+    local teamBuf = buffer.Buffer:new(24)
+    teamBuf:wuint(1, 0) -- id
+    teamBuf:wuint(5, 0) -- priv
+    teamBuf:wuint(9, 0) -- superCore
+    teamBuf:wuint(13, 0) -- isShow
+    teamBuf:wuint(17, 0) -- allContribution
+    teamBuf:wuint(21, 0) -- canExContribution
+    parts[#parts+1] = tostring(teamBuf)
+    
+    -- ========== TeamPKInfo (UserInfo 885) ==========
+    -- TeamPKInfo constructor reads: groupID(4), homeTeamID(4)
+    -- Total: 8 bytes
+    local teamPKBuf = buffer.Buffer:new(8)
+    teamPKBuf:wuint(1, 0) -- groupID
+    teamPKBuf:wuint(5, 0) -- homeTeamID
+    parts[#parts+1] = tostring(teamPKBuf)
+    
+    -- ========== 1 byte + badge + reserved (UserInfo 886-888) ==========
+    local reservedBuf = buffer.Buffer:new(32)
+    reservedBuf:wbyte(1, 0) -- 1 byte
+    reservedBuf:wuint(2, 0) -- badge (4 bytes)
+    -- reserved (27 bytes) - all zeros
+    parts[#parts+1] = tostring(reservedBuf):sub(1, 32)
+    
+    -- 计算任务缓冲区之前的数据大小
+    local sizeBeforeTask = 0
+    for i = 1, #parts do
+        sizeBeforeTask = sizeBeforeTask + #parts[i]
+    end
+    print(string.format("\27[33m[LOGIN] 任务缓冲区之前的数据大小: %d 字节 (0x%X)\27[0m", sizeBeforeTask, sizeBeforeTask))
+
+    -- ========== TasksManager (UserInfo 889-1003) ==========
     local buf = buffer.Buffer:new(4096)
     pos = 1
     
@@ -506,27 +662,41 @@ function SeerLoginResponse.makeLoginResponse(user)
     parts[#parts+1] = string.rep("\0", 20)
     
     -- ========== TasksManager (UserInfo 980-1003) ==========
-    -- Loop 1000 times: readUnsignedByte. Total 1000 bytes.
-    local taskBuf = buffer.Buffer:new(1000)
+    -- 客户端只读取前 500 个任务状态，所以我们也只发送 500 字节
+    local taskBuf = buffer.Buffer:new(500)
     -- 初始化全0
-    for i = 1, 1000 do
+    for i = 1, 500 do
         taskBuf:wbyte(i, 0)
     end
     
     -- 从数据库填充任务状态
     if user.tasks then
+        local taskCount = 0
+        print("\27[36m[LOGIN] 开始加载任务状态...\27[0m")
         for taskIdStr, taskData in pairs(user.tasks) do
             local tid = tonumber(taskIdStr)
-            if tid and tid >= 1 and tid <= 1000 then
+            if tid and tid >= 1 and tid <= 500 then  -- 只处理前 500 个任务
                 local status = 0
                 if taskData.status == "accepted" then
                     status = 1 -- ALR_ACCEPT
                 elseif taskData.status == "completed" then
                     status = 3 -- COMPLETE
                 end
+                -- Lua buffer 索引从 1 开始，客户端 AS3 数组索引从 0 开始
+                -- 任务 ID 1 → buffer 位置 1 → 客户端第 1 次读取 → taskList[0]
+                -- 任务 ID 85 → buffer 位置 85 → 客户端第 85 次读取 → taskList[84]
                 taskBuf:wbyte(tid, status)
+                taskCount = taskCount + 1
+                print(string.format("\27[36m[LOGIN]   任务 %d: %s (status=%d, buffer位置=%d)\27[0m", tid, taskData.status, status, tid))
             end
         end
+        if taskCount > 0 then
+            print(string.format("\27[32m[LOGIN] 加载了 %d 个任务状态\27[0m", taskCount))
+        else
+            print("\27[33m[LOGIN] 警告: user.tasks 存在但没有有效任务\27[0m")
+        end
+    else
+        print("\27[33m[LOGIN] 警告: user.tasks 为 nil\27[0m")
     end
     parts[#parts+1] = tostring(taskBuf)
     

@@ -587,6 +587,14 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
         local gameData = db:getOrCreateGameData(userId)
         if gameData then
             for k, v in pairs(gameData) do user[k] = v end
+            -- 调试: 打印任务数据
+            if gameData.tasks then
+                local taskCount = 0
+                for _ in pairs(gameData.tasks) do taskCount = taskCount + 1 end
+                print(string.format("\27[35m[LOGIN] 从数据库加载了 %d 个任务\27[0m", taskCount))
+            else
+                print("\27[33m[LOGIN] 警告: gameData.tasks 为 nil\27[0m")
+            end
         end
     end
     
@@ -910,6 +918,18 @@ function LocalGameServer:handleAcceptTask(clientData, cmdId, userId, seqId, body
         local db = self.userdb:new()
         local gameData = db:getOrCreateGameData(userId)
         gameData.tasks = gameData.tasks or {}
+        
+        -- 检查任务是否已经完成，如果已完成则不允许重新接受
+        local existingTask = gameData.tasks[tostring(taskId)]
+        if existingTask and existingTask.status == "completed" then
+            tprint(string.format("\27[33m[LocalGame] 任务 %d 已完成，拒绝重新接受\27[0m", taskId))
+            -- 仍然返回成功响应，但不修改数据库
+            local responseBody = writeUInt32BE(taskId)
+            self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+            return
+        end
+        
+        -- 如果任务未完成或不存在，则接受任务
         gameData.tasks[tostring(taskId)] = {
             status = "accepted",
             acceptTime = os.time()
