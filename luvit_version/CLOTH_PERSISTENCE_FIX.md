@@ -6,6 +6,7 @@
 2. RoomServer自动把items中的衣服显示为已装备，但GameServer不显示，导致行为不一致
 3. ENTER_MAP协议大小验证错误
 4. **在房间内换衣服后，背包和身上穿的不同步** ⭐ 关键问题
+5. **在 GameServer 换衣服后，进入 RoomServer 显示旧衣服** ⭐ 新问题
 
 ## 原因分析
 
@@ -21,12 +22,32 @@
 
 ### 缓存同步问题 ⭐ 核心原因
 
+#### 问题 1：房间内换衣服
+
 RoomServer 和 GameServer 各自维护独立的用户数据缓存：
 - 在房间内换衣服时，CMD 2604 由 GameServer 处理
 - GameServer 更新了自己的缓存和数据库
 - 但 **RoomServer 的缓存没有更新**
 - 导致 RoomServer 发送的 ENTER_MAP 使用旧的衣服数据
 - 结果：背包显示新衣服，但身上显示旧衣服
+
+#### 问题 2：GameServer 换衣服后进入 RoomServer ⭐ 新发现
+
+**场景**：
+1. 在 RoomServer：AB 穿身上，CDE 在背包
+   - RoomServer 缓存：`clothes = [A, B]`
+   - 数据库：`clothes = [A, B]`
+
+2. 进入 GameServer：换衣服，CD 穿身上，ABE 在背包
+   - GameServer 收到 CMD 2604
+   - GameServer 更新并保存：`clothes = [C, D]` ✓
+   - **RoomServer 缓存仍然是 `[A, B]`** ❌
+
+3. 再次进入 RoomServer：
+   - RoomServer 从**缓存**读取：`clothes = [A, B]`（旧数据）
+   - 显示：AB 穿身上，CDE 在背包 ❌
+
+**根本原因**：RoomServer 的缓存在用户离开后仍然保留，当用户在 GameServer 换衣服后，RoomServer 不知道数据已更新。
 
 ## 修复方案
 

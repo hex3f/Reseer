@@ -440,6 +440,12 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     tprint(string.format("\27[35m[RoomServer] 用户 %d 进入房间 (房主=%d) pos=(%d,%d)\27[0m", 
         userId, mapId, x, y))
     
+    -- 清除缓存，确保使用最新数据（用户可能在 GameServer 换过衣服）
+    if self.users[userId] then
+        self.users[userId] = nil
+        tprint(string.format("\27[35m[RoomServer] 清除用户 %d 的缓存（进入房间时刷新）\27[0m", userId))
+    end
+    
     -- 获取用户数据
     local userData = self:getOrCreateUser(userId)
     local nickname = userData.nick or userData.nickname or ("赛尔" .. userId)
