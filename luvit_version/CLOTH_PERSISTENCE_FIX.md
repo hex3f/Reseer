@@ -75,7 +75,7 @@ responseBody = responseBody .. writeUInt32BE(0)  -- curTitle
 - 未装备衣服：clothCount=0，144 bytes
 - 装备N件衣服：clothCount=N，144 + N*8 bytes
 
-### 2. RoomServer缓存同步 ⭐ 关键修复
+### 2. RoomServer 缓存同步（房间内换衣服）⭐ 关键修复
 
 **文件**: `luvit_version/roomserver/localroomserver.lua`
 
@@ -103,7 +103,41 @@ end
 5. 下次需要用户数据时（如发送 ENTER_MAP），RoomServer 从数据库重新加载
 6. 现在衣服数据是最新的，背包和身上同步！
 
+### 3. RoomServer 进入时刷新缓存 ⭐ 新增修复
+
+**文件**: `luvit_version/roomserver/localroomserver.lua`
+
+**问题**：用户在 GameServer 换衣服后，RoomServer 的缓存没有更新。
+
+**解决方案**：在用户进入房间时清除缓存，确保使用最新数据。
+
+```lua
+function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
+    -- ... 解析参数 ...
+    
+    -- 清除缓存，确保使用最新数据（用户可能在 GameServer 换过衣服）
+    if self.users[userId] then
+        self.users[userId] = nil
+        tprint(string.format("\27[35m[RoomServer] 清除用户 %d 的缓存（进入房间时刷新）\27[0m", userId))
+    end
+    
+    -- 获取用户数据（从数据库重新加载）
+    local userData = self:getOrCreateUser(userId)
+    -- ...
+end
+```
+
+**工作原理**：
+1. 用户在 GameServer 换衣服：`clothes = [C, D]`，保存到数据库 ✓
+2. 用户进入 RoomServer：`handleRoomLogin` 被调用
+3. 清除 RoomServer 的缓存：`self.users[userId] = nil`
+4. 调用 `getOrCreateUser`：从数据库读取最新数据
+5. 现在 RoomServer 使用的是最新的 `clothes = [C, D]` ✓
+6. 显示正确的衣服！
+
 ## 测试验证
+
+### 测试场景 1：在房间内换衣服
 
 1. **在房间内换衣服**：
    ```
@@ -121,6 +155,29 @@ end
    ✓ [CHANGE_CLOTH] 包体大小正确: 16字节
    ✓ [ENTER_MAP] 包体大小正确: 152字节 (1件服装)
    ```
+
+### 测试场景 2：GameServer 换衣服后进入 RoomServer ⭐ 新增
+
+1. **在 RoomServer**：AB 穿身上，CDE 在背包
+   - 数据库：`clothes = [A, B]`
+
+2. **进入 GameServer**：换衣服，CD 穿身上
+   - 发送 CMD 2604
+   - 数据库：`clothes = [C, D]` ✓
+
+3. **再次进入 RoomServer**：
+   ```
+   [RoomServer] 处理 CMD 10001: 房间登录
+   [RoomServer] 清除用户 X 的缓存（进入房间时刷新）
+   [RoomServer] 用户 X 服装数量: 2
+   ```
+   - 显示：CD 穿身上 ✓
+   - 背包：ABE ✓
+
+4. **验证**：
+   - 身上的衣服应该是 CD，不是 AB
+   - 背包应该包含 ABE
+   - 数据同步正确 ✓
 
 ## 实施日期
 

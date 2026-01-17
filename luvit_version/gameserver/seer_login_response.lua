@@ -353,11 +353,24 @@ function SeerLoginResponse.makeLoginResponse(user)
     parts[#parts+1] = tostring(taskBuf)
     
     -- ========== PetManager (lines 891-893) ==========
-    -- 客户端只读取 petNum (4 bytes)，然后根据 petNum 读取对应数量的 PetInfo
-    -- 当 petNum=0 时，不读取任何额外数据
-    local petBuf = buffer.Buffer:new(4)
-    petBuf:wuint(1, 0) -- petNum = 0
-    parts[#parts+1] = tostring(petBuf):sub(1, 4)
+    -- 客户端读取 petNum (4 bytes)，然后根据 petNum 读取对应数量的 PetInfo
+    local pets = user.pets or {}
+    local petCount = #pets
+    
+    -- 写入精灵数量（大端序 Big-Endian）
+    local petNumBuf = buffer.Buffer:new(4)
+    petNumBuf:wuint(1, petCount)
+    parts[#parts+1] = tostring(petNumBuf):sub(1, 4)
+    
+    -- 序列化精灵数据
+    if petCount > 0 then
+        local PetSerializer = require('../seer_pet_serializer')
+        for i, pet in ipairs(pets) do
+            local petData = PetSerializer.serializePetInfo(pet, true)
+            parts[#parts+1] = petData
+        end
+        print(string.format("\27[32m[LOGIN] 加载了 %d 个精灵\27[0m", petCount))
+    end
     
     -- ========== Clothes (lines 894-900) ==========
     -- 从用户数据读取服装列表
