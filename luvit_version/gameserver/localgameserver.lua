@@ -1406,18 +1406,19 @@ function LocalGameServer:handleListMapPlayer(clientData, cmdId, userId, seqId, b
         local clothes = playerData.clothes or {}
         local teamInfo = playerData.teamInfo or {}
         
-        -- PeopleInfo 结构 (与 ENTER_MAP 响应相同，但不含 sysTime)
-        responseBody = responseBody .. writeUInt32BE(playerId)                    -- userID
-        responseBody = responseBody .. writeFixedString(nickname, 16)             -- nick (16字节)
-        responseBody = responseBody .. writeUInt32BE(playerData.color or 0xFFFFFF) -- color
-        responseBody = responseBody .. writeUInt32BE(playerData.texture or 0)     -- texture
+        -- PeopleInfo 结构 (参照官服格式，包含 sysTime)
+        responseBody = responseBody .. writeUInt32BE(os.time())                     -- sysTime (官服格式必须)
+        responseBody = responseBody .. writeUInt32BE(playerId)                      -- userID
+        responseBody = responseBody .. writeFixedString(nickname, 16)               -- nick (16字节)
+        responseBody = responseBody .. writeUInt32BE(playerData.color or 0xFFFFFF)  -- color
+        responseBody = responseBody .. writeUInt32BE(playerData.texture or 0)       -- texture
         
         -- vipFlags
         local vipFlags = 0
         if playerData.vip then vipFlags = vipFlags + 1 end
         if playerData.viped then vipFlags = vipFlags + 2 end
-        responseBody = responseBody .. writeUInt32BE(vipFlags)                    -- vipFlags
-        responseBody = responseBody .. writeUInt32BE(playerData.vipStage or 1)    -- vipStage
+        responseBody = responseBody .. writeUInt32BE(vipFlags)                      -- vipFlags
+        responseBody = responseBody .. writeUInt32BE(playerData.vipStage or 0)      -- vipStage
         
         responseBody = responseBody .. writeUInt32BE(0)                           -- actionType
         responseBody = responseBody .. writeUInt32BE(playerData.x or 300)         -- posX
