@@ -25,21 +25,16 @@ end
 -- 数据包结构:
 -- 17 字节头部: length(4) + version(1) + cmdId(4) + userId(4) + result(4)
 
-function LocalRoomServer:new(sharedUserDB, sharedGameServer)
+function LocalRoomServer:new(sharedUserDB, sharedGameServer, sessionManager)
     local obj = {
         port = conf.roomserver_port or 5100,
         clients = {},
         userdb = sharedUserDB,      -- 共享用户数据库
         gameServer = sharedGameServer, -- 共享游戏服务器（用于命令处理）
+        sessionManager = sessionManager,  -- 会话管理器引用
         -- 不再使用缓存，每次都从数据库加载最新数据
     }
     setmetatable(obj, LocalRoomServer)
-    
-    -- 创建共享的 NoNo 跟随状态表（跨服务器共享）
-    if not sharedGameServer.nonoFollowingStates then
-        sharedGameServer.nonoFollowingStates = {}  -- userId -> boolean
-    end
-    
     obj:start()
     return obj
 end
@@ -205,11 +200,9 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
                        body:byte(3) * 256 + body:byte(4)
         clientData.nonoState = action  -- 更新会话级状态
         
-        -- 同时更新共享状态表（供游戏服务器访问）
-        if self.gameServer and self.gameServer.nonoFollowingStates then
-            self.gameServer.nonoFollowingStates[userId] = (action == 1)
-            tprint(string.format("\27[35m[RoomServer] 更新共享 NoNo 跟随状态: userId=%d, following=%s\27[0m", 
-                userId, tostring(action == 1)))
+        -- 同时更新会话管理器的状态
+        if self.sessionManager then
+            self.sessionManager:setNonoFollowing(userId, action == 1)
         end
         
         tprint(string.format("\27[35m[RoomServer] 更新 nonoState=%d\27[0m", action))
@@ -452,10 +445,10 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     local teamInfo = userData.teamInfo or {}
     local nonoData = userData.nono or {}  -- 获取 NONO 数据
     
-    -- 检查游戏服务器的共享 NoNo 跟随状态
-    -- 如果用户在游戏服务器中让 NoNo 跟随，进入房间时应该保持跟随状态
+    -- 检查会话管理器的 NoNo 跟随状态
+    -- 如果用户的 NoNo 正在跟随，进入房间时应该保持跟随状态
     clientData.nonoState = 0  -- 默认不跟随
-    if self.gameServer and self.gameServer.nonoFollowingStates and self.gameServer.nonoFollowingStates[userId] then
+    if self.sessionManager and self.sessionManager:getNonoFollowing(userId) then
         -- 用户的 NoNo 正在跟随，保持跟随状态
         clientData.nonoState = 1  -- 跟随中
         tprint(string.format("\27[35m[RoomServer] 用户 %d 的 NoNo 正在跟随，保持跟随状态\27[0m", userId))
@@ -928,11 +921,11 @@ function LocalRoomServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     local userData = self:getOrCreateUser(targetUserId)
     local nono = userData.nono or {}
     
-    -- 检查共享的 NoNo 跟随状态
+    -- 检查会话管理器的 NoNo 跟随状态
     -- 如果用户的 NoNo 正在跟随，返回 state=3；否则返回 state=1
     local stateValue = 1  -- 默认在房间
     
-    if self.gameServer and self.gameServer.nonoFollowingStates and self.gameServer.nonoFollowingStates[targetUserId] then
+    if self.sessionManager and self.sessionManager:getNonoFollowing(targetUserId) then
         -- 用户的 NoNo 正在跟随
         stateValue = 3  -- 跟随中
         tprint(string.format("\27[35m[RoomServer] 用户 %d 的 NoNo 正在跟随，返回 state=3\27[0m", targetUserId))

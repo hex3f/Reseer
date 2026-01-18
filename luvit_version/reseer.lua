@@ -218,16 +218,41 @@ if conf.local_server_mode then
     -- 本地模式：使用 TCP 登录服务器（Flash Socket 连接）
     print("\27[33m========== LOCAL SERVER MODE (TCP Socket) ==========\27[0m")
     
+    -- 创建会话管理器（统一状态管理）
+    print("\27[36m[初始化] 创建会话管理器...\27[0m")
+    local SessionManager = require "./session_manager"
+    local sessionManager = SessionManager:new()
+    
     -- 启动游戏服务器
     local lgs = require "./gameserver/localgameserver"
-    local gameServer = lgs.LocalGameServer:new()
+    local gameServer = lgs.LocalGameServer:new(nil, sessionManager)
     
-    -- 启动房间服务器 (共享用户数据库和命令处理器)
+    -- 启动房间服务器 (共享用户数据库、游戏服务器和会话管理器)
     local lrs = require "./roomserver/localroomserver"
-    local roomServer = lrs.LocalRoomServer:new(gameServer.userdb, gameServer)
+    local roomServer = lrs.LocalRoomServer:new(gameServer.userdb, gameServer, sessionManager)
     
     -- 启动登录服务器
     require "./loginserver/login"
+    
+    -- 添加定时清理任务
+    local timer = require('timer')
+    
+    -- 每 5 分钟清理离线用户
+    timer.setInterval(5 * 60 * 1000, function()
+        sessionManager:cleanupOfflineUsers(300)  -- 5 分钟未心跳
+    end)
+    
+    -- 每 1 小时清理过期会话
+    timer.setInterval(60 * 60 * 1000, function()
+        sessionManager:cleanupExpiredSessions(3600)  -- 1 小时未活跃
+    end)
+    
+    -- 每 10 分钟打印统计信息
+    timer.setInterval(10 * 60 * 1000, function()
+        sessionManager:printStats()
+    end)
+    
+    print("\27[32m[初始化] ✓ 会话管理器已启动\27[0m")
 else
     -- 官服模式：使用流量记录代理
     print("\27[35m╔════════════════════════════════════════════════════════════╗\27[0m")

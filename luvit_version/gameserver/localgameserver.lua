@@ -112,7 +112,7 @@ local function getConfigValue(val)
     return val
 end
 
-function LocalGameServer:new()
+function LocalGameServer:new(userdb, sessionManager)
     local obj = {
         port = conf.gameserver_port or 5000,
         clients = {},
@@ -121,7 +121,8 @@ function LocalGameServer:new()
         serverList = {},
         nextSeqId = 1,
         cryptoMap = {}, -- map<client, crypto>
-        nonoFollowingStates = {},  -- 共享的 NoNo 跟随状态表 (userId -> boolean)
+        sessionManager = sessionManager,  -- 会话管理器引用
+        -- 移除 nonoFollowingStates，改用 sessionManager
     }
     setmetatable(obj, LocalGameServer)
     obj:loadUserData()
@@ -306,6 +307,7 @@ function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, seqId, b
         body = body,
         clientData = clientData,
         gameServer = self_ref,  -- 添加游戏服务器引用（用于访问共享状态）
+        sessionManager = self_ref.sessionManager,  -- 添加会话管理器引用
         
         -- 发送响应
         sendResponse = function(packet)
