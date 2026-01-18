@@ -81,61 +81,60 @@ local function handlePetHatchGet(ctx)
     return true
 end
 
--- CMD 2318: PET_SET_EXP (设置精灵经验)
--- 请求: catchTime(4) + exp(4)
+-- CMD 2318: PET_SET_EXP (从经验池分配经验给宠物)
+-- 请求: catchTime(4) + expAmount(4) - 要分配给宠物的经验值
+-- 响应: newPoolExp(4) - 返回经验池剩余经验
+-- 逻辑: 经验池减少 expAmount，对应宠物增加 expAmount
 local function handlePetSetExp(ctx)
     local catchTime = 0
-    local exp = 0
+    local expAmount = 0
     
     if #ctx.body >= 4 then
         catchTime = readUInt32BE(ctx.body, 1)
     end
     if #ctx.body >= 8 then
-        exp = readUInt32BE(ctx.body, 5)
+        expAmount = readUInt32BE(ctx.body, 5)
     end
     
     local user = ctx.getOrCreateUser(ctx.userId)
     
-    -- 尝试用 catchTime 找到对应精灵并更新经验
-    if user.pets then
+    -- 获取当前经验池
+    local currentPool = user.expPool or 0
+    
+    -- 从经验池扣除经验
+    local newPoolExp = currentPool - expAmount
+    if newPoolExp < 0 then newPoolExp = 0 end
+    user.expPool = newPoolExp
+    
+    -- 同时给对应宠物增加经验 (如果找到的话)
+    if user.pets and catchTime > 0 then
         for petIdStr, petData in pairs(user.pets) do
             if petData.catchTime == catchTime then
-                petData.exp = exp
-                ctx.saveUser(ctx.userId, user)
-                print(string.format("\27[32m[Handler] → PET_SET_EXP catchTime=0x%X exp=%d\27[0m", catchTime, exp))
-                ctx.sendResponse(buildResponse(2318, ctx.userId, 0, writeUInt32BE(0)))
-                return true
+                petData.exp = (petData.exp or 0) + expAmount
+                break
             end
         end
     end
     
-    -- 如果没找到具体精灵，保存到全局 petExp (兼容旧数据)
-    user.petExp = exp
     ctx.saveUser(ctx.userId, user)
     
-    ctx.sendResponse(buildResponse(2318, ctx.userId, 0, writeUInt32BE(0)))
-    print(string.format("\27[32m[Handler] → PET_SET_EXP exp=%d (global)\27[0m", exp))
+    ctx.sendResponse(buildResponse(2318, ctx.userId, 0, writeUInt32BE(newPoolExp)))
+    print(string.format("\27[32m[Handler] → PET_SET_EXP 分配 %d 经验给宠物, 经验池剩余 %d\27[0m", expAmount, newPoolExp))
     return true
 end
 
--- CMD 2319: PET_GET_EXP (获取精灵经验)
--- 官服响应: exp(4) - 当前精灵的总经验值
+-- CMD 2319: PET_GET_EXP (获取经验池经验)
+-- 官服响应: exp(4) - 经验池的总经验值
+-- 经验池是玩家累积的经验，可以分配给任意宠物
 local function handlePetGetExp(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
-    local petId = user.currentPetId or 7
     
-    -- 从用户数据获取精灵经验，如果没有则使用默认值
-    local petExp = 0
-    if user.pets and user.pets[tostring(petId)] then
-        petExp = user.pets[tostring(petId)].exp or 0
-    elseif user.petExp then
-        -- 兼容旧数据格式
-        petExp = user.petExp
-    end
+    -- 获取经验池经验
+    local expPool = user.expPool or 0
     
-    local body = writeUInt32BE(petExp)
+    local body = writeUInt32BE(expPool)
     ctx.sendResponse(buildResponse(2319, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → PET_GET_EXP exp=%d\27[0m", petExp))
+    print(string.format("\27[32m[Handler] → PET_GET_EXP 经验池=%d\27[0m", expPool))
     return true
 end
 
