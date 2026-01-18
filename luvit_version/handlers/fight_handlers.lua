@@ -132,16 +132,15 @@ local function handleChallengeBoss(ctx)
     local body = ""
     body = body .. writeUInt32BE(2)  -- userCount = 2 (玩家 + 敌人)
     
-    -- Helper to build Battle Pet Info (with 4-slot padding)
+    -- Helper to build Battle Pet Info (战斗模式 PetInfo, param2=false)
+    -- 客户端解析顺序 (PetInfo.as 第107-141行):
+    -- id(4) + level(4) + hp(4) + maxHp(4) + skillNum(4) + [skillId(4)+pp(4)]x4 + catchTime(4) + catchMap(4) + catchRect(4) + catchLevel(4) + skinID(4)
     local function buildBattlePetInfo(pId, _catchTime, hp, maxHp, lv)
         local pb = ""
-        pb = pb .. writeUInt32BE(pId)
-        pb = pb .. writeUInt32BE(_catchTime)
-        pb = pb .. writeUInt32BE(hp)
-        pb = pb .. writeUInt32BE(maxHp)
-        pb = pb .. writeUInt32BE(lv)
-        pb = pb .. writeUInt32BE(0) -- mode/status
-        pb = pb .. writeUInt32BE(0) -- extra field
+        pb = pb .. writeUInt32BE(pId)       -- id
+        pb = pb .. writeUInt32BE(lv)        -- level
+        pb = pb .. writeUInt32BE(hp)        -- hp
+        pb = pb .. writeUInt32BE(maxHp)     -- maxHp
         
         -- Get Skills for Pet using SeerPets.getLearnableMoves
         local skills = {}
@@ -154,22 +153,32 @@ local function handleChallengeBoss(ctx)
             local startIdx = math.max(1, #moves - 3)
             for i = startIdx, #moves do
                 if moves[i] and moves[i].id then
-                    table.insert(skills, moves[i].id)
+                    table.insert(skills, {id = moves[i].id, pp = moves[i].maxPP or 20})
                 end
             end
         end
         
         -- 如果没有技能，使用默认技能
         if #skills == 0 then
-            skills = {10006, 20004}  -- 默认新手技能
+            skills = {{id = 10006, pp = 35}, {id = 20004, pp = 40}}
         end
         
-        pb = pb .. writeUInt32BE(4) -- SkillCount (Fixed 4)
+        pb = pb .. writeUInt32BE(#skills > 4 and 4 or #skills) -- skillNum
+        -- 每个技能需要 id(4) + pp(4) = 8 字节
         for i=1, 4 do
-            pb = pb .. writeUInt32BE(skills[i] or 0)
+            if skills[i] then
+                pb = pb .. writeUInt32BE(skills[i].id)
+                pb = pb .. writeUInt32BE(skills[i].pp or 20)
+            else
+                pb = pb .. writeUInt32BE(0) .. writeUInt32BE(0)
+            end
         end
         
-        pb = pb .. writeUInt32BE(301) -- CatchMap (Fixed 301 for safety)
+        pb = pb .. writeUInt32BE(_catchTime) -- catchTime
+        pb = pb .. writeUInt32BE(301)        -- catchMap
+        pb = pb .. writeUInt32BE(0)          -- catchRect
+        pb = pb .. writeUInt32BE(lv)         -- catchLevel
+        pb = pb .. writeUInt32BE(0)          -- skinID
         return pb
     end
     
