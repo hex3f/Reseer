@@ -289,17 +289,19 @@ local function handleNonoFollowOrHoom(ctx)
     local body = ""
     if action == 1 then
         -- 跟随: 返回完整 NONO 信息 (36 bytes)
+        -- 官服格式: flag=0, state=1
         body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
-        body = body .. writeUInt32BE(1)                             -- flag=1 跟随中 (4)
-        body = body .. writeUInt32BE(nonoData.state or 1)           -- state (4)
+        body = body .. writeUInt32BE(0)                             -- flag=0 (官服始终为0) (4)
+        body = body .. writeUInt32BE(1)                             -- state=1 跟随中 (4)
         body = body .. writeFixedString(nonoData.nick or "NONO", 16) -- nick (16)
         body = body .. writeUInt32BE(nonoData.color or 0xFFFFFF)    -- color (4)
         body = body .. writeUInt32BE(nonoData.chargeTime or 10000)  -- chargeTime (4)
     else
         -- 回家: 只返回 12 bytes (官服协议)
+        -- 官服格式: flag=0, state=0
         body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
-        body = body .. writeUInt32BE(0)                             -- flag=0 已回家 (4)
-        body = body .. writeUInt32BE(nonoData.state or 0)           -- state (4)
+        body = body .. writeUInt32BE(0)                             -- flag=0 (官服始终为0) (4)
+        body = body .. writeUInt32BE(0)                             -- state=0 已回家 (4)
     end
     
     ctx.sendResponse(buildResponse(9019, ctx.userId, 0, body))
