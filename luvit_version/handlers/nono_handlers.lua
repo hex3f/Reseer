@@ -217,7 +217,7 @@ local function handleNonoPlay(ctx)
 end
 
 -- CMD 9014: NONO_CLOSE_OPEN (NONO开关)
--- 官服响应: userID(4) + flag(4)
+-- 官服响应: 17 bytes (只有头部，body为空)
 local function handleNonoCloseOpen(ctx)
     local action = 0
     if #ctx.body >= 4 then
@@ -228,9 +228,9 @@ local function handleNonoCloseOpen(ctx)
     nonoData.state = action  -- 0=关闭, 1=开启
     saveNonoData(ctx, nonoData)
     
-    local body = writeUInt32BE(ctx.userId) .. writeUInt32BE(action)
-    ctx.sendResponse(buildResponse(9014, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → NONO_CLOSE_OPEN %d response\27[0m", action))
+    -- 官服返回空 body
+    ctx.sendResponse(buildResponse(9014, ctx.userId, 0, ""))
+    print(string.format("\27[32m[Handler] → NONO_CLOSE_OPEN action=%d response\27[0m", action))
     return true
 end
 
