@@ -67,25 +67,61 @@ local function handleBlackRemove(ctx)
 end
 
 -- CMD 2157: SEE_ONLINE (查看在线状态)
+-- 请求格式: count(4) + userIDs[count] (每个4字节)
+-- 响应格式: onlineCount(4) + [OnLineInfo]...
+-- OnLineInfo: userID(4) + serverID(4) + mapType(4) + mapID(4) = 16 bytes
 local function handleSeeOnline(ctx)
-    local targetId = 0
+    -- 读取请求中的用户ID列表
+    local requestCount = 0
+    local userIds = {}
+    
     if #ctx.body >= 4 then
-        targetId = readUInt32BE(ctx.body, 1)
+        requestCount = readUInt32BE(ctx.body, 1)
     end
     
-    -- 获取真实在线状态
-    local isOnline = 0
-    if ctx.onlineTracker and ctx.onlineTracker.isOnline then
-        isOnline = ctx.onlineTracker.isOnline(targetId) and 1 or 0
-    elseif ctx.userDB then
-        -- 备选方案: 检查用户是否有当前服务器记录
-        local serverId = ctx.userDB:getUserServer(targetId)
-        isOnline = (serverId and serverId > 0) and 1 or 0
+    -- 读取所有请求的用户ID
+    for i = 1, requestCount do
+        local offset = 5 + (i - 1) * 4
+        if #ctx.body >= offset + 3 then
+            local userId = readUInt32BE(ctx.body, offset)
+            table.insert(userIds, userId)
+        end
     end
     
-    local body = writeUInt32BE(targetId) .. writeUInt32BE(isOnline)
+    -- 构建在线用户列表
+    local onlineUsers = {}
+    local OnlineTracker = require('./online_tracker')
+    
+    for _, targetId in ipairs(userIds) do
+        -- 检查用户是否在线
+        local isOnline = OnlineTracker.isOnline(targetId)
+        
+        if isOnline then
+            local user = ctx.getOrCreateUser(targetId)
+            local mapId = OnlineTracker.getPlayerMap(targetId) or user.mapId or 0
+            local mapType = user.mapType or 0
+            local serverId = 1  -- 当前服务器ID
+            
+            table.insert(onlineUsers, {
+                userID = targetId,
+                serverID = serverId,
+                mapType = mapType,
+                mapID = mapId
+            })
+        end
+    end
+    
+    -- 构建响应: count(4) + [OnLineInfo]...
+    local body = writeUInt32BE(#onlineUsers)
+    for _, info in ipairs(onlineUsers) do
+        body = body .. writeUInt32BE(info.userID)     -- userID (4)
+        body = body .. writeUInt32BE(info.serverID)   -- serverID (4)
+        body = body .. writeUInt32BE(info.mapType)    -- mapType (4)
+        body = body .. writeUInt32BE(info.mapID)      -- mapID (4)
+    end
+    
     ctx.sendResponse(buildResponse(2157, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → SEE_ONLINE %d online=%d\27[0m", targetId, isOnline))
+    print(string.format("\27[32m[Handler] → SEE_ONLINE (requested=%d, online=%d)\27[0m", requestCount, #onlineUsers))
     return true
 end
 

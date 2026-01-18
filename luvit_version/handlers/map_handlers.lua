@@ -135,6 +135,34 @@ local function handleEnterMap(ctx)
     ctx.sendResponse(buildResponse(2003, ctx.userId, 0, playerListBody))
     print(string.format("\27[32m[Handler] → LIST_MAP_PLAYER (auto-push, 1 player)\27[0m"))
     
+    -- 检测是否进入家园地图 (mapId 大于 10000 或等于用户ID)
+    -- 如果是家园，需要额外发送房间相关数据
+    if mapId > 10000 or mapId == ctx.userId then
+        print(string.format("\27[33m[Handler] 检测到家园地图 %d，发送房间数据\27[0m", mapId))
+        
+        -- 发送 NONO_INFO (9003) 让房间中显示 NONO
+        local nono = user.nono or {}
+        local nonoBody = ""
+        nonoBody = nonoBody .. writeUInt32BE(ctx.userId)                    -- userID
+        nonoBody = nonoBody .. writeUInt32BE(nono.flag or 1)                -- flag
+        nonoBody = nonoBody .. writeUInt32BE(1)                             -- state=1 (NONO在家)
+        nonoBody = nonoBody .. writeFixedString(nono.nick or "NONO", 16)    -- nick
+        nonoBody = nonoBody .. writeUInt32BE(nono.superNono or 0)           -- superNono
+        nonoBody = nonoBody .. writeUInt32BE(nono.color or 0xFFFFFF)        -- color
+        nonoBody = nonoBody .. writeUInt32BE(nono.power or 10000)           -- power
+        nonoBody = nonoBody .. writeUInt32BE(nono.mate or 10000)            -- mate
+        nonoBody = nonoBody .. writeUInt32BE(nono.iq or 0)                  -- iq
+        nonoBody = nonoBody .. writeUInt16BE(nono.ai or 0)                  -- ai
+        nonoBody = nonoBody .. writeUInt32BE(nono.birth or os.time())       -- birth
+        nonoBody = nonoBody .. writeUInt32BE(nono.chargeTime or 500)        -- chargeTime
+        nonoBody = nonoBody .. string.rep("\xFF", 20)                       -- func (所有功能开启)
+        nonoBody = nonoBody .. writeUInt32BE(nono.superEnergy or 0)         -- superEnergy
+        nonoBody = nonoBody .. writeUInt32BE(nono.superLevel or 0)          -- superLevel
+        nonoBody = nonoBody .. writeUInt32BE(nono.superStage or 0)          -- superStage
+        ctx.sendResponse(buildResponse(9003, ctx.userId, 0, nonoBody))
+        print("\27[32m[Handler] → NONO_INFO (9003) for home room (state=1, NONO在家)\27[0m")
+    end
+    
     return true
 end
 
