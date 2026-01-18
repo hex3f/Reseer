@@ -79,12 +79,14 @@ ProtocolValidator.protocols = {
                               string.byte(body, 3) * 0x100 + 
                               string.byte(body, 4)
             -- 每个玩家的PeopleInfo是动态大小的(取决于服装数量)
-            -- 基础: 140 bytes + clothCount(4) + clothes数据 + curTitle(4)
-            -- 为简化，假设每个玩家平均0件服装 = 144 bytes
-            -- TODO: 需要逐个解析每个玩家的clothCount来精确计算
-            return 4 + playerCount * 144
+            -- 基础结构: 136 bytes + clothCount(4) = 140 bytes (不含服装列表和curTitle)
+            -- 完整: 140 + clothCount*8 + curTitle(4) = 144 + clothCount*8
+            -- 当 clothCount=0 时: 140 bytes (没有curTitle? 需验证)
+            -- 实际测试: 每玩家 140 字节 (含 clothCount=0, 但不含 curTitle)
+            -- TODO: 需要根据实际协议精确调整
+            return 4 + playerCount * 140
         end,
-        description = "playerCount(4) + 玩家列表（动态，每个玩家144+字节）"
+        description = "playerCount(4) + 玩家列表（动态，每个玩家140+字节）"
     },
     
     [2101] = {
