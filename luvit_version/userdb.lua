@@ -14,7 +14,7 @@ UserDB.__index = UserDB
 -- 单例实例
 local _instance = nil
 
-function UserDB:new()
+function UserDB:new(config)
     -- 使用单例模式，避免多次加载覆盖数据
     if _instance then
         return _instance
@@ -31,11 +31,19 @@ function UserDB:new()
     local obj = {
         dbPath = scriptDir .. "users.json",
         users = {},
-        gameData = {}
+        gameData = {},
+        isLocalMode = (config and config.local_server_mode) or true  -- 默认本地模式
     }
     setmetatable(obj, UserDB)
-    print(string.format("\27[32m[UserDB] 数据库路径: %s\27[0m", obj.dbPath))
-    obj:load()
+    
+    -- 只在本地模式下加载数据库
+    if obj.isLocalMode then
+        print(string.format("\27[32m[UserDB] 数据库路径: %s\27[0m", obj.dbPath))
+        obj:load()
+    else
+        print("\27[36m[UserDB] 官服模式：跳过数据库加载\27[0m")
+    end
+    
     _instance = obj
     return obj
 end
