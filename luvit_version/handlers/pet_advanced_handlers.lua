@@ -75,9 +75,14 @@ local function handlePetHatch(ctx)
 end
 
 -- CMD 2316: PET_HATCH_GET (获取孵化精灵)
+-- 官服响应: 16 bytes 全0 (无孵化中的精灵)
 local function handlePetHatchGet(ctx)
-    ctx.sendResponse(buildResponse(2316, ctx.userId, 0, writeUInt32BE(0)))
-    print("\27[32m[Handler] → PET_HATCH_GET response\27[0m")
+    local body = writeUInt32BE(0) ..  -- 状态/数量
+                 writeUInt32BE(0) ..  -- 精灵ID
+                 writeUInt32BE(0) ..  -- 孵化时间
+                 writeUInt32BE(0)     -- 剩余时间
+    ctx.sendResponse(buildResponse(2316, ctx.userId, 0, body))
+    print("\27[32m[Handler] → PET_HATCH_GET response (16 bytes)\27[0m")
     return true
 end
 
