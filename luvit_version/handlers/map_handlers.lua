@@ -439,6 +439,36 @@ local function handleChat(ctx)
     print(string.format("\27[32m[Handler] → CHAT: %s\27[0m", message:sub(1, 20)))
     return true
 end
+
+-- CMD 2112: ON_OR_OFF_FLYING (NONO飞行模式开关)
+-- 请求: flyMode(4) - 0=关闭, 1-4=飞行样式
+-- 响应: userId(4) + flyMode(4)
+-- 需要广播给同地图其他玩家
+local function handleOnOrOffFlying(ctx)
+    local flyMode = 0
+    if #ctx.body >= 4 then
+        flyMode = readUInt32BE(ctx.body, 1)
+    end
+    
+    -- 保存飞行状态到用户数据
+    local user = ctx.getOrCreateUser(ctx.userId)
+    user.flyMode = flyMode
+    ctx.saveUserDB()
+    
+    -- 构建响应: userId + flyMode
+    local body = writeUInt32BE(ctx.userId) .. writeUInt32BE(flyMode)
+    local response = buildResponse(2112, ctx.userId, 0, body)
+    
+    -- 发送给自己
+    ctx.sendResponse(response)
+    
+    -- 广播给同地图其他玩家
+    if ctx.broadcastToMap then
+        ctx.broadcastToMap(response, ctx.userId)
+    end
+    
+    print(string.format("\27[32m[Handler] → ON_OR_OFF_FLYING mode=%d\27[0m", flyMode))
+    return true
 end
 
 -- CMD 2103: DANCE_ACTION (舞蹈动作)
@@ -503,6 +533,7 @@ function MapHandlers.register(Handlers)
     Handlers.register(2103, handleDanceAction)
     Handlers.register(2104, handleAimat)
     Handlers.register(2111, handlePeopleTransform)
+    Handlers.register(2112, handleOnOrOffFlying)
     print("\27[36m[Handlers] 地图命令处理器已注册\27[0m")
 end
 
