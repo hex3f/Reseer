@@ -146,14 +146,19 @@ function Response:notFound(path,reason)
     fetchUrl(officialUrl, function(statusCode, fetchedData)
         print(string.format("\27[36m[官服下载] 响应: status=%d, size=%d bytes\27[0m", statusCode, #fetchedData))
         
-        if statusCode == 200 and #fetchedData > 0 then
-            print(string.format("\27[90m[下载] %s (%d bytes)\27[0m", path, #fetchedData))
+        -- 只要 status=200 就保存（包括 0 字节文件）
+        if statusCode == 200 then
+            if #fetchedData > 0 then
+                print(string.format("\27[90m[下载] %s (%d bytes)\27[0m", path, #fetchedData))
+            else
+                print(string.format("\27[33m[下载] %s (空文件, 创建占位符)\27[0m", path))
+            end
             
             -- 记录到日志
             Logger.logResource("DOWNLOAD", path, 200, #fetchedData)
             
             -- 如果是 SWF 文件，特别标记
-            if path:lower():match("%.swf$") then
+            if path:lower():match("%.swf$") and #fetchedData > 0 then
                 print(string.format("\27[35m[SWF下载] %s\27[0m", path))
             end
             
@@ -164,7 +169,7 @@ function Response:notFound(path,reason)
             end
             
             local fullPath = root .. savePath
-            local dirPath = fullPath:match("(.*/)")
+            local dirPath = fullPath:match("(.*/)") 
             
             if dirPath then
                 -- 递归创建所有父目录
@@ -189,7 +194,7 @@ function Response:notFound(path,reason)
                 end
             end
             
-            -- 保存文件
+            -- 保存文件（包括0字节文件作为占位符）
             local success, err = pcall(function()
                 fs.writeFileSync(fullPath, fetchedData)
             end)
