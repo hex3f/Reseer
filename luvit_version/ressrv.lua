@@ -397,6 +397,44 @@ local resServer = http.createServer(function(req, res)
         return
     end
     
+    -- ========== 根据模式选择 NieoCore 文件 ==========
+    if dest:match("/dll/NieoCore%.swf") then
+        local coreFile
+        if conf.local_server_mode then
+            -- 本地模式：使用 NieoCore.swf
+            coreFile = root .. "/dll/NieoCore.swf"
+            print("\27[36m[CORE] 本地模式: 加载 NieoCore.swf\27[0m")
+        else
+            -- 官服模式：使用 NieoCore2.swf
+            coreFile = root .. "/dll/NieoCore2.swf"
+            print("\27[35m[CORE] 官服模式: 加载 NieoCore2.swf\27[0m")
+        end
+        
+        fs.stat(coreFile, function(err, stat)
+            if not err and stat.type == "file" then
+                res:writeHead(200, {
+                    ["Content-Type"] = "application/x-shockwave-flash",
+                    ["Content-Length"] = stat.size,
+                    ["Access-Control-Allow-Origin"] = "*",
+                    ["Cache-Control"] = "no-cache"
+                })
+                fs.createReadStream(coreFile):pipe(res)
+                print(string.format("\27[36m[SWF加载] %s (%d bytes)\27[0m", coreFile, stat.size))
+            else
+                local errorMsg = "Core file not found: " .. coreFile
+                print("\27[31m[CORE] " .. errorMsg .. "\27[0m")
+                res:writeHead(404, {
+                    ["Content-Type"] = "text/plain",
+                    ["Content-Length"] = #errorMsg,
+                    ["Access-Control-Allow-Origin"] = "*"
+                })
+                res:write(errorMsg)
+                res:finish()
+            end
+        end)
+        return
+    end
+    
     -- ========== 处理 JavaScript 日志请求 ==========
     if dest == "/__log__" then
         local query = req.uri.query or ""

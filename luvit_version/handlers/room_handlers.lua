@@ -57,7 +57,8 @@ local function handleRoomLogin(ctx)
     user.y = y
     ctx.saveUserDB()
     
-    -- 构建 UserInfo 响应 (与 ENTER_MAP 相同的格式)
+    -- ROOM_LOGIN 响应：返回 UserInfo（与 ENTER_MAP 相同）
+    -- 这样客户端就能正确进入房间
     local nickname = user.nick or user.nickname or user.username or ("赛尔" .. ctx.userId)
     local petId = user.currentPetId or 0
     local clothes = user.clothes or {}
@@ -115,14 +116,10 @@ local function handleRoomLogin(ctx)
     end
     body = body .. writeUInt32BE(user.curTitle or 0)            -- curTitle (4)
     
-    ctx.sendResponse(buildResponse(10001, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → ROOM_LOGIN response (entered room %d at %d,%d)\27[0m", 
+    -- 发送 ROOM_LOGIN 响应（使用 CMD 2001 ENTER_MAP）
+    ctx.sendResponse(buildResponse(2001, ctx.userId, 0, body))
+    print(string.format("\27[32m[Handler] → ROOM_LOGIN response as ENTER_MAP (room %d at %d,%d)\27[0m", 
         mapId, x, y))
-    
-    -- 主动推送 LIST_MAP_PLAYER (包含自己) - 与 ENTER_MAP 一致
-    local playerListBody = writeUInt32BE(1) .. body  -- count=1 + 自己的 UserInfo
-    ctx.sendResponse(buildResponse(2003, ctx.userId, 0, playerListBody))
-    print("\27[32m[Handler] → LIST_MAP_PLAYER (auto-push after ROOM_LOGIN, 1 player)\27[0m")
     
     return true
 end
