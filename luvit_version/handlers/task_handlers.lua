@@ -103,9 +103,27 @@ local function buildTaskCompleteResponse(taskId, param, user)
                writeUInt32BE(captureTm) ..
                writeUInt32BE(#reward.items)
         
-        -- 添加物品列表
+        -- 添加物品到用户背包并构建响应
+        user.items = user.items or {}
         for _, item in ipairs(reward.items) do
             body = body .. writeUInt32BE(item.id) .. writeUInt32BE(item.count)
+            
+            -- 真正添加物品到用户数据 (id=1 是金币，特殊处理)
+            if item.id == 1 then
+                user.coins = (user.coins or 0) + item.count
+                print(string.format("\27[32m[Handler] 任务奖励: +%d 金币 (总计: %d)\27[0m", item.count, user.coins))
+            else
+                local itemKey = tostring(item.id)
+                if user.items[itemKey] then
+                    user.items[itemKey].count = (user.items[itemKey].count or 1) + item.count
+                else
+                    user.items[itemKey] = {
+                        count = item.count,
+                        expireTime = 0x057E40  -- 永久
+                    }
+                end
+                print(string.format("\27[32m[Handler] 任务奖励: 物品 %d x%d\27[0m", item.id, item.count))
+            end
         end
     else
         -- 默认响应: 无奖励
