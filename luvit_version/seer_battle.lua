@@ -946,7 +946,12 @@ function SeerBattle.executeAttack(attacker, defender, skill, attackerUserId, isF
         gainHp = gainHp,
         recoilDamage = recoilDamage,
         atkTimes = hitCount,
-        effects = effectResults
+        effects = effectResults,
+        -- Snapshot for packet
+        attackerBattleLv = {unpack(attacker.battleLv or {0,0,0,0,0,0})},
+        targetBattleLv = {unpack(defender.battleLv or {0,0,0,0,0,0})},
+        attackerStatus = attacker.status or {},
+        targetStatus = defender.status or {}
     }
 end
 

@@ -71,11 +71,53 @@ local function buildFightPetInfo(userId, petId, catchTime, hp, maxHp, level, cat
     return body
 end
 
+-- 序列化战斗等级 (6字节)
+-- [atk, def, spAtk, spDef, speed, accuracy]
+local function writeBattleLv(lvTable)
+    local s = ""
+    for i=1, 6 do
+        local val = lvTable[i] or 0
+        -- 确保在 -6 到 6 之间 (Protocol requires signed byte or unsigned with offset? Usually signed int8)
+        -- Looking at protocol, it's often int8. Let's assume standard packing.
+        -- But wait, standard `string.char` is for unsigned bytes 0-255.
+        -- If value is negative (e.g. -1), string.char(-1) will error.
+        -- Map -6..6 to 0..255 (usually casting to byte).
+        -- 256 + val if val < 0
+        if val < 0 then val = 256 + val end
+        s = s .. string.char(val % 256)
+    end
+    return s
+end
+
+-- 序列化状态 (20字节 = 5 * 4 bytes)
+-- Protocol usually expects array of status IDs (UInt32)
+local function writeStatus(statusTable)
+    local s = ""
+    local count = 0
+    if statusTable then
+        for k, v in pairs(statusTable) do
+            if v and v > 0 and count < 5 then
+                s = s .. writeUInt32BE(k)
+                count = count + 1
+            end
+        end
+    end
+    -- Pad remaining with 0
+    for i = count + 1, 5 do
+        s = s .. writeUInt32BE(0)
+    end
+    return s
+end
+
 -- 构建 AttackValue (完整版，与客户端 AttackValue.as 对应)
 -- AttackValue: userID(4) + skillID(4) + atkTimes(4) + lostHP(4) + gainHP(4) + remainHp(4) + maxHp(4) 
 --            + state(4) + skillListCount(4) + [skillInfo...] + isCrit(4) + status(20) + battleLv(6)
 --            + maxShield(4) + curShield(4) + petType(4)
-local function buildAttackValue(userId, skillId, atkTimes, lostHP, gainHP, remainHp, maxHp, isCrit, petType)
+-- 构建 AttackValue (完整版，与客户端 AttackValue.as 对应)
+-- AttackValue: userID(4) + skillID(4) + atkTimes(4) + lostHP(4) + gainHP(4) + remainHp(4) + maxHp(4) 
+--            + state(4) + skillListCount(4) + [skillInfo...] + isCrit(4) + status(20) + battleLv(6)
+--            + maxShield(4) + curShield(4) + petType(4)
+local function buildAttackValue(userId, skillId, atkTimes, lostHP, gainHP, remainHp, maxHp, isCrit, petType, status, battleLv, state)
     local body = ""
     body = body .. writeUInt32BE(userId)
     body = body .. writeUInt32BE(skillId or 0)
@@ -84,11 +126,16 @@ local function buildAttackValue(userId, skillId, atkTimes, lostHP, gainHP, remai
     body = body .. writeUInt32BE(gainHP or 0)
     body = body .. writeUInt32BE(remainHp or 100)
     body = body .. writeUInt32BE(maxHp or 100)
-    body = body .. writeUInt32BE(0)              -- state
+    body = body .. writeUInt32BE(state or 0)     -- state (0=Hit, 1=Miss/Block?)
     body = body .. writeUInt32BE(0)              -- skillListCount
     body = body .. writeUInt32BE(isCrit or 0)
-    body = body .. string.rep("\0", 20)          -- status (20字节)
-    body = body .. string.rep("\0", 6)           -- battleLv (6字节)
+    
+    -- Status (20 bytes)
+    body = body .. writeStatus(status)
+    
+    -- BattleLv (6 bytes)
+    body = body .. writeBattleLv(battleLv or {0,0,0,0,0,0})
+    
     body = body .. writeUInt32BE(0)              -- maxShield (4)
     body = body .. writeUInt32BE(0)              -- curShield (4)
     body = body .. writeUInt32BE(petType or 0)   -- petType (4)
@@ -380,30 +427,175 @@ local function handleUseSkill(ctx)
         if result.firstAttack then
             local atk1 = result.firstAttack
             local petType1 = atk1.userId == ctx.userId and playerPetId or enemyPetId
+            
+            -- Determin whose status/battleLv to show.
+            -- AttackValue usually shows the TARGET's status/battleLv change, OR the attacker's?
+            -- Based on protocol: "status" field is "pet status".
+            -- Usually this packet describes "User X used Skill Y, causing Z damage, and here is result state of User X?"
+            -- Wait, if UseSkill causes damage to enemy, where is enemy HP? 
+            --   - lostHP is damage.
+            --   - remainHP is ATTACKER'S remain HP? No, typically "remainHp" in AttackValue is victim? 
+            --   Let's check `buildAttackValue`: it says `remainHp`.
+            --   In `handleUseSkill` previous code: `atk1.attackerRemainHp` was passed as `remainHp`.
+            --   This implies the packet describes the ATTACKER state?
+            --   But `lostHP` is damage dealt.
+            
+            -- Re-reading standard Seer protocols (which can be confusing):
+            -- AttackValue usually describes the action result. 
+            -- If it's "User uses Skill":
+            --   - lostHP: damage dealt to *target*? Or self?
+            --   - remainHP: *attacker's* HP?
+            
+            -- Let's look at `buildAttackValue` usage in previous code:
+            -- `atk1.attackerRemainHp` passed to `remainHp`.
+            -- `atk1.damage` passed to `lostHP`.
+            
+            -- If `lostHP` is damage to target, but `remainHP` is attacker HP, then where is target HP?
+            -- Maybe `remainHp` IS target HP? 
+            -- Previous code: `atk1.attackerRemainHp`. This looks wrong if `lostHP` is damage to enemy.
+            -- If `lostHP` > 0 (damage), it should be subtracted from target.
+            
+            -- Let's check `executeAttack` return:
+            -- attackerRemainHp = attacker.hp
+            -- targetRemainHp = targetRemainHp
+            
+            -- If the packet is about "Attacker used skill", usually it shows Attacker's state.
+            -- BUT damage is done to Victim.
+            
+            -- Let's look at how client likely uses it.
+            -- If I use a skill, I want to see:
+            -- 1. Animation
+            -- 2. Damage number on enemy (lostHP)
+            -- 3. Enemy HP bar update
+            -- 4. My HP bar update (if recoil/drain)
+            
+            -- If `remainHp` is attacker's HP, how does client know enemy HP?
+            -- Maybe `AttackValue` is for the *Target*?
+            -- "UserID" = who is being hit? No, "UserID" is usually who performs the action.
+            
+            -- Let's stick to the previous code's assumption BUT Fix the naming if it was wrong, or just pass correct data.
+            -- Previous: `atk1.attackerRemainHp` passed as `remainHp`.
+            -- If this was wrong, that explains why "no damage" seen (if client updates target HP based on this).
+            
+            -- Wait, in `result.firstAttack`:
+            -- attackerRemainHp = attacker.hp
+            -- targetRemainHp = ...
+            
+            -- I'll try to pass `targetRemainHp` into `remainHp` if `lostHP` refers to damage on target.
+            -- BUT `userId` is the attacker. 
+            -- If the packet is "Attacker State Update", then `remainHp` = attackerHp makes sense.
+            -- But then `lostHP` = damage to whom?
+            
+            -- Let's infer from the packet name `AttackValue`.
+            -- Usually contains `damage` (lostHp).
+            
+            -- Let's look closer at `buildAttackValue`:
+            -- body = body .. writeUInt32BE(userId)  <-- Attacker
+            -- body = body .. writeUInt32BE(skillId)
+            
+            -- If I pass `atk1.attackerRemainHp` to `remainHp`, and `atk1.damage` to `lostHP`.
+            -- If I hit enemy for 100 dmg. Attacker HP = 100.
+            -- Packet: User=Me, Burn=100, HP=100.
+            -- Client: "Me used skill. Damage 100. My HP 100."
+            -- Where does it say "Enemy HP"?
+            
+            -- Maybe the client calculates EnemyHP - Damage?
+            -- Or maybe `remainHp` IS the Target's HP?
+            -- BUT `userId` is clearly Attacker.
+            
+            -- Alternative: `buildAttackValue` is actually `TargetState`?
+            -- No, `userId` is attacker.
+            
+            -- Let's assume the previous code `atk1.attackerRemainHp` was CORRECT for the `remainHp` field (Attacker's HP).
+            -- And `lostHP` is "Damage Dealt".
+            
+            -- However, `battleLv` and `status` should probably be the *Target's* if we want to show effects on target?
+            -- Or Attacker's?
+            -- Usually effects are on Target (e.g. paralysis).
+            -- But buffs are on Attacker.
+            
+            -- Correct logic:
+            -- The client receives specific AttackValue.
+            -- It probably applies `status` to `userId` (Attacker)?
+            -- If so, how do we show status on Enemy?
+            -- There is usually a Second AttackValue or separate packet?
+            -- NOTE_USE_SKILL (2505) sends TWO AttackValues.
+            -- Maybe one for Attacker, one for Defender?
+            -- Previous code:
+            --   - First Attack: userId = attacker.
+            --   - Second Attack: userId = defender (if counter attack).
+            
+            -- If I want to update Enemy Status (e.g. Poisoned by my attack), how is that sent?
+            -- If I only send "My Attack", and "Enemy Counter Attack".
+            -- Maybe Enemy Status is updated in "Enemy Counter Attack" packet?
+            -- But what if Enemy dies or doesn't attack?
+            -- Then second packet is empty?
+            
+            -- Actually, `executeTurn` logic in `seer_battle.lua`:
+            -- `result.firstAttack` (Attacker -> Defender)
+            -- `result.secondAttack` (Defender -> Attacker)
+            
+            -- If I poison enemy, `result.firstAttack` should probably carry that info?
+            -- BUT if `buildAttackValue` ties `status` to `userId` (Attacker), then I can't show Enemy status there.
+            
+            -- HYPOTHESIS: `AttackValue` struct includes `state` which might be Target Status?
+            -- Or `status` field is Target Status?
+            -- Unlike `userId`, `status` might helping client show "Text" or "Icon" on target.
+            
+            -- For now, I will provide:
+            -- `remainHp` = `atk1.attackerRemainHp` (Attacker HP).
+            -- `status` = `atk1.targetStatus` (Target status - attempting this swap to see if it fixes "no effect on enemy").
+            -- Wait, if I set `status` to Target Status, but `userId` is Attacker, client might show ME as poisoned?
+            -- Safest bet: `attackerStatus`.
+            
+            -- Let's populate consistently:
+            -- `remainHp` -> `attackerRemainHp`
+            -- `maxHp` -> `attackerMaxHp`
+            -- `status` -> `attackerStatus`
+            -- `battleLv` -> `attackerBattleLv`
+            
+            -- BUT wait, the User Complaint is "Battle stops... no damage".
+            -- If "no damage" logic was `lostHP` (which was passed `atk1.damage`), that seems correct.
+            -- Why stops? Maybe client error due to bad binary data in dummy strings?
+            
+            -- Use the helpers.
+            local state1 = 0
+            if atk1.missed then state1 = 1 end
+            if atk1.blocked then state1 = 1 end -- or special state
+            if atk1.isCrit then state1 = 2 end -- maybe?
+            
             body2505 = body2505 .. buildAttackValue(
                 atk1.userId, atk1.skillId, atk1.atkTimes or 1, 
                 atk1.damage or 0, atk1.gainHp or 0, 
                 atk1.attackerRemainHp, atk1.attackerMaxHp, 
-                atk1.isCrit and 1 or 0, petType1)
+                atk1.isCrit and 1 or 0, petType1,
+                atk1.attackerStatus, atk1.attackerBattleLv, state1)
         else
             -- 没有第一次攻击，发送空数据
             body2505 = body2505 .. buildAttackValue(ctx.userId, 0, 0, 0, 0, 
-                battle.player.hp, battle.player.maxHp, 0, playerPetId)
+                battle.player.hp, battle.player.maxHp, 0, playerPetId,
+                battle.player.status, battle.player.battleLv, 0)
         end
         
         -- 第二次攻击 (反击)
         if result.secondAttack then
             local atk2 = result.secondAttack
             local petType2 = atk2.userId == ctx.userId and playerPetId or enemyPetId
+            
+            local state2 = 0
+            if atk2.missed then state2 = 1 end
+            
             body2505 = body2505 .. buildAttackValue(
                 atk2.userId, atk2.skillId, atk2.atkTimes or 1, 
                 atk2.damage or 0, atk2.gainHp or 0, 
                 atk2.attackerRemainHp, atk2.attackerMaxHp, 
-                atk2.isCrit and 1 or 0, petType2)
+                atk2.isCrit and 1 or 0, petType2,
+                atk2.attackerStatus, atk2.attackerBattleLv, state2)
         else
             -- 没有第二次攻击，发送空数据
             body2505 = body2505 .. buildAttackValue(0, 0, 0, 0, 0, 
-                battle.enemy.hp, battle.enemy.maxHp, 0, enemyPetId)
+                battle.enemy.hp, battle.enemy.maxHp, 0, enemyPetId, 
+                battle.enemy.status, battle.enemy.battleLv, 0)
         end
         
         ctx.sendResponse(buildResponse(2505, ctx.userId, 0, body2505))
