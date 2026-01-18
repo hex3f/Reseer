@@ -76,7 +76,7 @@ local function buildNonoInfoBody(userId, nonoData, forceState)
     -- 使用 forceState 或默认�?3（NoNo 在房间）
     body = body .. writeUInt32BE(forceState or 3)           -- state (32 bits)
     body = body .. writeFixedString(nonoData.nick or "NONO", 16)  -- nick (官服用大�?
-    body = body .. writeUInt32BE(nonoData.superNono or 1)   -- superNono
+    body = body .. writeUInt32BE(nonoData.superNono or 0)   -- superNono (0=普通, 1=超能)
     body = body .. writeUInt32BE(nonoData.color or 0xFFFFFF)  -- color (官服默认白色)
     body = body .. writeUInt32BE(nonoData.power or 10000)   -- power (官服默认10000)
     body = body .. writeUInt32BE(nonoData.mate or 10000)    -- mate (官服默认10000)
@@ -459,21 +459,31 @@ local function handleNieoLogin(ctx)
         user.nono = nonoData
         ctx.saveUser(ctx.userId, user)
         
-        -- 格式化到期时�?
+        -- 格式化到期时间
         local endTimeStr = os.date("%Y-%m-%d", endTime)
         local message = string.format("成功激活超能NONO！\n到期时间:%s", endTimeStr)
         
-        -- 先发�?80002 激活成功通知
+        -- 先发送 80002 激活成功通知
         local msgLen = #message
         local notifyBody = writeUInt32BE(msgLen) .. message
         ctx.sendResponse(buildResponse(80002, ctx.userId, 0, notifyBody))
         
-        tprint(string.format("\27[32m[Handler] �?NIEO_REGISTER 激活成�? 到期: %s\27[0m", endTimeStr))
+        -- 发送 VIP_CO (8006) 命令来更新客户端的 MainManager.actorInfo.superNono
+        -- 格式: userId(4) + vipFlag(4) + autoCharge(4) + vipEndTime(4)
+        -- vipFlag=2 表示激活超能 NONO
+        local vipBody = ""
+        vipBody = vipBody .. writeUInt32BE(ctx.userId)       -- userId
+        vipBody = vipBody .. writeUInt32BE(2)                -- vipFlag=2 (激活超能NONO)
+        vipBody = vipBody .. writeUInt32BE(nonoData.autoCharge or 0)  -- autoCharge
+        vipBody = vipBody .. writeUInt32BE(endTime)          -- vipEndTime
+        ctx.sendResponse(buildResponse(8006, ctx.userId, 0, vipBody))
+        
+        tprint(string.format("\27[32m[Handler] → NIEO_REGISTER 激活成功 到期: %s (已发送 VIP_CO 更新)\27[0m", endTimeStr))
     end
     
-    -- 发�?80001 状态响�?
+    -- 发送 80001 状态响应
     ctx.sendResponse(buildResponse(80001, ctx.userId, 0, writeUInt32BE(0)))
-    tprint("\27[32m[Handler] �?NIEO_LOGIN status=0\27[0m")
+    tprint("\27[32m[Handler] ?NIEO_LOGIN status=0\27[0m")
     return true
 end
 
