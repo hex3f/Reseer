@@ -14,8 +14,7 @@ print("")
 local conf = {
     login_port = 1863,
     local_server_mode = true,
-    gameserver_port = 5000,
-    roomserver_port = 5100,
+    gameserver_port = 5000,  -- 游戏服务器（已包含家园系统）
 }
 _G.conf = conf
 
@@ -24,8 +23,7 @@ require "./buffer_extension"
 
 print("\27[33m========== 登录服务器配置 ==========\27[0m")
 print("🔌 端口: " .. conf.login_port)
-print("🎮 游戏服务器: 127.0.0.1:" .. conf.gameserver_port)
-print("🏠 房间服务器: 127.0.0.1:" .. conf.roomserver_port)
+print("🎮 游戏服务器: 127.0.0.1:" .. conf.gameserver_port .. " (含家园系统)")
 print("")
 
 -- 启动登录服务器

@@ -73,17 +73,82 @@ function UserDB:save()
     local data = json.stringify({
         users = self.users,
         gameData = self.gameData
-    })
+    }, {indent = true})  -- 添加缩进使文件更易读
     fs.writeFileSync(self.dbPath, data)
     print("\27[32m[UserDB] 数据已保存到磁盘\27[0m")
 end
 
--- 内存中更新游戏数据 (不写入磁盘)
+-- 显式保存方法（供外部调用，如服务器关闭时）
+function UserDB:saveToFile()
+    self:save()
+end
 
+-- 内存中更新游戏数据 (不写入磁盘)
+-- 注意：数据只在内存中更新，需要显式调用 saveToFile() 才会写入磁盘
 function UserDB:saveGameData(userId, data)
     self.gameData[tostring(userId)] = data
-    -- 不再自动保存到磁盘，只在关闭时保存
+    -- 会话式管理：不自动保存到磁盘，只在关闭时或显式调用时保存
 end
+
+-- 预留：数据库接口（未来可替换为 MySQL/PostgreSQL 等）
+-- function UserDB:saveGameDataToDB(userId, data)
+--     -- TODO: 实现数据库保存逻辑
+--     -- 例如: db:query("UPDATE game_data SET data = ? WHERE user_id = ?", json.stringify(data), userId)
+-- end
+
+-- ==================== 数据库接口预留 ====================
+-- 以下是预留的数据库接口，可以替换 JSON 文件存储
+-- 
+-- 使用示例（MySQL）:
+-- local mysql = require('mysql')
+-- local db = mysql:new({
+--     host = "localhost",
+--     port = 3306,
+--     database = "seer",
+--     user = "root",
+--     password = "password"
+-- })
+--
+-- function UserDB:loadFromDB()
+--     local result = db:query("SELECT * FROM users")
+--     for _, row in ipairs(result) do
+--         self.users[row.user_id] = json.parse(row.data)
+--     end
+--     
+--     local gameResult = db:query("SELECT * FROM game_data")
+--     for _, row in ipairs(gameResult) do
+--         self.gameData[row.user_id] = json.parse(row.data)
+--     end
+-- end
+--
+-- function UserDB:saveToDB()
+--     for userId, userData in pairs(self.users) do
+--         db:query("INSERT INTO users (user_id, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = ?",
+--             userId, json.stringify(userData), json.stringify(userData))
+--     end
+--     
+--     for userId, gameData in pairs(self.gameData) do
+--         db:query("INSERT INTO game_data (user_id, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = ?",
+--             userId, json.stringify(gameData), json.stringify(gameData))
+--     end
+-- end
+--
+-- 数据库表结构:
+-- CREATE TABLE users (
+--     user_id BIGINT PRIMARY KEY,
+--     data JSON NOT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+-- );
+--
+-- CREATE TABLE game_data (
+--     user_id BIGINT PRIMARY KEY,
+--     data JSON NOT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(user_id)
+-- );
+-- ==================== 数据库接口预留结束 ====================
 
 -- ==================== 账号管理 ====================
 
@@ -109,7 +174,7 @@ end
 function UserDB:saveUser(user)
     if user and user.userId then
         self.users[tostring(user.userId)] = user
-        -- \u4e0d\u518d\u81ea\u52a8\u4fdd\u5b58\u5230\u78c1\u76d8\uff0c\u53ea\u5728\u5173\u95ed\u65f6\u4fdd\u5b58
+        -- 会话式管理：不自动保存到磁盘，只在关闭时或显式调用时保存
     end
 end
 
@@ -141,9 +206,9 @@ function UserDB:createUser(email, password)
     }
     
     self.users[tostring(newUserId)] = user
-    -- 不再自动保存到磁盘，只在关闭时保存
+    -- 会话式管理：不自动保存到磁盘，只在关闭时或显式调用时保存
     
-    print(string.format("\27[32m[UserDB] 创建新用户: %d\27[0m", newUserId))
+    print(string.format("\27[32m[UserDB] 创建新用户: %d (内存中)\27[0m", newUserId))
     return user
 end
 
@@ -293,8 +358,8 @@ function UserDB:getOrCreateGameData(userId)
             -- 精灵仓库 (不在背包的精灵)
             storagePets = {}
         }
-        -- 不再自动保存到磁盘，只在关闭时保存
-        print(string.format("\27[32m[UserDB] 创建游戏数据: userId=%d (含默认家具)\27[0m", userId))
+        -- 会话式管理：不自动保存到磁盘，只在关闭时或显式调用时保存
+        print(string.format("\27[32m[UserDB] 创建游戏数据: userId=%d (含默认家具，内存中)\27[0m", userId))
     else
         -- 数据迁移：修正错误的 NoNo HP 值 (100000 -> 10000)
         local gameData = self.gameData[key]

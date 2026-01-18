@@ -388,8 +388,20 @@ function SeerLoginResponse.makeLoginResponse(user)
     -- 每件服装: id(4) + level(4)
     -- 注意：客户端把第二个字段当作 level 读取，不是 expireTime！
     for _, cloth in ipairs(clothes) do
-        local clothId = cloth.id or cloth[1] or 0
-        local level = cloth.level or 1  -- 默认等级为 1
+        local clothId, level
+        
+        -- 兼容多种格式
+        if type(cloth) == "table" then
+            clothId = cloth.id or cloth[1] or 0
+            level = cloth.level or cloth[2] or 1
+        elseif type(cloth) == "number" then
+            clothId = cloth
+            level = 1
+        else
+            clothId = 0
+            level = 1
+        end
+        
         clothBuf:wuint(pos, clothId)
         pos = pos + 4
         clothBuf:wuint(pos, level)

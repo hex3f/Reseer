@@ -3,12 +3,156 @@
 
 local Utils = require('./utils')
 local writeUInt32BE = Utils.writeUInt32BE
+local writeUInt16BE = Utils.writeUInt16BE
 local readUInt32BE = Utils.readUInt32BE
 local writeFixedString = Utils.writeFixedString
 local buildResponse = Utils.buildResponse
 local OnlineTracker = require('./online_tracker')
 
 local SystemHandlers = {}
+
+-- CMD 105: COMMEND_ONLINE (获取服务器列表)
+-- 响应结构: maxOnlineID(4) + isVIP(4) + onlineCnt(4) + [ServerInfo]...
+-- ServerInfo: onlineID(4) + userCnt(4) + ip(16) + port(2) + friends(4) = 30 bytes
+local function handleCommendOnline(ctx)
+    -- 获取服务器列表配置
+    local serverList = {}
+    for i = 1, 29 do
+        table.insert(serverList, {
+            id = i,
+            userCnt = math.random(10, 60),
+            ip = "127.0.0.1",
+            port = 5000,  -- 统一游戏服务器端口
+            friends = 0
+        })
+    end
+    
+    local maxOnlineID = #serverList
+    local isVIP = 0
+    local onlineCnt = #serverList
+    
+    local body = writeUInt32BE(maxOnlineID) ..
+                 writeUInt32BE(isVIP) ..
+                 writeUInt32BE(onlineCnt)
+    
+    for _, server in ipairs(serverList) do
+        body = body ..
+            writeUInt32BE(server.id) ..
+            writeUInt32BE(server.userCnt) ..
+            writeFixedString(server.ip, 16) ..
+            writeUInt16BE(server.port) ..
+            writeUInt32BE(server.friends)
+    end
+    
+    ctx.sendResponse(buildResponse(105, ctx.userId, 0, body))
+    print(string.format("\27[32m[Handler] → COMMEND_ONLINE response (%d servers)\27[0m", onlineCnt))
+    return true
+end
+
+-- CMD 106: RANGE_ONLINE (获取指定范围服务器)
+-- 请求: startId(4) + endId(4)
+-- 响应: count(4) + [ServerInfo]...
+local function handleRangeOnline(ctx)
+    local startId = 1
+    local endId = 29
+    
+    if #ctx.body >= 8 then
+        startId = readUInt32BE(ctx.body, 1)
+        endId = readUInt32BE(ctx.body, 5)
+    end
+    
+    local servers = {}
+    for i = startId, math.min(endId, 29) do
+        table.insert(servers, {
+            id = i,
+            userCnt = math.random(10, 60),
+            ip = "127.0.0.1",
+            port = 5000,
+            friends = 0
+        })
+    end
+    
+    local body = writeUInt32BE(#servers)
+    
+    for _, server in ipairs(servers) do
+        body = body ..
+            writeUInt32BE(server.id) ..
+            writeUInt32BE(server.userCnt) ..
+            writeFixedString(server.ip, 16) ..
+            writeUInt16BE(server.port) ..
+            writeUInt32BE(server.friends)
+    end
+    
+    ctx.sendResponse(buildResponse(106, ctx.userId, 0, body))
+    print(string.format("\27[32m[Handler] → RANGE_ONLINE response (%d-%d, %d servers)\27[0m", 
+        startId, endId, #servers))
+    return true
+end
+
+-- CMD 1001: LOGIN_IN (登录游戏服务器)
+-- 这是最核心的命令，需要返回完整的用户信息
+-- 响应由 SeerLoginResponse 模块生成
+local function handleLoginIn(ctx)
+    -- 从 body 中提取 session (如果有)
+    local session = ""
+    if #ctx.body >= 16 then
+        session = ctx.body:sub(1, 16)
+    end
+    
+    -- 获取完整用户数据
+    local user = {}
+    if ctx.gameServer and ctx.gameServer.userdb then
+        local db = ctx.gameServer.userdb:new()
+        
+        -- 1. 账号数据
+        local account = db:findByUserId(ctx.userId)
+        if account then
+            for k, v in pairs(account) do user[k] = v end
+        end
+        
+        -- 2. 游戏数据
+        local gameData = db:getOrCreateGameData(ctx.userId)
+        if gameData then
+            for k, v in pairs(gameData) do user[k] = v end
+        end
+    else
+        -- 如果没有数据库，使用 getOrCreateUser
+        user = ctx.getOrCreateUser(ctx.userId)
+    end
+    
+    -- 确保基本字段存在
+    user.userid = ctx.userId
+    user.nick = user.nick or user.nickname or ("Seer" .. ctx.userId)
+    user.coins = user.coins or 99999
+    user.mapID = user.mapID or 1
+    user.energy = user.energy or 100000
+    
+    -- 生成登录响应
+    local SeerLoginResponse = require('../gameserver/seer_login_response')
+    local responseBody, keySeed = SeerLoginResponse.makeLoginResponse(user)
+    
+    -- 更新密钥（如果支持）
+    if ctx.gameServer and ctx.gameServer.cryptoMap and ctx.clientData then
+        local crypto = ctx.gameServer.cryptoMap[ctx.clientData]
+        if crypto then
+            crypto:setKey(keySeed)
+            print(string.format("\27[32m[Handler] 密钥已更新: userId=%d, keySeed=%d\27[0m", ctx.userId, keySeed))
+        end
+    end
+    
+    ctx.sendResponse(buildResponse(1001, ctx.userId, 0, responseBody))
+    print(string.format("\27[32m[Handler] → LOGIN_IN response (user=%d)\27[0m", ctx.userId))
+    
+    -- 标记已登录并启动心跳（如果支持）
+    if ctx.clientData then
+        ctx.clientData.loggedIn = true
+        if ctx.gameServer and ctx.gameServer.startHeartbeat then
+            ctx.gameServer:startHeartbeat(ctx.clientData, ctx.userId)
+        end
+    end
+    
+    return true
+end
 
 -- CMD 1002: SYSTEM_TIME (系统时间)
 -- SystemTimeInfo: timestamp(4) + num(4)
@@ -103,6 +247,9 @@ end
 
 -- 注册所有处理器
 function SystemHandlers.register(Handlers)
+    Handlers.register(105, handleCommendOnline)
+    Handlers.register(106, handleRangeOnline)
+    Handlers.register(1001, handleLoginIn)
     Handlers.register(1002, handleSystemTime)
     Handlers.register(1004, handleMapHot)
     Handlers.register(1005, handleGetImageAddress)

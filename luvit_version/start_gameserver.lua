@@ -1,12 +1,12 @@
 -- 游戏服务器 (Game Server)
--- 负责：游戏逻辑、地图系统、战斗系统
+-- 负责：游戏逻辑、地图系统、战斗系统、家园系统（已合并）
 
 -- 初始化日志系统
 local Logger = require("./logger")
 Logger.init()
 
 print("\27[36m╔════════════════════════════════════════════════════════════╗\27[0m")
-print("\27[36m║                游戏服务器 - Game Server                    ║\27[0m")
+print("\27[36m║          游戏服务器 - Game Server (含家园系统)             ║\27[0m")
 print("\27[36m╚════════════════════════════════════════════════════════════╝\27[0m")
 print("")
 
@@ -81,11 +81,21 @@ _G.sessionManager = sessionManager
 _G.userdb = userdb
 _G.dataClient = dataClient
 
--- 定时保存数据
+print("\27[36m[游戏服务器] ========== 会话式数据管理 ==========\27[0m")
+print("\27[36m[游戏服务器] • 启动时: 从 users.json 加载所有数据到内存\27[0m")
+print("\27[36m[游戏服务器] • 运行时: 所有数据在内存中更新（会话式）\27[0m")
+print("\27[36m[游戏服务器] • 定时保存: 每 30 秒自动保存到 users.json\27[0m")
+print("\27[36m[游戏服务器] • 关闭时: 自动保存所有数据\27[0m")
+print("\27[36m[游戏服务器] • 数据库: 预留接口，可替换为 MySQL/PostgreSQL\27[0m")
+print("")
+
+-- 定期保存数据（每30秒）
 local timer = require('timer')
-timer.setInterval(30 * 1000, function()
+local saveInterval = 30 * 1000  -- 30秒
+timer.setInterval(saveInterval, function()
     local db = userdb:new()
-    db:save()
+    db:saveToFile()
+    print(string.format("\27[90m[自动保存] %s\27[0m", os.date("%H:%M:%S")))
 end)
 
 -- 保持进程活跃
@@ -106,20 +116,30 @@ end)
 
 -- 关闭时保存数据
 local function saveAllData()
-    print("\27[33m[游戏服务器] 正在保存数据...\27[0m")
+    print("\n\27[33m[游戏服务器] 正在保存所有数据到 users.json...\27[0m")
     local db = userdb:new()
-    db:save()
+    db:saveToFile()
     print("\27[32m[游戏服务器] ✓ 数据已保存\27[0m")
 end
 
+-- 捕获退出信号
 pcall(function()
     process:on("SIGINT", function()
-        print("\n\27[33m[游戏服务器] 收到退出信号...\27[0m")
+        print("\n\27[33m[游戏服务器] 收到退出信号 (Ctrl+C)...\27[0m")
         saveAllData()
+        print("\27[32m[游戏服务器] 服务器已安全关闭\27[0m")
+        os.exit(0)
+    end)
+    
+    process:on("SIGTERM", function()
+        print("\n\27[33m[游戏服务器] 收到终止信号...\27[0m")
+        saveAllData()
+        print("\27[32m[游戏服务器] 服务器已安全关闭\27[0m")
         os.exit(0)
     end)
 end)
 
 print("\27[32m[游戏服务器] ========== 服务器就绪 ==========\27[0m")
 print(string.format("\27[36m[游戏服务器] 监听端口: %d\27[0m", conf.gameserver_port))
+print("\27[36m[游戏服务器] 功能: 游戏逻辑 + 家园系统 (已合并)\27[0m")
 print("")
