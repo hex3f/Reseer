@@ -62,54 +62,79 @@ local function handleEnterMap(ctx)
     
     print(string.format("\27[36m[Handler] ENTER_MAP: mapType=%d, mapId=%d, pos=(%d,%d)\27[0m", mapType, mapId, x, y))
     
-    -- 使用 buildUserInfo 构建响应 (在下面定义)
+    -- 使用真实用户数据构建响应
     local nickname = user.nick or user.nickname or user.username or ("赛尔" .. ctx.userId)
     local petId = user.currentPetId or 0
     local catchTime = user.catchId or 0
+    local clothes = user.clothes or {}
+    local clothCount = #clothes
     
-    -- 构建 UserInfo 响应 (setForPeoleInfo 格式)
+    -- 构建 UserInfo 响应 (setForPeoleInfo 格式 - 根据客户端代码)
     local body = ""
-    body = body .. writeUInt32BE(ctx.userId)           -- userID (4)
-    body = body .. writeFixedString(nickname, 16)      -- nick (16)
-    body = body .. writeUInt32BE(0xFFFFFF)             -- color (4)
-    body = body .. writeUInt32BE(0)                    -- texture (4)
-    body = body .. writeUInt32BE(0)                    -- vip flags (4)
-    body = body .. writeUInt32BE(0)                    -- vipStage (4)
-    body = body .. writeUInt32BE(0)                    -- actionType (4)
-    body = body .. writeUInt32BE(x)                    -- pos.x (4)
-    body = body .. writeUInt32BE(y)                    -- pos.y (4)
-    body = body .. writeUInt32BE(0)                    -- action (4)
-    body = body .. writeUInt32BE(0)                    -- direction (4)
-    body = body .. writeUInt32BE(0)                    -- changeShape (4)
-    body = body .. writeUInt32BE(catchTime)            -- spiritTime (4)
-    body = body .. writeUInt32BE(petId)                -- spiritID (4)
-    body = body .. writeUInt32BE(31)                   -- petDV (4)
-    body = body .. writeUInt32BE(0)                    -- petShiny (4)
-    body = body .. writeUInt32BE(0)                    -- petSkin (4)
-    body = body .. writeUInt32BE(0)                    -- achievementsId (4)
-    body = body .. writeUInt32BE(0)                    -- petRide (4)
-    body = body .. writeUInt32BE(0)                    -- padding (4)
-    body = body .. writeUInt32BE(0)                    -- fightFlag (4)
-    body = body .. writeUInt32BE(0)                    -- teacherID (4)
-    body = body .. writeUInt32BE(0)                    -- studentID (4)
-    body = body .. writeUInt32BE(0)                    -- nonoState (4)
-    body = body .. writeUInt32BE(0)                    -- nonoColor (4)
-    body = body .. writeUInt32BE(0)                    -- superNono (4)
-    body = body .. writeUInt32BE(0)                    -- playerForm (4)
-    body = body .. writeUInt32BE(0)                    -- transTime (4)
-    -- TeamInfo
-    body = body .. writeUInt32BE(0)                    -- teamInfo.id (4)
-    body = body .. writeUInt32BE(0)                    -- teamInfo.coreCount (4)
-    body = body .. writeUInt32BE(0)                    -- teamInfo.isShow (4)
-    body = body .. writeUInt16BE(0)                    -- teamInfo.logoBg (2)
-    body = body .. writeUInt16BE(0)                    -- teamInfo.logoIcon (2)
-    body = body .. writeUInt16BE(0)                    -- teamInfo.logoColor (2)
-    body = body .. writeUInt16BE(0)                    -- teamInfo.txtColor (2)
-    body = body .. writeFixedString("", 4)             -- teamInfo.logoWord (4)
-    body = body .. writeUInt32BE(0)                    -- clothCount (4)
+    body = body .. writeUInt32BE(os.time())                     -- sysTime (4) ← 第一个字段！
+    body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
+    body = body .. writeFixedString(nickname, 16)               -- nick (16)
+    body = body .. writeUInt32BE(user.color or 0xFFFFFF)        -- color (4)
+    body = body .. writeUInt32BE(user.texture or 0)             -- texture (4)
+    -- vipFlags: bit 0 = vip, bit 1 = viped
+    local vipFlags = 0
+    if user.vip then vipFlags = vipFlags + 1 end
+    if user.viped then vipFlags = vipFlags + 2 end
+    body = body .. writeUInt32BE(vipFlags)                      -- vipFlags (4)
+    body = body .. writeUInt32BE(user.vipStage or 0)            -- vipStage (4)
+    body = body .. writeUInt32BE(0)                             -- actionType (4)
+    body = body .. writeUInt32BE(x)                             -- pos.x (4)
+    body = body .. writeUInt32BE(y)                             -- pos.y (4)
+    body = body .. writeUInt32BE(0)                             -- action (4)
+    body = body .. writeUInt32BE(0)                             -- direction (4)
+    body = body .. writeUInt32BE(0)                             -- changeShape (4)
+    body = body .. writeUInt32BE(catchTime)                     -- spiritTime (4)
+    body = body .. writeUInt32BE(petId)                         -- spiritID (4)
+    body = body .. writeUInt32BE(31)                            -- petDV (4)
+    body = body .. writeUInt32BE(0)                             -- petSkin (4) ← 注意：不是 petShiny！
+    body = body .. writeUInt32BE(0)                             -- fightFlag (4)
+    body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
+    body = body .. writeUInt32BE(user.studentID or 0)           -- studentID (4)
+    body = body .. writeUInt32BE(user.nonoState or 0)           -- nonoState (4)
+    body = body .. writeUInt32BE(user.nonoColor or 0)           -- nonoColor (4)
+    body = body .. writeUInt32BE(user.superNono or 0)           -- superNono (4)
+    body = body .. writeUInt32BE(0)                             -- playerForm (4)
+    body = body .. writeUInt32BE(0)                             -- transTime (4)
+    -- TeamInfo (完整版本：24 bytes)
+    local teamInfo = user.teamInfo or {}
+    body = body .. writeUInt32BE(teamInfo.id or 0)              -- teamInfo.id (4)
+    body = body .. writeUInt32BE(teamInfo.coreCount or 0)       -- teamInfo.coreCount (4)
+    body = body .. writeUInt32BE(teamInfo.isShow or 0)          -- teamInfo.isShow (4)
+    body = body .. writeUInt16BE(teamInfo.logoBg or 0)          -- teamInfo.logoBg (2)
+    body = body .. writeUInt16BE(teamInfo.logoIcon or 0)        -- teamInfo.logoIcon (2)
+    body = body .. writeUInt16BE(teamInfo.logoColor or 0)       -- teamInfo.logoColor (2)
+    body = body .. writeUInt16BE(teamInfo.txtColor or 0)        -- teamInfo.txtColor (2)
+    body = body .. writeFixedString(teamInfo.logoWord or "", 4) -- teamInfo.logoWord (4)
+    body = body .. writeUInt32BE(clothCount)                    -- clothCount (4)
+    
+    -- 添加服装列表
+    for _, cloth in ipairs(clothes) do
+        local clothId = cloth
+        local clothLevel = 0
+        if type(cloth) == "table" then
+            clothId = cloth.id or 0
+            clothLevel = cloth.level or 0
+        end
+        body = body .. writeUInt32BE(clothId)                   -- clothId (4)
+        body = body .. writeUInt32BE(clothLevel)                -- clothLevel (4)
+    end
+    -- curTitle (4 bytes)
+    body = body .. writeUInt32BE(user.curTitle or 0)            -- curTitle (4)
     
     ctx.sendResponse(buildResponse(2001, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → ENTER_MAP %d at (%d,%d)\27[0m", mapId, x, y))
+    print(string.format("\27[32m[Handler] → ENTER_MAP %d at (%d,%d) with %d clothes\27[0m", mapId, x, y, clothCount))
+    
+    -- 主动推送 LIST_MAP_PLAYER (包含自己)
+    -- 使用完整的 UserInfo 格式（与 buildUserInfo 一致）
+    local playerListBody = writeUInt32BE(1) .. body  -- count=1 + 自己的 UserInfo
+    ctx.sendResponse(buildResponse(2003, ctx.userId, 0, playerListBody))
+    print(string.format("\27[32m[Handler] → LIST_MAP_PLAYER (auto-push, 1 player)\27[0m"))
+    
     return true
 end
 
@@ -122,53 +147,71 @@ local function handleLeaveMap(ctx)
     return true
 end
 
--- 构建 UserInfo (setForPeoleInfo 格式)
+-- 构建完整的 UserInfo (用于 LIST_MAP_PLAYER，根据客户端 setForPeoleInfo)
 local function buildUserInfo(userId, user)
     local nickname = user.nick or user.nickname or user.username or ("赛尔" .. userId)
     local petId = user.currentPetId or 0
     local catchTime = user.catchId or 0
     local x = user.x or 500
     local y = user.y or 300
+    local clothes = user.clothes or {}
+    local clothCount = #clothes
     
     local body = ""
-    body = body .. writeUInt32BE(userId)               -- userID (4)
-    body = body .. writeFixedString(nickname, 16)      -- nick (16)
-    body = body .. writeUInt32BE(0xFFFFFF)             -- color (4)
-    body = body .. writeUInt32BE(0)                    -- texture (4)
-    body = body .. writeUInt32BE(0)                    -- vip flags (4)
-    body = body .. writeUInt32BE(0)                    -- vipStage (4)
-    body = body .. writeUInt32BE(0)                    -- actionType (4)
-    body = body .. writeUInt32BE(x)                    -- pos.x (4)
-    body = body .. writeUInt32BE(y)                    -- pos.y (4)
-    body = body .. writeUInt32BE(0)                    -- action (4)
-    body = body .. writeUInt32BE(0)                    -- direction (4)
-    body = body .. writeUInt32BE(0)                    -- changeShape (4)
-    body = body .. writeUInt32BE(catchTime)            -- spiritTime (4)
-    body = body .. writeUInt32BE(petId)                -- spiritID (4)
-    body = body .. writeUInt32BE(31)                   -- petDV (4)
-    body = body .. writeUInt32BE(0)                    -- petShiny (4)
-    body = body .. writeUInt32BE(0)                    -- petSkin (4)
-    body = body .. writeUInt32BE(0)                    -- achievementsId (4)
-    body = body .. writeUInt32BE(0)                    -- petRide (4)
-    body = body .. writeUInt32BE(0)                    -- padding (4)
-    body = body .. writeUInt32BE(0)                    -- fightFlag (4)
-    body = body .. writeUInt32BE(0)                    -- teacherID (4)
-    body = body .. writeUInt32BE(0)                    -- studentID (4)
-    body = body .. writeUInt32BE(0)                    -- nonoState (4)
-    body = body .. writeUInt32BE(0)                    -- nonoColor (4)
-    body = body .. writeUInt32BE(0)                    -- superNono (4)
-    body = body .. writeUInt32BE(0)                    -- playerForm (4)
-    body = body .. writeUInt32BE(0)                    -- transTime (4)
-    -- TeamInfo
-    body = body .. writeUInt32BE(0)                    -- teamInfo.id (4)
-    body = body .. writeUInt32BE(0)                    -- teamInfo.coreCount (4)
-    body = body .. writeUInt32BE(0)                    -- teamInfo.isShow (4)
-    body = body .. writeUInt16BE(0)                    -- teamInfo.logoBg (2)
-    body = body .. writeUInt16BE(0)                    -- teamInfo.logoIcon (2)
-    body = body .. writeUInt16BE(0)                    -- teamInfo.logoColor (2)
-    body = body .. writeUInt16BE(0)                    -- teamInfo.txtColor (2)
-    body = body .. writeFixedString("", 4)             -- teamInfo.logoWord (4)
-    body = body .. writeUInt32BE(0)                    -- clothCount (4)
+    body = body .. writeUInt32BE(os.time())                     -- sysTime (4)
+    body = body .. writeUInt32BE(userId)                        -- userID (4)
+    body = body .. writeFixedString(nickname, 16)               -- nick (16)
+    body = body .. writeUInt32BE(user.color or 0xFFFFFF)        -- color (4)
+    body = body .. writeUInt32BE(user.texture or 0)             -- texture (4)
+    -- vipFlags
+    local vipFlags = 0
+    if user.vip then vipFlags = vipFlags + 1 end
+    if user.viped then vipFlags = vipFlags + 2 end
+    body = body .. writeUInt32BE(vipFlags)                      -- vipFlags (4)
+    body = body .. writeUInt32BE(user.vipStage or 0)            -- vipStage (4)
+    body = body .. writeUInt32BE(0)                             -- actionType (4)
+    body = body .. writeUInt32BE(x)                             -- pos.x (4)
+    body = body .. writeUInt32BE(y)                             -- pos.y (4)
+    body = body .. writeUInt32BE(0)                             -- action (4)
+    body = body .. writeUInt32BE(0)                             -- direction (4)
+    body = body .. writeUInt32BE(0)                             -- changeShape (4)
+    body = body .. writeUInt32BE(catchTime)                     -- spiritTime (4)
+    body = body .. writeUInt32BE(petId)                         -- spiritID (4)
+    body = body .. writeUInt32BE(31)                            -- petDV (4)
+    body = body .. writeUInt32BE(0)                             -- petSkin (4)
+    body = body .. writeUInt32BE(0)                             -- fightFlag (4)
+    body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
+    body = body .. writeUInt32BE(user.studentID or 0)           -- studentID (4)
+    body = body .. writeUInt32BE(user.nonoState or 0)           -- nonoState (4)
+    body = body .. writeUInt32BE(user.nonoColor or 0)           -- nonoColor (4)
+    body = body .. writeUInt32BE(user.superNono or 0)           -- superNono (4)
+    body = body .. writeUInt32BE(0)                             -- playerForm (4)
+    body = body .. writeUInt32BE(0)                             -- transTime (4)
+    -- TeamInfo (完整版本)
+    local teamInfo = user.teamInfo or {}
+    body = body .. writeUInt32BE(teamInfo.id or 0)              -- teamInfo.id (4)
+    body = body .. writeUInt32BE(teamInfo.coreCount or 0)       -- teamInfo.coreCount (4)
+    body = body .. writeUInt32BE(teamInfo.isShow or 0)          -- teamInfo.isShow (4)
+    body = body .. writeUInt16BE(teamInfo.logoBg or 0)          -- teamInfo.logoBg (2)
+    body = body .. writeUInt16BE(teamInfo.logoIcon or 0)        -- teamInfo.logoIcon (2)
+    body = body .. writeUInt16BE(teamInfo.logoColor or 0)       -- teamInfo.logoColor (2)
+    body = body .. writeUInt16BE(teamInfo.txtColor or 0)        -- teamInfo.txtColor (2)
+    body = body .. writeFixedString(teamInfo.logoWord or "", 4) -- teamInfo.logoWord (4)
+    body = body .. writeUInt32BE(clothCount)                    -- clothCount (4)
+    
+    -- 添加服装列表
+    for _, cloth in ipairs(clothes) do
+        local clothId = cloth
+        local clothLevel = 0
+        if type(cloth) == "table" then
+            clothId = cloth.id or 0
+            clothLevel = cloth.level or 0
+        end
+        body = body .. writeUInt32BE(clothId)                   -- clothId (4)
+        body = body .. writeUInt32BE(clothLevel)                -- clothLevel (4)
+    end
+    -- curTitle (4 bytes)
+    body = body .. writeUInt32BE(user.curTitle or 0)            -- curTitle (4)
     
     return body
 end

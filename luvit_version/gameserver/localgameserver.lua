@@ -316,6 +316,36 @@ function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, seqId, b
             end)
             if ok then
                 tprint(string.format("\27[32m[GlobalHandler] 发送响应 %d bytes 到客户端\27[0m", #packet))
+                
+                -- 显示详细的十六进制数据（用于调试）
+                if #packet > 17 then
+                    local body = packet:sub(18)  -- 跳过 17 字节包头
+                    local cmdId = packet:byte(6) * 16777216 + packet:byte(7) * 65536 + 
+                                  packet:byte(8) * 256 + packet:byte(9)
+                    
+                    tprint(string.format("\27[36m[PACKET] CMD=%d 包体详情 (%d bytes):\27[0m", cmdId, #body))
+                    
+                    -- 十六进制格式输出 (每行16字节)
+                    for i = 1, #body, 16 do
+                        local hexPart = ""
+                        local asciiPart = ""
+                        for j = i, math.min(i + 15, #body) do
+                            local byte = body:byte(j)
+                            hexPart = hexPart .. string.format("%02X ", byte)
+                            if byte >= 32 and byte < 127 then
+                                asciiPart = asciiPart .. string.char(byte)
+                            else
+                                asciiPart = asciiPart .. "."
+                            end
+                        end
+                        -- 补齐不足16字节的行
+                        local padding = 16 - math.min(16, #body - i + 1)
+                        hexPart = hexPart .. string.rep("   ", padding)
+                        
+                        tprint(string.format("\27[90m  %04X: %s |%s|\27[0m", i - 1, hexPart, asciiPart))
+                    end
+                    tprint(string.format("\27[36m[PACKET] --- 包体结束 ---\27[0m"))
+                end
             else
                 tprint(string.format("\27[31m[GlobalHandler] 发送响应失败: %s\27[0m", tostring(err)))
             end
@@ -478,7 +508,7 @@ function LocalGameServer:sendResponse(clientData, cmdId, userId, result, body)
         tprint(string.format("\27[32m[LocalGame] 发送 CMD=%d (%s) RESULT=%d LEN=%d\27[0m", 
             cmdId, getCmdName(cmdId), result, length))
         
-        -- 详细包体输出 (完整十六进制)
+        -- 详细包体输出 (完整十六进制) - 始终显示
         if #body > 0 then
             tprint(string.format("\27[36m[PACKET] CMD=%d 包体详情 (%d bytes):\27[0m", cmdId, #body))
             

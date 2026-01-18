@@ -11,111 +11,84 @@ local buildResponse = Utils.buildResponse
 local RoomHandlers = {}
 
 -- CMD 10001: ROOM_LOGIN (房间登录)
--- 请求格式: flag(4) + targetUserId(4) + encryptedData(32) + padding(8) + targetUserId(4) + x(4) + y(4)
--- 响应: 空响应表示成功，然后服务器主动发送 ENTER_MAP
+-- 请求格式（根据客户端代码）:
+--   session(24 bytes) + catchTime(4) + flag(4) + targetUserId(4) + x(4) + y(4) = 44 bytes
+-- 响应: 空响应表示成功
+-- 注意：由于房间服务器已合并，客户端会通过 isIlk=true 检测到是同一连接
+--       因此 ROOM_LOGIN 后，客户端会发送 ENTER_MAP 命令来真正进入地图
 local function handleRoomLogin(ctx)
     -- 解析请求
+    local session = ""
+    local catchTime = 0
     local flag = 0
     local targetUserId = ctx.userId
     local x = 300
     local y = 300
     
-    if #ctx.body >= 4 then
-        flag = readUInt32BE(ctx.body, 1)
+    if #ctx.body >= 24 then
+        session = ctx.body:sub(1, 24)
     end
-    if #ctx.body >= 8 then
-        targetUserId = readUInt32BE(ctx.body, 5)
+    if #ctx.body >= 28 then
+        catchTime = readUInt32BE(ctx.body, 25)
     end
-    -- 跳过加密数据和padding，读取坐标
-    if #ctx.body >= 52 then
-        x = readUInt32BE(ctx.body, 49)
+    if #ctx.body >= 32 then
+        flag = readUInt32BE(ctx.body, 29)
     end
-    if #ctx.body >= 56 then
-        y = readUInt32BE(ctx.body, 53)
+    if #ctx.body >= 36 then
+        targetUserId = readUInt32BE(ctx.body, 33)
+    end
+    if #ctx.body >= 40 then
+        x = readUInt32BE(ctx.body, 37)
+    end
+    if #ctx.body >= 44 then
+        y = readUInt32BE(ctx.body, 41)
     end
     
-    print(string.format("\27[36m[Handler] ROOM_LOGIN: flag=%d, target=%d, pos=(%d,%d)\27[0m", flag, targetUserId, x, y))
+    print(string.format("\27[36m[Handler] ROOM_LOGIN: flag=%d, target=%d, catchTime=0x%08X, pos=(%d,%d)\27[0m", 
+        flag, targetUserId, catchTime, x, y))
     
-    -- 发送 ROOM_LOGIN 成功响应
-    ctx.sendResponse(buildResponse(10001, ctx.userId, 0, ""))
-    print("\27[32m[Handler] → ROOM_LOGIN response\27[0m")
-    
-    -- 更新用户位置到家园
+    -- 更新用户位置到家园（预设置，等待 ENTER_MAP 确认）
     local user = ctx.getOrCreateUser(ctx.userId)
-    user.mapId = 60  -- 家园地图ID
-    user.mapType = 1  -- 家园地图类型
-    user.x = x
-    user.y = y
-    ctx.saveUserDB()
+    user.pendingMapId = targetUserId  -- 待进入的家园地图ID
+    user.pendingMapType = 1           -- 家园地图类型
+    user.pendingX = x
+    user.pendingY = y
     
-    -- 构建并发送 ENTER_MAP 响应 (让客户端进入家园地图)
-    local nickname = user.nick or user.nickname or user.username or ("赛尔" .. ctx.userId)
-    local petId = user.currentPetId or 0
-    local catchTime = user.catchId or 0
-    
-    local enterMapBody = ""
-    enterMapBody = enterMapBody .. writeUInt32BE(ctx.userId)           -- userID (4)
-    enterMapBody = enterMapBody .. writeFixedString(nickname, 16)      -- nick (16)
-    enterMapBody = enterMapBody .. writeUInt32BE(0xFFFFFF)             -- color (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- texture (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- vip flags (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- vipStage (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- actionType (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(x)                    -- pos.x (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(y)                    -- pos.y (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- action (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- direction (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- changeShape (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(catchTime)            -- spiritTime (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(petId)                -- spiritID (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(31)                   -- petDV (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- petShiny (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- petSkin (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- achievementsId (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- petRide (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- padding (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- fightFlag (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- teacherID (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- studentID (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- nonoState (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- nonoColor (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- superNono (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- playerForm (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- transTime (4)
-    -- TeamInfo
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- teamInfo.id (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- teamInfo.coreCount (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- teamInfo.isShow (4)
-    enterMapBody = enterMapBody .. writeUInt16BE(0)                    -- teamInfo.logoBg (2)
-    enterMapBody = enterMapBody .. writeUInt16BE(0)                    -- teamInfo.logoIcon (2)
-    enterMapBody = enterMapBody .. writeUInt16BE(0)                    -- teamInfo.logoColor (2)
-    enterMapBody = enterMapBody .. writeUInt16BE(0)                    -- teamInfo.txtColor (2)
-    enterMapBody = enterMapBody .. writeFixedString("", 4)             -- teamInfo.logoWord (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(0)                    -- clothCount (4)
-    
-    ctx.sendResponse(buildResponse(2001, ctx.userId, 0, enterMapBody))
-    print(string.format("\27[32m[Handler] → ENTER_MAP (家园地图 60) at (%d,%d)\27[0m", x, y))
+    -- 发送 ROOM_LOGIN 成功响应（空响应）
+    -- 客户端收到后会发送 ENTER_MAP 命令
+    ctx.sendResponse(buildResponse(10001, ctx.userId, 0, ""))
+    print("\27[32m[Handler] → ROOM_LOGIN response (waiting for ENTER_MAP)\27[0m")
     
     return true
 end
 
 -- CMD 10002: GET_ROOM_ADDRES (获取房间地址)
 -- 请求: targetUserId(4)
--- 官服响应: userID(4) + encryptedData(26 bytes) = 30 bytes total
+-- 响应格式（根据客户端代码）:
+--   session(24 bytes) + ip(4 bytes) + port(2 bytes) = 30 bytes total
+-- 注意：由于房间服务器已合并到游戏服务器，返回相同的地址
+-- 客户端会检测到是同一服务器（isIlk=true），不会创建新连接
 local function handleGetRoomAddress(ctx)
     local targetUserId = ctx.userId
     if #ctx.body >= 4 then
         targetUserId = readUInt32BE(ctx.body, 1)
     end
     
-    -- 构建响应 (与官服格式一致: 4 + 26 = 30 bytes)
-    local body = writeUInt32BE(targetUserId)     -- targetUserId (4)
-    -- 加密数据 (26 bytes) - 官服返回的是加密的房间服务器信息
-    -- 本地服务器不需要真正的加密，填充占位数据
-    body = body .. string.rep("\0", 26)
+    -- 生成 session（24字节，可以为空）
+    local session = string.rep("\0", 24)
+    
+    -- 游戏服务器 IP: 127.0.0.1 (0x7F000001)
+    local ip = string.char(0x7F, 0x00, 0x00, 0x01)
+    
+    -- 游戏服务器端口: 5000 (大端序)
+    local port = writeUInt16BE(5000)
+    
+    -- 构建响应: session(24) + ip(4) + port(2) = 30 bytes
+    local body = session .. ip .. port
     
     ctx.sendResponse(buildResponse(10002, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → GET_ROOM_ADDRES response (target=%d, size=30)\27[0m", targetUserId))
+    print(string.format("\27[32m[Handler] → GET_ROOM_ADDRES response (target=%d, ip=127.0.0.1:5000, isIlk=true)\27[0m", 
+        targetUserId))
     return true
 end
 
