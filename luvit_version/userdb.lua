@@ -75,21 +75,14 @@ function UserDB:save()
         gameData = self.gameData
     })
     fs.writeFileSync(self.dbPath, data)
+    print("\27[32m[UserDB] 数据已保存到磁盘\27[0m")
 end
+
+-- 内存中更新游戏数据 (不写入磁盘)
 
 function UserDB:saveGameData(userId, data)
     self.gameData[tostring(userId)] = data
-    self:save()
-    -- 调试: 打印保存的任务状态
-    if data.tasks then
-        local taskCount = 0
-        for taskId, task in pairs(data.tasks) do
-            taskCount = taskCount + 1
-        end
-        if taskCount > 0 then
-            print(string.format("\27[35m[UserDB] 保存游戏数据: userId=%d, 任务数=%d\27[0m", userId, taskCount))
-        end
-    end
+    -- 不再自动保存到磁盘，只在关闭时保存
 end
 
 -- ==================== 账号管理 ====================
@@ -116,7 +109,7 @@ end
 function UserDB:saveUser(user)
     if user and user.userId then
         self.users[tostring(user.userId)] = user
-        self:save()
+        -- \u4e0d\u518d\u81ea\u52a8\u4fdd\u5b58\u5230\u78c1\u76d8\uff0c\u53ea\u5728\u5173\u95ed\u65f6\u4fdd\u5b58
     end
 end
 
@@ -148,7 +141,7 @@ function UserDB:createUser(email, password)
     }
     
     self.users[tostring(newUserId)] = user
-    self:save()
+    -- 不再自动保存到磁盘，只在关闭时保存
     
     print(string.format("\27[32m[UserDB] 创建新用户: %d\27[0m", newUserId))
     return user
@@ -300,7 +293,7 @@ function UserDB:getOrCreateGameData(userId)
             -- 精灵仓库 (不在背包的精灵)
             storagePets = {}
         }
-        self:save()
+        -- 不再自动保存到磁盘，只在关闭时保存
         print(string.format("\27[32m[UserDB] 创建游戏数据: userId=%d (含默认家具)\27[0m", userId))
     end
     return self.gameData[key]

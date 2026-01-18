@@ -281,10 +281,9 @@ local function handleNonoFollowOrHoom(ctx)
     nonoData.isFollowing = (action == 1)
     saveNonoData(ctx, nonoData)
     
-    -- 更新用户的 nonoState，用于地图上显示 NONO
-    local user = ctx.getOrCreateUser(ctx.userId)
-    user.nonoState = action  -- 1=跟随(显示), 0=回家(不显示)
-    ctx.saveUser(ctx.userId, user)
+    -- 注意: nonoState 不保存到数据库
+    -- nonoState 是会话级状态，重新进入房间时会重置为 0
+    -- 这样可以避免重复显示 NONO 的问题
     
     local body = ""
     if action == 1 then

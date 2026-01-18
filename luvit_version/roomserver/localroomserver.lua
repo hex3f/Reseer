@@ -31,7 +31,7 @@ function LocalRoomServer:new(sharedUserDB, sharedGameServer)
         clients = {},
         userdb = sharedUserDB,      -- 共享用户数据库
         gameServer = sharedGameServer, -- 共享游戏服务器（用于命令处理）
-        users = {},                 -- userId -> user data (缓存)
+        -- 不再使用缓存，每次都从数据库加载最新数据
     }
     setmetatable(obj, LocalRoomServer)
     obj:start()
@@ -50,7 +50,8 @@ function LocalRoomServer:start()
             session = "",
             roomId = 0,
             loggedIn = false,
-            heartbeatTimer = nil  -- 心跳定时器
+            heartbeatTimer = nil,  -- 心跳定时器
+            nonoState = 0          -- NONO状态 (会话级, 0=不跟随, 1=跟随)
         }
         table.insert(self.clients, clientData)
         
@@ -191,19 +192,18 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
         return
     end
     
+    -- 特殊处理: NONO_FOLLOW_OR_HOOM (9019) 需要更新会话级 nonoState
+    if cmdId == 9019 and #body >= 4 then
+        local action = body:byte(1) * 16777216 + body:byte(2) * 65536 + 
+                       body:byte(3) * 256 + body:byte(4)
+        clientData.nonoState = action  -- 更新会话级状态
+        tprint(string.format("\27[35m[RoomServer] 更新 nonoState=%d\27[0m", action))
+    end
+    
     -- 尝试使用游戏服务器的处理器（共用命令）
     if self.gameServer and self.gameServer.handleCommandDirect then
         local success = self.gameServer:handleCommandDirect(clientData, cmdId, userId, seqId, body)
         if success then
-            -- 如果是会修改用户数据的命令，清除 RoomServer 的缓存
-            -- 这样下次访问时会从数据库重新加载最新数据
-            if cmdId == 2604 then  -- CHANGE_CLOTH
-                self.users[userId] = nil
-                tprint(string.format("\27[35m[RoomServer] 清除用户 %d 的缓存（衣服已更新）\27[0m", userId))
-            elseif cmdId == 9019 then  -- NONO_FOLLOW_OR_HOOM
-                self.users[userId] = nil
-                tprint(string.format("\27[35m[RoomServer] 清除用户 %d 的缓存（NONO状态已更新）\27[0m", userId))
-            end
             return
         end
     end
@@ -294,13 +294,8 @@ local function readUInt32BE(data, offset)
            data:byte(offset + 3)
 end
 
--- 获取或创建用户数据 (从共享数据库)
+-- 获取用户数据 (从共享数据库，每次都加载最新)
 function LocalRoomServer:getOrCreateUser(userId)
-    -- 首先检查缓存
-    if self.users[userId] then
-        return self.users[userId]
-    end
-    
     -- 从共享数据库获取
     if self.userdb then
         local db = self.userdb:new()
@@ -381,12 +376,11 @@ function LocalRoomServer:getOrCreateUser(userId)
         end
         
         userData.id = userId
-        self.users[userId] = userData
         return userData
     end
     
-    -- 默认用户数据
-    self.users[userId] = {
+    -- 默认用户数据 (数据库不可用时的后备)
+    return {
         id = userId,
         nick = "赛尔" .. userId,
         fitments = {{id = 500001, x = 0, y = 0, dir = 0, status = 0}},
@@ -394,18 +388,14 @@ function LocalRoomServer:getOrCreateUser(userId)
         clothes = {},
         nono = {flag = 1, state = 1, nick = "NONO", color = 0xFFFFFF, hp = 10000, maxHp = 10000}
     }
-    return self.users[userId]
 end
 
 -- 保存用户数据
-function LocalRoomServer:saveUserData()
-    if self.userdb then
+function LocalRoomServer:saveUserData(userId, userData)
+    if self.userdb and userId and userData then
         local db = self.userdb:new()
-        for uId, userData in pairs(self.users) do
-            -- 只保存游戏数据 (包含家具)
-            db:saveGameData(uId, userData)
-        end
-        tprint("\27[35m[RoomServer] 用户数据已保存\27[0m")
+        db:saveGameData(userId, userData)
+        tprint(string.format("\27[35m[RoomServer] 用户 %d 数据已保存\27[0m", userId))
     end
 end
 
@@ -441,21 +431,15 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     tprint(string.format("\27[35m[RoomServer] 用户 %d 进入房间 (房主=%d) pos=(%d,%d)\27[0m", 
         userId, mapId, x, y))
     
-    -- 清除缓存，确保使用最新数据（用户可能在 GameServer 换过衣服）
-    if self.users[userId] then
-        self.users[userId] = nil
-        tprint(string.format("\27[35m[RoomServer] 清除用户 %d 的缓存（进入房间时刷新）\27[0m", userId))
-    end
-    
-    -- 获取用户数据
+    -- 获取用户数据（每次都从数据库加载最新）
     local userData = self:getOrCreateUser(userId)
     local nickname = userData.nick or userData.nickname or ("赛尔" .. userId)
     local teamInfo = userData.teamInfo or {}
     local nonoData = userData.nono or {}  -- 获取 NONO 数据
     
     -- 进入房间时重置 nonoState 为 0 (NONO 跟随是会话级行为，需要用户手动激活)
-    -- 这避免了从保存数据中加载旧的 nonoState=1 导致重复 NONO
-    userData.nonoState = 0
+    -- nonoState 存储在 clientData 中，不从数据库加载
+    clientData.nonoState = 0
     
     -- 先发送 ENTER_MAP 响应
     -- 官服行为：如果用户装备了衣服，则发送衣服数据；否则 clothCount=0
@@ -483,7 +467,7 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- fightFlag (4)
     enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- teacherID (4)
     enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- studentID (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoState or 0)   -- nonoState (4) 默认0=不跟随
+    enterMapBody = enterMapBody .. writeUInt32BE(clientData.nonoState or 0)   -- nonoState (4) 从会话状态读取
     enterMapBody = enterMapBody .. writeUInt32BE(nonoData.color or 0xFFFFFF)   -- nonoColor (从nonoData读取)
     enterMapBody = enterMapBody .. writeUInt32BE(nonoData.superNono or 0)   -- superNono (从nonoData读取，与NONO_INFO一致)
     enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- playerForm (4)
@@ -513,6 +497,15 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     self:sendResponse(clientData, cmdId, userId, 0, "")
     tprint(string.format("\27[32m[RoomServer] → ROOM_LOGIN 成功\27[0m"))
     
+    -- 发送 NONO 回家消息，确保客户端重置 NONO 状态
+    -- 这样可以避免客户端残留的跟随状态导致重复 NONO
+    local nonoGoHomeBody = ""
+    nonoGoHomeBody = nonoGoHomeBody .. writeUInt32BE(userId)  -- userID
+    nonoGoHomeBody = nonoGoHomeBody .. writeUInt32BE(0)       -- flag=0
+    nonoGoHomeBody = nonoGoHomeBody .. writeUInt32BE(0)       -- state=0 (已回家)
+    self:sendResponse(clientData, 9019, userId, 0, nonoGoHomeBody)
+    tprint("\27[32m[RoomServer] → NONO_FOLLOW_OR_HOOM 回家 (重置客户端状态)\27[0m")
+    
     -- 启动心跳定时器
     self:startHeartbeat(clientData, userId)
 end
@@ -538,7 +531,7 @@ function LocalRoomServer:handleFitmentUsering(clientData, cmdId, userId, seqId, 
     -- 初始化默认家具
     if not userData.fitments or #userData.fitments == 0 then
         userData.fitments = {{id = 500001, x = 0, y = 0, dir = 0, status = 0}}
-        self:saveUserData()
+        self:saveUserData(targetUserId, userData)
     end
     
     local fitments = userData.fitments or {}
@@ -566,7 +559,7 @@ function LocalRoomServer:handleFitmentAll(clientData, cmdId, userId, seqId, body
     
     if not userData.allFitments or #userData.allFitments == 0 then
         userData.allFitments = {{id = 500001, usedCount = 1, allCount = 1}}
-        self:saveUserData()
+        self:saveUserData(userId, userData)
     end
     
     local allFitments = userData.allFitments or {}
@@ -630,7 +623,7 @@ function LocalRoomServer:handleSetFitment(clientData, cmdId, userId, seqId, body
         end
     end
     
-    self:saveUserData()
+    self:saveUserData(userId, userData)
     
     -- 官服响应是空的 (17 bytes = 只有包头)
     self:sendResponse(clientData, cmdId, userId, 0, "")
@@ -663,7 +656,7 @@ function LocalRoomServer:handleBuyFitment(clientData, cmdId, userId, seqId, body
         table.insert(userData.allFitments, {id = fitmentId, usedCount = 0, allCount = count})
     end
     
-    self:saveUserData()
+    self:saveUserData(userId, userData)
     
     local responseBody = writeUInt32BE(coins) ..
                         writeUInt32BE(fitmentId) ..
@@ -721,7 +714,7 @@ function LocalRoomServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(0)                         -- fightFlag (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- teacherID (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- studentID (4)
-    responseBody = responseBody .. writeUInt32BE(userData.nonoState or 0)   -- nonoState (4) 默认0=不跟随
+    responseBody = responseBody .. writeUInt32BE(clientData.nonoState or 0)   -- nonoState (4) 从会话状态读取
     responseBody = responseBody .. writeUInt32BE(nonoData.color or 0xFFFFFF)   -- nonoColor (从nonoData)
     responseBody = responseBody .. writeUInt32BE(nonoData.superNono or 0)   -- superNono (从nonoData)
     responseBody = responseBody .. writeUInt32BE(0)                         -- playerForm (4)
@@ -788,7 +781,7 @@ function LocalRoomServer:handleListMapPlayer(clientData, cmdId, userId, seqId, b
     responseBody = responseBody .. writeUInt32BE(0)                         -- fightFlag (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- teacherID (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- studentID (4)
-    responseBody = responseBody .. writeUInt32BE(userData.nonoState or 0)   -- nonoState (4) 默认0=不跟随
+    responseBody = responseBody .. writeUInt32BE(clientData.nonoState or 0)   -- nonoState (4) 从会话状态读取
     responseBody = responseBody .. writeUInt32BE(nonoData.color or 0xFFFFFF)   -- nonoColor (从nonoData)
     responseBody = responseBody .. writeUInt32BE(nonoData.superNono or 0)   -- superNono (从nonoData)
     responseBody = responseBody .. writeUInt32BE(0)                         -- playerForm (4)

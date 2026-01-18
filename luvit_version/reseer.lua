@@ -274,10 +274,43 @@ pcall(function()
     end
 end)
 
+-- ============================================================
+-- 关闭时保存数据
+-- ============================================================
+local function saveAllData()
+    print("\27[33m[SHUTDOWN] 正在保存所有用户数据...\27[0m")
+    local success, UserDB = pcall(require, "./userdb")
+    if success then
+        local db = UserDB:new()
+        db:save()
+        print("\27[32m[SHUTDOWN] ✓ 用户数据已保存\27[0m")
+    else
+        print("\27[31m[SHUTDOWN] 保存用户数据失败: " .. tostring(UserDB) .. "\27[0m")
+    end
+end
+
+-- 监听进程退出信号 (仅 Unix/Linux 支持，Windows 会静默失败)
+pcall(function()
+    process:on("SIGINT", function()
+        print("\n\27[33m[SHUTDOWN] 收到 SIGINT 信号 (Ctrl+C)，正在关闭...\27[0m")
+        saveAllData()
+        os.exit(0)
+    end)
+end)
+
+pcall(function()
+    process:on("SIGTERM", function()
+        print("\n\27[33m[SHUTDOWN] 收到 SIGTERM 信号，正在关闭...\27[0m")
+        saveAllData()
+        os.exit(0)
+    end)
+end)
+
 -- 全局错误捕获
 process:on("uncaughtException", function(err)
     print("\27[31m[CRITICAL] Uncaught Exception: " .. tostring(err) .. "\27[0m")
     print(debug.traceback())
+    saveAllData()  -- 出错时也尝试保存数据
 end)
 
 print("\27[32m========== SERVER READY ==========\27[0m")
