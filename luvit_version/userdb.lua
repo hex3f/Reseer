@@ -222,12 +222,12 @@ function UserDB:getOrCreateGameData(userId)
                 flag = nonoDefaults.flag or 1,
                 state = nonoDefaults.state or 0,
                 nick = nonoDefaults.nick or "NoNo",
-                color = nonoDefaults.color or 1,
+                color = nonoDefaults.color or 0xFFFFFF,
                 
                 -- VIP/超能NoNo
                 superNono = nonoDefaults.superNono or 0,
                 vipLevel = nonoDefaults.vipLevel or 0,
-                vipStage = nonoDefaults.vipStage or 1,
+                vipStage = nonoDefaults.vipStage or 0,
                 vipValue = nonoDefaults.vipValue or 0,
                 autoCharge = nonoDefaults.autoCharge or 0,
                 vipEndTime = nonoDefaults.vipEndTime or 0,
@@ -236,11 +236,11 @@ function UserDB:getOrCreateGameData(userId)
                 -- 超能属性
                 superEnergy = nonoDefaults.superEnergy or 0,
                 superLevel = nonoDefaults.superLevel or 0,
-                superStage = nonoDefaults.superStage or 1,
+                superStage = nonoDefaults.superStage or 0,
                 
                 -- NoNo属性值
-                power = nonoDefaults.power or 80000,
-                mate = nonoDefaults.mate or 80000,
+                power = nonoDefaults.power or 10000,
+                mate = nonoDefaults.mate or 10000,
                 iq = nonoDefaults.iq or 0,
                 ai = nonoDefaults.ai or 0,
                 hp = nonoDefaults.hp or 100000,
@@ -249,7 +249,7 @@ function UserDB:getOrCreateGameData(userId)
                 
                 -- 时间相关
                 birth = (nonoDefaults.birth == 0) and os.time() or (nonoDefaults.birth or os.time()),
-                chargeTime = nonoDefaults.chargeTime or 0,
+                chargeTime = nonoDefaults.chargeTime or 500,
                 expire = nonoDefaults.expire or 0,
                 
                 -- 其他
