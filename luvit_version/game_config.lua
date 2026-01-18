@@ -132,7 +132,10 @@ Config.InitialPlayer = {
         -- ========== 其他 ==========
         chip = 0,             -- 芯片数量
         grow = 0,             -- 成长值
-        isFollowing = false   -- 是否正在跟随 (布尔值)
+        isFollowing = false,  -- 是否正在跟随 (布尔值)
+        
+        -- ========== 超能NONO开通配置 ==========
+        superNonoDurationDays = 30   -- 超能NONO默认开通天数 (30=一个月)
     }
 }
 

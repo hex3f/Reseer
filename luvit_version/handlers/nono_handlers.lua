@@ -379,6 +379,58 @@ local function handleNonoIsInfo(ctx)
     return true
 end
 
+-- CMD 80001: NIEO_LOGIN (超能NONO登录/状态检查)
+-- 请求: 无参数
+-- 响应: status(4) - 0=正常/已激活
+-- 如果新激活，会先发送 80002 通知消息
+local function handleNieoLogin(ctx)
+    local user = ctx.getOrCreateUser(ctx.userId)
+    local nonoData = user.nono or {}
+    
+    -- 从配置读取默认开通天数
+    local GameConfig = require('../game_config')
+    local nonoConfig = GameConfig.InitialPlayer.nono or {}
+    local durationDays = nonoConfig.superNonoDurationDays or 30
+    
+    local currentTime = os.time()
+    local needActivate = false
+    
+    -- 检查是否需要激活/续费
+    if not nonoData.superNono or nonoData.superNono == 0 then
+        needActivate = true
+    elseif nonoData.vipEndTime and nonoData.vipEndTime > 0 and nonoData.vipEndTime < currentTime then
+        needActivate = true  -- 已过期，需要续费
+    end
+    
+    if needActivate then
+        -- 激活超能NONO
+        local endTime = currentTime + (durationDays * 24 * 60 * 60)
+        nonoData.superNono = 1
+        nonoData.vipEndTime = endTime
+        nonoData.superLevel = math.max(1, nonoData.superLevel or 0)
+        nonoData.superStage = math.max(1, nonoData.superStage or 0)
+        
+        user.nono = nonoData
+        ctx.saveUser(ctx.userId, user)
+        
+        -- 格式化到期时间
+        local endTimeStr = os.date("%Y-%m-%d", endTime)
+        local message = string.format("成功激活超能NONO！\n到期时间:%s", endTimeStr)
+        
+        -- 先发送 80002 激活成功通知
+        local msgLen = #message
+        local notifyBody = writeUInt32BE(msgLen) .. message
+        ctx.sendResponse(buildResponse(80002, ctx.userId, 0, notifyBody))
+        
+        print(string.format("\27[32m[Handler] → NIEO_REGISTER 激活成功, 到期: %s\27[0m", endTimeStr))
+    end
+    
+    -- 发送 80001 状态响应
+    ctx.sendResponse(buildResponse(80001, ctx.userId, 0, writeUInt32BE(0)))
+    print("\27[32m[Handler] → NIEO_LOGIN status=0\27[0m")
+    return true
+end
+
 -- 注册所有处理器
 function NonoHandlers.register(Handlers)
     Handlers.register(9001, handleNonoOpen)
@@ -404,6 +456,7 @@ function NonoHandlers.register(Handlers)
     Handlers.register(9025, handleGetDiamond)
     Handlers.register(9026, handleNonoAddExp)
     Handlers.register(9027, handleNonoIsInfo)
+    Handlers.register(80001, handleNieoLogin)
     print("\27[36m[Handlers] NONO命令处理器已注册\27[0m")
 end
 

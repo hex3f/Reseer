@@ -413,6 +413,21 @@ ProtocolValidator.protocols = {
         maxSize = 4,
         description = "荣誉值: honorValue(4)"
     },
+    
+    -- ========== 超能NONO系统 ==========
+    [80001] = {
+        name = "NIEO_LOGIN",
+        minSize = 4,
+        maxSize = 4,
+        description = "超能NONO状态: status(4)"
+    },
+    
+    [80002] = {
+        name = "NIEO_REGISTER",
+        minSize = 4,
+        maxSize = nil,
+        description = "超能NONO激活通知: msgLen(4) + message(动态)"
+    },
 }
 
 -- 验证包体大小
