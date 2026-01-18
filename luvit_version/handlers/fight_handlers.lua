@@ -142,13 +142,28 @@ local function handleChallengeBoss(ctx)
         pb = pb .. writeUInt32BE(maxHp)
         pb = pb .. writeUInt32BE(lv)
         pb = pb .. writeUInt32BE(0) -- mode/status
-        pb = pb .. writeUInt32BE(0) -- catchTime? (duplicate?) - No, follow 2304 simplified structure but with SKILLS
-        -- Wait, CMD 2503 PetInfo is specific.
-        -- Let's use the one that worked in localgameserver.lua CMD 2503
-        -- Structure: ID(4) + CatchTime(4) + HP(4) + MaxHP(4) + Lv(4) + SkillCount(4) + Skill1(4)...Skill4(4)
+        pb = pb .. writeUInt32BE(0) -- extra field
         
-        -- Get Skills for Pet
-        local skills = SeerPets.getDefaultSkills(pId, lv)
+        -- Get Skills for Pet using SeerPets.getLearnableMoves
+        local skills = {}
+        local success, moves = pcall(function()
+            return SeerPets.getLearnableMoves(pId, lv)
+        end)
+        
+        if success and moves and #moves > 0 then
+            -- 获取最后学会的4个技能
+            local startIdx = math.max(1, #moves - 3)
+            for i = startIdx, #moves do
+                if moves[i] and moves[i].id then
+                    table.insert(skills, moves[i].id)
+                end
+            end
+        end
+        
+        -- 如果没有技能，使用默认技能
+        if #skills == 0 then
+            skills = {10006, 20004}  -- 默认新手技能
+        end
         
         pb = pb .. writeUInt32BE(4) -- SkillCount (Fixed 4)
         for i=1, 4 do

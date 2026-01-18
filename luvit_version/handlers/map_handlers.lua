@@ -329,9 +329,9 @@ end
 
 -- CMD 2052: GET_MORE_USERINFO (获取详细用户信息)
 -- 响应结构: userID(4) + nick(16) + regTime(4) + petAllNum(4) + petMaxLev(4) + 
---           bossAchievement(20) + graduationCount(4) + monKingWin(4) + 
---           messWin(4) + maxStage(4) + maxArenaWins(4)
--- 总长度: 4+16+4+4+4+20+4+4+4+4+4 = 72 bytes
+--           bossAchievement(200) + graduationCount(4) + monKingWin(4) + 
+--           messWin(4) + maxStage(4) + maxArenaWins(4) + curTitle(4)
+-- 总长度: 4+16+4+4+4+200+4+4+4+4+4+4 = 256 bytes
 local function handleGetMoreUserInfo(ctx)
     -- 解析请求的目标用户ID
     local targetUserId = ctx.userId
@@ -346,12 +346,13 @@ local function handleGetMoreUserInfo(ctx)
         writeUInt32BE(user.regTime or os.time()) ..                -- regTime (4)
         writeUInt32BE(user.petAllNum or 1) ..                      -- petAllNum (4)
         writeUInt32BE(user.petMaxLev or 100) ..                    -- petMaxLev (4)
-        string.rep("\0", 20) ..                                    -- bossAchievement (20)
+        string.rep("\0", 200) ..                                   -- bossAchievement (200 bytes!)
         writeUInt32BE(user.graduationCount or 0) ..                -- graduationCount (4)
         writeUInt32BE(user.monKingWin or 0) ..                     -- monKingWin (4)
         writeUInt32BE(user.messWin or 0) ..                        -- messWin (4)
         writeUInt32BE(user.maxStage or 0) ..                       -- maxStage (4)
-        writeUInt32BE(user.maxArenaWins or 0)                      -- maxArenaWins (4)
+        writeUInt32BE(user.maxArenaWins or 0) ..                   -- maxArenaWins (4)
+        writeUInt32BE(user.curTitle or 0)                          -- curTitle (4)
     
     ctx.sendResponse(buildResponse(2052, ctx.userId, 0, body))
     print(string.format("\27[32m[Handler] → GET_MORE_USERINFO for user %d response\27[0m", targetUserId))
