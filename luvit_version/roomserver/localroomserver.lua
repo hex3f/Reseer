@@ -149,13 +149,12 @@ function LocalRoomServer:processPacket(clientData, packet)
         tprint(string.format("\27[35m[RoomServer] 收到 CMD=%d (%s) UID=%d LEN=%d\27[0m", 
             cmdId, getCmdName(cmdId), userId, length))
         
-        -- 打印 HEX 数据
+        -- 打印 HEX 数据 (完整)
         if #body > 0 then
             local hexStr = ""
-            for i = 1, math.min(#body, 100) do
+            for i = 1, #body do
                 hexStr = hexStr .. string.format("%02X ", body:byte(i))
             end
-            if #body > 100 then hexStr = hexStr .. "..." end
             tprint(string.format("\27[35m[RoomServer]   HEX: %s\27[0m", hexStr))
         end
     end
@@ -247,13 +246,12 @@ function LocalRoomServer:sendResponse(clientData, cmdId, userId, result, body)
         tprint(string.format("\27[32m[RoomServer] 发送 CMD=%d (%s) RESULT=%d LEN=%d\27[0m", 
             cmdId, getCmdName(cmdId), result, length))
         
-        -- 打印响应 HEX
+        -- 打印响应 HEX (完整)
         if #body > 0 then
             local hexStr = ""
-            for i = 1, math.min(#body, 100) do
+            for i = 1, #body do
                 hexStr = hexStr .. string.format("%02X ", body:byte(i))
             end
-            if #body > 100 then hexStr = hexStr .. "..." end
             tprint(string.format("\27[32m[RoomServer]   HEX: %s\27[0m", hexStr))
         end
     end

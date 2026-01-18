@@ -307,9 +307,14 @@ function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, seqId, b
         
         -- 发送响应
         sendResponse = function(packet)
-            pcall(function()
+            local ok, err = pcall(function()
                 clientData.socket:write(packet)
             end)
+            if ok then
+                tprint(string.format("\27[32m[GlobalHandler] 发送响应 %d bytes 到客户端\27[0m", #packet))
+            else
+                tprint(string.format("\27[31m[GlobalHandler] 发送响应失败: %s\27[0m", tostring(err)))
+            end
         end,
         
         -- 获取或创建用户
@@ -725,6 +730,10 @@ function LocalGameServer:handleLoginIn(clientData, cmdId, userId, seqId, body)
     end
     
     self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+    
+    -- 标记已登录并启动心跳
+    clientData.loggedIn = true
+    self:startHeartbeat(clientData, userId)
 end
 
 

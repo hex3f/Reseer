@@ -291,7 +291,7 @@ local function handleNonoFollowOrHoom(ctx)
         body = body .. writeUInt32BE(nonoData.color or 0xFFFFFF)    -- color (4)
         body = body .. writeUInt32BE(nonoData.chargeTime or 10000)  -- chargeTime (4)
     else
-        -- 回家: 返回简化信息 (12 bytes)
+        -- 回家: 只返回 12 bytes (官服协议)
         body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
         body = body .. writeUInt32BE(0)                             -- flag=0 已回家 (4)
         body = body .. writeUInt32BE(nonoData.state or 0)           -- state (4)
