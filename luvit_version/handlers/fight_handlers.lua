@@ -71,12 +71,14 @@ local function buildFightPetInfo(userId, petId, catchTime, hp, maxHp, level, cat
     return body
 end
 
--- 构建 AttackValue
--- AttackValue: userID(4) + skillID(4) + atkTimes(4) + lostHP(4) + gainHP(4) + remainHp(4) + maxHp(4) + state(4) + skillListCount(4) + [skills] + isCrit(4) + status(20) + battleLv(6)
-local function buildAttackValue(userId, skillId, atkTimes, lostHP, gainHP, remainHp, maxHp, isCrit)
+-- 构建 AttackValue (完整版，与客户端 AttackValue.as 对应)
+-- AttackValue: userID(4) + skillID(4) + atkTimes(4) + lostHP(4) + gainHP(4) + remainHp(4) + maxHp(4) 
+--            + state(4) + skillListCount(4) + [skillInfo...] + isCrit(4) + status(20) + battleLv(6)
+--            + maxShield(4) + curShield(4) + petType(4)
+local function buildAttackValue(userId, skillId, atkTimes, lostHP, gainHP, remainHp, maxHp, isCrit, petType)
     local body = ""
     body = body .. writeUInt32BE(userId)
-    body = body .. writeUInt32BE(skillId)
+    body = body .. writeUInt32BE(skillId or 0)
     body = body .. writeUInt32BE(atkTimes or 1)
     body = body .. writeUInt32BE(lostHP or 0)
     body = body .. writeUInt32BE(gainHP or 0)
@@ -87,6 +89,9 @@ local function buildAttackValue(userId, skillId, atkTimes, lostHP, gainHP, remai
     body = body .. writeUInt32BE(isCrit or 0)
     body = body .. string.rep("\0", 20)          -- status (20字节)
     body = body .. string.rep("\0", 6)           -- battleLv (6字节)
+    body = body .. writeUInt32BE(0)              -- maxShield (4)
+    body = body .. writeUInt32BE(0)              -- curShield (4)
+    body = body .. writeUInt32BE(petType or 0)   -- petType (4)
     return body
 end
 
@@ -365,20 +370,40 @@ local function handleUseSkill(ctx)
         local result = SeerBattle.executeTurn(battle, skillId)
         
         -- 构建响应 NOTE_USE_SKILL (2505)
+        -- 客户端 UseSkillInfo 总是读取 2 个 AttackValue，所以必须发送2个
         local body2505 = ""
         
-        -- 第一次攻击 (通常是先手)
+        local playerPetId = battle.player.id or 7
+        local enemyPetId = battle.enemy.id or 58
+        
+        -- 第一次攻击
         if result.firstAttack then
             local atk1 = result.firstAttack
-            body2505 = body2505 .. buildAttackValue(atk1.userId, atk1.skillId, 1, 
-                atk1.damage, 0, atk1.attackerRemainHp, atk1.attackerMaxHp, atk1.isCrit and 1 or 0)
+            local petType1 = atk1.userId == ctx.userId and playerPetId or enemyPetId
+            body2505 = body2505 .. buildAttackValue(
+                atk1.userId, atk1.skillId, atk1.atkTimes or 1, 
+                atk1.damage or 0, atk1.gainHp or 0, 
+                atk1.attackerRemainHp, atk1.attackerMaxHp, 
+                atk1.isCrit and 1 or 0, petType1)
+        else
+            -- 没有第一次攻击，发送空数据
+            body2505 = body2505 .. buildAttackValue(ctx.userId, 0, 0, 0, 0, 
+                battle.player.hp, battle.player.maxHp, 0, playerPetId)
         end
         
         -- 第二次攻击 (反击)
         if result.secondAttack then
             local atk2 = result.secondAttack
-            body2505 = body2505 .. buildAttackValue(atk2.userId, atk2.skillId, 1, 
-                atk2.damage, 0, atk2.attackerRemainHp, atk2.attackerMaxHp, atk2.isCrit and 1 or 0)
+            local petType2 = atk2.userId == ctx.userId and playerPetId or enemyPetId
+            body2505 = body2505 .. buildAttackValue(
+                atk2.userId, atk2.skillId, atk2.atkTimes or 1, 
+                atk2.damage or 0, atk2.gainHp or 0, 
+                atk2.attackerRemainHp, atk2.attackerMaxHp, 
+                atk2.isCrit and 1 or 0, petType2)
+        else
+            -- 没有第二次攻击，发送空数据
+            body2505 = body2505 .. buildAttackValue(0, 0, 0, 0, 0, 
+                battle.enemy.hp, battle.enemy.maxHp, 0, enemyPetId)
         end
         
         ctx.sendResponse(buildResponse(2505, ctx.userId, 0, body2505))
