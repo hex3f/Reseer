@@ -22,46 +22,34 @@ end
 
 -- CMD 1004: MAP_HOT (地图热度/热门地图列表)
 -- MapHotInfo: count(4) + [mapId(4) + hotValue(4)]...
--- 返回实时在线人数统计
+-- 地图列表与官服一致 (29个地图，固定顺序)
+-- 在线人数从 OnlineTracker 实时获取
 local function handleMapHot(ctx)
-    -- 获取所有有人的地图
-    local mapCounts = OnlineTracker.getAllMapCounts()
-    
-    -- 预设的常用地图列表 (即使没人也显示)
-    local defaultMaps = {
-        1, 3, 4, 5, 6, 7, 8, 9, 10, 15, 17, 19, 20, 25, 30,
-        40, 47, 51, 54, 57, 60,  -- 家园
-        101, 102, 103, 107,      -- 克洛斯星系列
-        314, 325, 328, 333, 338  -- 其他地图
+    -- 官服地图列表 (29个地图，固定顺序)
+    local officialMaps = {
+        1, 4, 5, 325, 6, 7, 8, 328, 9, 10,
+        333, 15, 17, 338, 19, 20, 25, 30,
+        101, 102, 103, 40, 107, 47, 51, 54, 57, 314, 60
     }
     
-    -- 合并实时数据和预设地图
-    local mapData = {}
-    local seenMaps = {}
-    
-    -- 先添加有人的地图
+    -- 获取各地图的实时在线人数
+    local mapOnlineCounts = {}
+    local mapCounts = OnlineTracker.getAllMapCounts()
     for _, data in ipairs(mapCounts) do
-        table.insert(mapData, {data.mapId, data.count})
-        seenMaps[data.mapId] = true
+        mapOnlineCounts[data.mapId] = data.count
     end
     
-    -- 再添加预设地图 (人数为0)
-    for _, mapId in ipairs(defaultMaps) do
-        if not seenMaps[mapId] then
-            table.insert(mapData, {mapId, 0})
-        end
-    end
-    
-    -- 构建响应
-    local body = writeUInt32BE(#mapData)  -- count
-    for _, map in ipairs(mapData) do
-        body = body .. writeUInt32BE(map[1])  -- mapId
-        body = body .. writeUInt32BE(map[2])  -- hotValue (在线人数)
+    -- 构建响应 (按官服顺序)
+    local body = writeUInt32BE(#officialMaps)  -- count = 29
+    for _, mapId in ipairs(officialMaps) do
+        local onlineCount = mapOnlineCounts[mapId] or 0  -- 实时在线人数，默认0
+        body = body .. writeUInt32BE(mapId)
+        body = body .. writeUInt32BE(onlineCount)
     end
     
     ctx.sendResponse(buildResponse(1004, ctx.userId, 0, body))
     print(string.format("\27[32m[Handler] → MAP_HOT response (%d maps, %d online)\27[0m", 
-        #mapData, OnlineTracker.getOnlineCount()))
+        #officialMaps, OnlineTracker.getOnlineCount()))
     return true
 end
 
