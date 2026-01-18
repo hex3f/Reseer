@@ -305,10 +305,16 @@ end)
 -- 关闭时保存数据
 -- ============================================================
 local function saveAllData()
+    -- 只在本地模式下保存数据
+    if not conf.local_server_mode then
+        print("\27[36m[SHUTDOWN] 官服模式：跳过数据保存\27[0m")
+        return
+    end
+    
     print("\27[33m[SHUTDOWN] 正在保存所有用户数据...\27[0m")
     local success, UserDB = pcall(require, "./userdb")
     if success then
-        local db = UserDB:new()
+        local db = UserDB:new(conf)
         db:save()
         print("\27[32m[SHUTDOWN] ✓ 用户数据已保存\27[0m")
     else

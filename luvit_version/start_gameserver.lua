@@ -105,16 +105,22 @@ print("\27[36m[游戏服务器] • 关闭时: 自动保存所有数据\27[0m")
 print("\27[36m[游戏服务器] • 数据库: 预留接口，可替换为 MySQL/PostgreSQL\27[0m")
 print("")
 
--- 定期保存数据（每30秒）
-local timer = require('timer')
-local saveInterval = 30 * 1000  -- 30秒
-timer.setInterval(saveInterval, function()
-    local db = userdb:new()
-    db:saveToFile()
-    print(string.format("\27[90m[自动保存] %s\27[0m", os.date("%H:%M:%S")))
-end)
+-- 定期保存数据（每30秒）- 仅本地模式
+if conf.local_server_mode then
+    local timer = require('timer')
+    local saveInterval = 30 * 1000  -- 30秒
+    timer.setInterval(saveInterval, function()
+        local db = userdb:new(conf)
+        db:saveToFile()
+        print(string.format("\27[90m[自动保存] %s\27[0m", os.date("%H:%M:%S")))
+    end)
+    print("\27[36m[游戏服务器] ✓ 自动保存已启用 (每30秒)\27[0m")
+else
+    print("\27[36m[游戏服务器] 官服模式：自动保存已禁用\27[0m")
+end
 
 -- 保持进程活跃
+local timer = require('timer')
 timer.setInterval(1000 * 60, function() end)
 
 -- 监听标准输入
@@ -132,8 +138,12 @@ end)
 
 -- 关闭时保存数据
 local function saveAllData()
+    if not conf.local_server_mode then
+        print("\n\27[36m[游戏服务器] 官服模式：跳过数据保存\27[0m")
+        return
+    end
     print("\n\27[33m[游戏服务器] 正在保存所有数据到 users.json...\27[0m")
-    local db = userdb:new()
+    local db = userdb:new(conf)
     db:saveToFile()
     print("\27[32m[游戏服务器] ✓ 数据已保存\27[0m")
 end
