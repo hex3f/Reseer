@@ -268,7 +268,9 @@ local function handleNonoEndExe(ctx)
 end
 
 -- CMD 9019: NONO_FOLLOW_OR_HOOM (跟随或回家)
--- 官服响应 (53 bytes): userID(4) + flag(4) + state(4) + nick(16) + color(4) + ...
+-- 官服响应根据 action 不同返回不同长度:
+--   action=1 (跟随): 36 bytes = userID(4) + flag(4) + state(4) + nick(16) + color(4) + chargeTime(4)
+--   action=0 (回家): 12 bytes = userID(4) + flag(4) + state(4)
 local function handleNonoFollowOrHoom(ctx)
     local action = 0  -- 0=回家, 1=跟随
     if #ctx.body >= 4 then
@@ -279,7 +281,22 @@ local function handleNonoFollowOrHoom(ctx)
     nonoData.isFollowing = (action == 1)
     saveNonoData(ctx, nonoData)
     
-    local body = buildNonoFollowBody(ctx.userId, nonoData, nonoData.isFollowing)
+    local body = ""
+    if action == 1 then
+        -- 跟随: 返回完整 NONO 信息 (36 bytes)
+        body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
+        body = body .. writeUInt32BE(1)                             -- flag=1 跟随中 (4)
+        body = body .. writeUInt32BE(nonoData.state or 1)           -- state (4)
+        body = body .. writeFixedString(nonoData.nick or "NONO", 16) -- nick (16)
+        body = body .. writeUInt32BE(nonoData.color or 0xFFFFFF)    -- color (4)
+        body = body .. writeUInt32BE(nonoData.chargeTime or 10000)  -- chargeTime (4)
+    else
+        -- 回家: 返回简化信息 (12 bytes)
+        body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
+        body = body .. writeUInt32BE(0)                             -- flag=0 已回家 (4)
+        body = body .. writeUInt32BE(nonoData.state or 0)           -- state (4)
+    end
+    
     ctx.sendResponse(buildResponse(9019, ctx.userId, 0, body))
     
     -- 广播给同地图其他玩家
@@ -287,8 +304,8 @@ local function handleNonoFollowOrHoom(ctx)
         ctx.broadcastToMap(buildResponse(9019, ctx.userId, 0, body), ctx.userId)
     end
     
-    print(string.format("\27[32m[Handler] → NONO_FOLLOW_OR_HOOM %s response\27[0m", 
-        action == 1 and "跟随" or "回家"))
+    print(string.format("\27[32m[Handler] → NONO_FOLLOW_OR_HOOM %s response (%d bytes)\27[0m", 
+        action == 1 and "跟随" or "回家", #body))
     return true
 end
 

@@ -82,17 +82,60 @@ local function handlePetHatchGet(ctx)
 end
 
 -- CMD 2318: PET_SET_EXP (设置精灵经验)
+-- 请求: catchTime(4) + exp(4)
 local function handlePetSetExp(ctx)
+    local catchTime = 0
+    local exp = 0
+    
+    if #ctx.body >= 4 then
+        catchTime = readUInt32BE(ctx.body, 1)
+    end
+    if #ctx.body >= 8 then
+        exp = readUInt32BE(ctx.body, 5)
+    end
+    
+    local user = ctx.getOrCreateUser(ctx.userId)
+    
+    -- 尝试用 catchTime 找到对应精灵并更新经验
+    if user.pets then
+        for petIdStr, petData in pairs(user.pets) do
+            if petData.catchTime == catchTime then
+                petData.exp = exp
+                ctx.saveUser(ctx.userId, user)
+                print(string.format("\27[32m[Handler] → PET_SET_EXP catchTime=0x%X exp=%d\27[0m", catchTime, exp))
+                ctx.sendResponse(buildResponse(2318, ctx.userId, 0, writeUInt32BE(0)))
+                return true
+            end
+        end
+    end
+    
+    -- 如果没找到具体精灵，保存到全局 petExp (兼容旧数据)
+    user.petExp = exp
+    ctx.saveUser(ctx.userId, user)
+    
     ctx.sendResponse(buildResponse(2318, ctx.userId, 0, writeUInt32BE(0)))
-    print("\27[32m[Handler] → PET_SET_EXP response\27[0m")
+    print(string.format("\27[32m[Handler] → PET_SET_EXP exp=%d (global)\27[0m", exp))
     return true
 end
 
 -- CMD 2319: PET_GET_EXP (获取精灵经验)
+-- 官服响应: exp(4) - 当前精灵的总经验值
 local function handlePetGetExp(ctx)
-    local body = writeUInt32BE(0)  -- exp
+    local user = ctx.getOrCreateUser(ctx.userId)
+    local petId = user.currentPetId or 7
+    
+    -- 从用户数据获取精灵经验，如果没有则使用默认值
+    local petExp = 0
+    if user.pets and user.pets[tostring(petId)] then
+        petExp = user.pets[tostring(petId)].exp or 0
+    elseif user.petExp then
+        -- 兼容旧数据格式
+        petExp = user.petExp
+    end
+    
+    local body = writeUInt32BE(petExp)
     ctx.sendResponse(buildResponse(2319, ctx.userId, 0, body))
-    print("\27[32m[Handler] → PET_GET_EXP response\27[0m")
+    print(string.format("\27[32m[Handler] → PET_GET_EXP exp=%d\27[0m", petExp))
     return true
 end
 
