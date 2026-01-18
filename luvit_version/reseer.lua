@@ -266,6 +266,19 @@ else
     local gs = conf.trafficlogger and require "./gameserver/trafficlogger" or require "./gameserver/gameserver"
     gs.GameServer:new()
     
+    -- 启动房间代理服务器（用于官服房间转发）
+    print("\27[36m[官服代理] 启动房间代理服务器 (端口 5100)...\27[0m")
+    local ok, result = pcall(function()
+        local RoomProxy = require "./room_proxy"
+        return RoomProxy:new(5100)
+    end)
+    if ok then
+        _G.roomProxy = result
+        print("\27[32m[官服代理] ✓ 房间代理服务器已启动\27[0m")
+    else
+        print("\27[31m[官服代理] ✗ 房间代理服务器启动失败: " .. tostring(result) .. "\27[0m")
+    end
+    
     -- 启动登录服务器代理
     local _ = conf.trafficlogger and require "./loginserver/trafficloggerlogin" or require "./loginserver/login"
 end

@@ -591,6 +591,7 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                         
                         -- 修改响应，替换为本地代理地址
                         local localRoomPort = conf.roomserver_port or 5100
+                        -- 保留原始session（可能包含验证信息）
                         local modifiedBody = session ..
                             string.char(127, 0, 0, 1) ..  -- 127.0.0.1
                             string.char(math.floor(localRoomPort / 256), localRoomPort % 256)
@@ -606,6 +607,13 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
                         
                         tprint(string.format("\27[35m[GAME:%d] 已修改响应: 127.0.0.1:%d\27[0m", 
                             localPort, localRoomPort))
+                        
+                        -- 调试：打印修改后的包体
+                        local debugHex = ""
+                        for i = 1, math.min(#modifiedBody, 32) do
+                            debugHex = debugHex .. string.format("%02X ", modifiedBody:byte(i))
+                        end
+                        tprint(string.format("\27[90m[GAME:%d] 修改后包体: %s\27[0m", localPort, debugHex))
                         
                         -- 返回修改后的数据包
                         return modifiedPacket, header, true  -- true 表示数据已修改
@@ -699,14 +707,19 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             ce:on("data", function(data)
                 if clientClosed then return end
                 responseReceived = true
-                tprint(string.format("\27[32m[GAME:%d] 收到官服数据: %d bytes\27[0m", localPort, #data))
+                -- 只在详细模式下记录常规数据传输
+                if conf.verbose_traffic_log then
+                    tprint(string.format("\27[32m[GAME:%d] 收到官服数据: %d bytes\27[0m", localPort, #data))
+                end
                 -- 添加到缓冲区并处理
                 serverBuffer = serverBuffer .. data
                 local remaining, modifiedData = processBuffer("SRV", serverBuffer)
                 serverBuffer = remaining
                 -- 转发数据给客户端（如果有修改则使用修改后的数据）
                 if modifiedData then
-                    tprint(string.format("\27[35m[GAME:%d] 转发修改后的数据: %d bytes\27[0m", localPort, #modifiedData))
+                    if conf.verbose_traffic_log then
+                        tprint(string.format("\27[35m[GAME:%d] 转发修改后的数据: %d bytes\27[0m", localPort, #modifiedData))
+                    end
                     sendToClient(modifiedData)
                 else
                     sendToClient(data)
@@ -809,7 +822,9 @@ local function createGameServerForPort(localPort, targetIP, targetPort, serverID
             
             -- 转发原始数据给官服
             if officialReady and not officialClosed then
-                tprint(string.format("\27[36m[GAME:%d] 转发数据到官服: %d bytes\27[0m", localPort, #data))
+                if conf.verbose_traffic_log then
+                    tprint(string.format("\27[36m[GAME:%d] 转发数据到官服: %d bytes\27[0m", localPort, #data))
+                end
                 local success, err = pcall(function() ce:write(data) end)
                 if not success then
                     tprint(string.format("\27[31m[GAME:%d] 转发失败: %s\27[0m", localPort, tostring(err)))

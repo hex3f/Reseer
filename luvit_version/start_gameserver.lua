@@ -17,6 +17,7 @@ local conf = _G.conf or {
     local_server_mode = true,
     hide_frequent_cmds = true,
     hide_cmd_list = {80008},
+    verbose_traffic_log = false,  -- 详细流量日志（仅在调试时启用）
 }
 _G.conf = conf
 
@@ -75,11 +76,26 @@ print("\27[36m[游戏服务器] 启动游戏服务器...\27[0m")
 local lgs = require "./gameserver/localgameserver"
 local gameServer = lgs.LocalGameServer:new(userdb, sessionManager, dataClient)
 
+-- 启动房间代理服务器（用于官服模式）
+print("\27[36m[游戏服务器] 启动房间代理服务器 (端口 5100)...\27[0m")
+local ok, result = pcall(function()
+    local RoomProxy = require "./room_proxy"
+    return RoomProxy:new(5100)
+end)
+if ok then
+    local roomProxy = result
+    print("\27[32m[游戏服务器] ✓ 房间代理服务器已启动\27[0m")
+    _G.roomProxy = roomProxy
+else
+    print("\27[31m[游戏服务器] ✗ 房间代理服务器启动失败: " .. tostring(result) .. "\27[0m")
+end
+
 -- 导出到全局（供其他模块使用）
 _G.gameServer = gameServer
 _G.sessionManager = sessionManager
 _G.userdb = userdb
 _G.dataClient = dataClient
+-- roomProxy 已在上面设置
 
 print("\27[36m[游戏服务器] ========== 会话式数据管理 ==========\27[0m")
 print("\27[36m[游戏服务器] • 启动时: 从 users.json 加载所有数据到内存\27[0m")

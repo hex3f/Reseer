@@ -13,9 +13,8 @@ local RoomHandlers = {}
 -- CMD 10001: ROOM_LOGIN (房间登录)
 -- 请求格式（根据客户端代码）:
 --   session(24 bytes) + catchTime(4) + flag(4) + targetUserId(4) + x(4) + y(4) = 44 bytes
--- 响应: 空响应表示成功
--- 注意：由于房间服务器已合并，客户端会通过 isIlk=true 检测到是同一连接
---       因此 ROOM_LOGIN 后，客户端会发送 ENTER_MAP 命令来真正进入地图
+-- 响应: UserInfo (与 ENTER_MAP 相同的格式)
+-- 注意：由于房间服务器已合并，ROOM_LOGIN 直接完成房间进入，不需要额外的 ENTER_MAP
 local function handleRoomLogin(ctx)
     -- 解析请求
     local session = ""
@@ -47,17 +46,83 @@ local function handleRoomLogin(ctx)
     print(string.format("\27[36m[Handler] ROOM_LOGIN: flag=%d, target=%d, catchTime=0x%08X, pos=(%d,%d)\27[0m", 
         flag, targetUserId, catchTime, x, y))
     
-    -- 更新用户位置到家园（预设置，等待 ENTER_MAP 确认）
+    -- 直接进入房间地图
     local user = ctx.getOrCreateUser(ctx.userId)
-    user.pendingMapId = targetUserId  -- 待进入的家园地图ID
-    user.pendingMapType = 1           -- 家园地图类型
-    user.pendingX = x
-    user.pendingY = y
+    -- 房间地图ID: 使用固定的房间地图 (500001-500010 等)
+    -- 简化处理：所有玩家使用 500001 作为默认房间
+    local mapId = 500001
+    user.mapId = mapId
+    user.mapType = 1  -- 房间地图类型
+    user.x = x
+    user.y = y
+    ctx.saveUserDB()
     
-    -- 发送 ROOM_LOGIN 成功响应（空响应）
-    -- 客户端收到后会发送 ENTER_MAP 命令
-    ctx.sendResponse(buildResponse(10001, ctx.userId, 0, ""))
-    print("\27[32m[Handler] → ROOM_LOGIN response (waiting for ENTER_MAP)\27[0m")
+    -- 构建 UserInfo 响应 (与 ENTER_MAP 相同的格式)
+    local nickname = user.nick or user.nickname or user.username or ("赛尔" .. ctx.userId)
+    local petId = user.currentPetId or 0
+    local clothes = user.clothes or {}
+    local clothCount = #clothes
+    
+    local body = ""
+    body = body .. writeUInt32BE(os.time())                     -- sysTime (4)
+    body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
+    body = body .. writeFixedString(nickname, 16)               -- nick (16)
+    body = body .. writeUInt32BE(user.color or 0xFFFFFF)        -- color (4)
+    body = body .. writeUInt32BE(user.texture or 0)             -- texture (4)
+    local vipFlags = 0
+    if user.vip then vipFlags = vipFlags + 1 end
+    if user.viped then vipFlags = vipFlags + 2 end
+    body = body .. writeUInt32BE(vipFlags)                      -- vipFlags (4)
+    body = body .. writeUInt32BE(user.vipStage or 0)            -- vipStage (4)
+    body = body .. writeUInt32BE(0)                             -- actionType (4)
+    body = body .. writeUInt32BE(x)                             -- pos.x (4)
+    body = body .. writeUInt32BE(y)                             -- pos.y (4)
+    body = body .. writeUInt32BE(0)                             -- action (4)
+    body = body .. writeUInt32BE(0)                             -- direction (4)
+    body = body .. writeUInt32BE(0)                             -- changeShape (4)
+    body = body .. writeUInt32BE(catchTime)                     -- spiritTime (4)
+    body = body .. writeUInt32BE(petId)                         -- spiritID (4)
+    body = body .. writeUInt32BE(31)                            -- petDV (4)
+    body = body .. writeUInt32BE(0)                             -- petSkin (4)
+    body = body .. writeUInt32BE(0)                             -- fightFlag (4)
+    body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
+    body = body .. writeUInt32BE(user.studentID or 0)           -- studentID (4)
+    body = body .. writeUInt32BE(user.nonoState or 0)           -- nonoState (4)
+    body = body .. writeUInt32BE(user.nonoColor or 0)           -- nonoColor (4)
+    body = body .. writeUInt32BE(user.superNono or 0)           -- superNono (4)
+    body = body .. writeUInt32BE(0)                             -- playerForm (4)
+    body = body .. writeUInt32BE(0)                             -- transTime (4)
+    local teamInfo = user.teamInfo or {}
+    body = body .. writeUInt32BE(teamInfo.id or 0)              -- teamInfo.id (4)
+    body = body .. writeUInt32BE(teamInfo.coreCount or 0)       -- teamInfo.coreCount (4)
+    body = body .. writeUInt32BE(teamInfo.isShow or 0)          -- teamInfo.isShow (4)
+    body = body .. writeUInt16BE(teamInfo.logoBg or 0)          -- teamInfo.logoBg (2)
+    body = body .. writeUInt16BE(teamInfo.logoIcon or 0)        -- teamInfo.logoIcon (2)
+    body = body .. writeUInt16BE(teamInfo.logoColor or 0)       -- teamInfo.logoColor (2)
+    body = body .. writeUInt16BE(teamInfo.txtColor or 0)        -- teamInfo.txtColor (2)
+    body = body .. writeFixedString(teamInfo.logoWord or "", 4) -- teamInfo.logoWord (4)
+    body = body .. writeUInt32BE(clothCount)                    -- clothCount (4)
+    
+    for _, cloth in ipairs(clothes) do
+        local clothId = cloth
+        local clothLevel = 0
+        if type(cloth) == "table" then
+            clothId = cloth.id or 0
+            clothLevel = cloth.level or 0
+        end
+        body = body .. writeUInt32BE(clothId)
+        body = body .. writeUInt32BE(clothLevel)
+    end
+    body = body .. writeUInt32BE(user.curTitle or 0)            -- curTitle (4)
+    
+    ctx.sendResponse(buildResponse(10001, ctx.userId, 0, body))
+    print(string.format("\27[32m[Handler] → ROOM_LOGIN response (entered room %d at %d,%d)\27[0m", 
+        mapId, x, y))
+    
+    -- 主动推送 LIST_MAP_PLAYER (包含自己) - 与 ENTER_MAP 一致
+    local playerListBody = writeUInt32BE(1) .. body  -- count=1 + 自己的 UserInfo
+    ctx.sendResponse(buildResponse(2003, ctx.userId, 0, playerListBody))
+    print("\27[32m[Handler] → LIST_MAP_PLAYER (auto-push after ROOM_LOGIN, 1 player)\27[0m")
     
     return true
 end
