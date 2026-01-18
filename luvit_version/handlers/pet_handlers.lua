@@ -245,17 +245,18 @@ local function handlePetCure(ctx)
 end
 
 -- CMD 2309: PET_BARGE_LIST (精灵图鉴列表)
--- 请求: startIndex(4) + count(4)
--- PetBargeListInfo响应: monCount(4) + [monID(4) + enCntCnt(4) + isCatched(4) + isKilled(4)]...
+-- 请求: type(4) + maxId(4)
+-- 官服响应: maxId(4) + flag(4) + [unknown(4) + encountered(4) + caught(4) + petId(4)]...
+-- 返回全部精灵，格式与官服一致
 local function handlePetBargeList(ctx)
-    local startIndex = 1
-    local count = 100
+    local reqType = 1
+    local maxId = 1498  -- 默认最大精灵ID
     
     if ctx.body and #ctx.body >= 4 then
-        startIndex = readUInt32BE(ctx.body, 1)
+        reqType = readUInt32BE(ctx.body, 1)
     end
     if ctx.body and #ctx.body >= 8 then
-        count = readUInt32BE(ctx.body, 5)
+        maxId = readUInt32BE(ctx.body, 5)
     end
     
     local user = ctx.getOrCreateUser(ctx.userId)
@@ -266,75 +267,38 @@ local function handlePetBargeList(ctx)
         userPetBook = ctx.userDB:getPetBook(ctx.userId)
     end
     
-    -- 获取所有精灵ID（从数据库）
-    -- local allPetIds = Monsters.getAllIds()
-    -- Use raw loop or implement getAllIds in SeerPets (which relies on petsMap)
-    -- As a temporary fix, iterate 1 to 2000 checking existence
-    local allPetIds = {}
-    for i=1, 2000 do
-        if Pets.exists(i) then
-            table.insert(allPetIds, i)
-        end
-    end
+    -- 从 XML 获取精灵数据以确定实际存在的精灵
+    -- 如果没有加载 Pets，则使用请求的 maxId
+    local actualMaxId = maxId
     
-    -- 构建图鉴列表
-    -- 只返回用户有记录的精灵（遭遇过、捕获过或击败过）
-    local petList = {}
+    -- 构建响应头: maxId(4) + flag(4)
+    local body = writeUInt32BE(maxId) .. writeUInt32BE(reqType)
     
-    for _, petId in ipairs(allPetIds) do
+    -- 遍历所有精灵 ID (1 到 maxId)
+    for petId = 1, maxId do
         local petIdStr = tostring(petId)
-        local userRecord = userPetBook[petIdStr]
+        local userRecord = userPetBook[petIdStr] or {}
         
-        -- 只有用户有记录的精灵才加入列表
-        if userRecord then
-            table.insert(petList, {
-                id = petId,
-                encountered = userRecord.encountered or 0,
-                caught = userRecord.caught or 0,
-                killed = userRecord.killed or 0
-            })
+        -- 检查用户是否拥有此精灵
+        local encountered = userRecord.encountered or 0
+        local caught = userRecord.caught or 0
+        local killed = userRecord.killed or 0
+        
+        -- 如果用户拥有该精灵，标记为已捕获
+        if user.pets and user.pets[petIdStr] then
+            caught = 1
+            encountered = math.max(encountered, 1)
         end
-    end
-    
-    -- 确保用户当前精灵在图鉴中（已捕获状态）
-    if user.currentPetId then
-        local found = false
-        for _, pet in ipairs(petList) do
-            if pet.id == user.currentPetId then
-                pet.caught = 1  -- 确保标记为已捕获
-                found = true
-                break
-            end
-        end
-        if not found then
-            -- 添加当前精灵到图鉴
-            table.insert(petList, {
-                id = user.currentPetId,
-                encountered = 1,
-                caught = 1,
-                killed = 0
-            })
-            -- 同时更新数据库
-            if ctx.userDB and ctx.userDB.recordCatch then
-                ctx.userDB:recordCatch(ctx.userId, user.currentPetId)
-            end
-        end
-    end
-    
-    -- 按精灵ID排序
-    table.sort(petList, function(a, b) return a.id < b.id end)
-    
-    -- 构建响应
-    local body = writeUInt32BE(#petList)  -- monCount
-    for _, pet in ipairs(petList) do
-        body = body .. writeUInt32BE(pet.id)          -- monID
-        body = body .. writeUInt32BE(pet.encountered) -- enCntCnt (遭遇次数)
-        body = body .. writeUInt32BE(pet.caught)      -- isCatched (是否捕获: 0/1)
-        body = body .. writeUInt32BE(pet.killed)      -- isKilled (击败次数)
+        
+        -- 官服格式: unknown(4) + encountered(4) + caught(4) + petId(4)
+        body = body .. writeUInt32BE(0)            -- unknown (总是0)
+        body = body .. writeUInt32BE(encountered)  -- 遭遇次数
+        body = body .. writeUInt32BE(caught)       -- 是否捕获
+        body = body .. writeUInt32BE(petId)        -- 精灵ID
     end
     
     ctx.sendResponse(buildResponse(2309, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → PET_BARGE_LIST response (%d pets, user=%d)\27[0m", #petList, ctx.userId))
+    print(string.format("\\27[32m[Handler] → PET_BARGE_LIST response (%d pets, maxId=%d)\\27[0m", maxId, maxId))
     return true
 end
 
