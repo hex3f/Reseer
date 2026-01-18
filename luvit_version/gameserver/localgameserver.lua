@@ -44,6 +44,53 @@ local ProtocolValidator = require('../protocol_validator')
 -- 加载在线追踪模块
 local OnlineTracker = require('../handlers/online_tracker')
 
+-- ==================== 全局处理器注册系统 ====================
+-- 处理器模块可以注册到这里,由 handleCommand 统一调用
+local GlobalHandlers = {}
+local GlobalHandlerRegistry = {
+    handlers = {},  -- cmdId -> handler function
+    register = function(cmdId, handler)
+        GlobalHandlers[cmdId] = handler
+    end
+}
+
+-- 加载所有处理器模块
+local handlerModules = {
+    '../handlers/nono_handlers',
+    '../handlers/pet_handlers',
+    '../handlers/pet_advanced_handlers',
+    '../handlers/task_handlers',
+    '../handlers/fight_handlers',
+    '../handlers/item_handlers',
+    '../handlers/friend_handlers',
+    '../handlers/mail_handlers',
+    '../handlers/map_handlers',
+    '../handlers/room_handlers',
+    '../handlers/team_handlers',
+    '../handlers/teampk_handlers',
+    '../handlers/arena_handlers',
+    '../handlers/exchange_handlers',
+    '../handlers/game_handlers',
+    '../handlers/misc_handlers',
+    '../handlers/special_handlers',
+    '../handlers/system_handlers',
+    '../handlers/teacher_handlers',
+    '../handlers/work_handlers',
+    '../handlers/xin_handlers',
+}
+
+for _, modulePath in ipairs(handlerModules) do
+    local ok, module = pcall(require, modulePath)
+    if ok and module and module.register then
+        module.register(GlobalHandlerRegistry)
+        tprint(string.format("\27[36m[LocalGame] 已加载处理器模块: %s\27[0m", modulePath))
+    elseif not ok then
+        tprint(string.format("\27[33m[LocalGame] 加载处理器模块失败: %s - %s\27[0m", modulePath, tostring(module)))
+    end
+end
+
+tprint(string.format("\27[32m[LocalGame] 共注册 %d 个全局命令处理器\27[0m", (function() local n=0 for _ in pairs(GlobalHandlers) do n=n+1 end return n end)()))
+
 -- 加载配置
 local GameConfig = require('../game_config')
 local SeerLoginResponse = require('./seer_login_response')
@@ -247,6 +294,71 @@ local function shouldHideCmd(cmdId)
     return false
 end
 
+-- 构建处理器上下文 (供模块处理器使用)
+-- 处理器模块使用 ctx 对象访问服务器功能
+function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, seqId, body)
+    local self_ref = self
+    local ctx = {
+        userId = userId,
+        cmdId = cmdId,
+        seqId = seqId,
+        body = body,
+        clientData = clientData,
+        
+        -- 发送响应
+        sendResponse = function(packet)
+            pcall(function()
+                clientData.socket:write(packet)
+            end)
+        end,
+        
+        -- 获取或创建用户
+        getOrCreateUser = function(uid)
+            return self_ref:getOrCreateUser(uid or userId)
+        end,
+        
+        -- 保存用户数据
+        saveUser = function(uid, userData)
+            if self_ref.userdb then
+                local db = self_ref.userdb:new()
+                db:saveGameData(uid or userId, userData)
+            end
+        end,
+        
+        -- 保存用户数据库 (整体)
+        saveUserDB = function()
+            if self_ref.userdb then
+                local db = self_ref.userdb:new()
+                local user = self_ref:getOrCreateUser(userId)
+                db:saveGameData(userId, user)
+            end
+        end,
+        
+        -- 广播到同地图玩家
+        broadcastToMap = function(packet, excludeUserId)
+            -- 获取同地图的其他玩家
+            for _, otherClient in ipairs(self_ref.clients) do
+                if otherClient.userId ~= excludeUserId then
+                    local otherUser = self_ref.users[otherClient.userId]
+                    local thisUser = self_ref.users[userId]
+                    if otherUser and thisUser and otherUser.mapId == thisUser.mapId then
+                        pcall(function()
+                            otherClient.socket:write(packet)
+                        end)
+                    end
+                end
+            end
+        end,
+        
+        -- 在线追踪器
+        onlineTracker = OnlineTracker,
+        
+        -- 用户数据库引用
+        userDB = self_ref.userdb and self_ref.userdb:new() or nil,
+    }
+    return ctx
+end
+
 -- 获取本地处理器表（供 handleCommand 和 handleCommandDirect 共用）
 function LocalGameServer:getLocalHandlers()
     return {
@@ -323,10 +435,21 @@ end
 function LocalGameServer:handleCommand(clientData, cmdId, userId, seqId, body)
     local localHandlers = self:getLocalHandlers()
     
-    -- 使用本地处理器
+    -- 优先使用本地处理器 (直接方法)
     local handler = localHandlers[cmdId]
     if handler then
         handler(self, clientData, cmdId, userId, seqId, body)
+        return
+    end
+    
+    -- 尝试全局处理器 (模块处理器,需要 ctx 上下文)
+    local globalHandler = GlobalHandlers[cmdId]
+    if globalHandler then
+        local ctx = self:buildHandlerContext(clientData, cmdId, userId, seqId, body)
+        local ok, err = pcall(globalHandler, ctx)
+        if not ok then
+            tprint(string.format("\27[31m[LocalGame] 全局处理器错误 CMD=%d: %s\27[0m", cmdId, tostring(err)))
+        end
         return
     end
     
@@ -344,6 +467,17 @@ function LocalGameServer:handleCommandDirect(clientData, cmdId, userId, seqId, b
     local handler = localHandlers[cmdId]
     if handler then
         handler(self, clientData, cmdId, userId, seqId, body)
+        return true
+    end
+    
+    -- 尝试全局处理器 (模块处理器)
+    local globalHandler = GlobalHandlers[cmdId]
+    if globalHandler then
+        local ctx = self:buildHandlerContext(clientData, cmdId, userId, seqId, body)
+        local ok, err = pcall(globalHandler, ctx)
+        if not ok then
+            tprint(string.format("\27[31m[LocalGame] 全局处理器错误 CMD=%d: %s\27[0m", cmdId, tostring(err)))
+        end
         return true
     end
     
