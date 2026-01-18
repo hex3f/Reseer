@@ -64,6 +64,21 @@ local function handleRoomLogin(ctx)
     local clothes = user.clothes or {}
     local clothCount = #clothes
     
+    -- 读取 NONO 数据
+    local nono = user.nono or {}
+    -- NONO state: 0=不跟随, 1=跟随, 3=在房间但不跟随
+    -- 在房间中，如果 NONO 存在，应该设置为 state=1 (跟随) 才会显示
+    local nonoState = 0
+    if (nono.hasNono and nono.hasNono > 0) or (nono.flag and nono.flag > 0) then
+        nonoState = 1  -- NONO 跟随状态（会显示）
+    end
+    local nonoColor = nono.color or 0xFFFFFF
+    -- superNono 应该是 0 或 1，不是 vipLevel
+    local superNono = (nono.superNono and nono.superNono > 0) and 1 or 0
+    
+    print(string.format("\27[33m[NONO] hasNono=%d, flag=%d, state=%d, color=0x%X, superNono=%d\27[0m", 
+        nono.hasNono or 0, nono.flag or 0, nonoState, nonoColor, superNono))
+    
     local body = ""
     body = body .. writeUInt32BE(os.time())                     -- sysTime (4)
     body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
@@ -88,9 +103,9 @@ local function handleRoomLogin(ctx)
     body = body .. writeUInt32BE(0)                             -- fightFlag (4)
     body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
     body = body .. writeUInt32BE(user.studentID or 0)           -- studentID (4)
-    body = body .. writeUInt32BE(user.nonoState or 0)           -- nonoState (4)
-    body = body .. writeUInt32BE(user.nonoColor or 0)           -- nonoColor (4)
-    body = body .. writeUInt32BE(user.superNono or 0)           -- superNono (4)
+    body = body .. writeUInt32BE(nonoState)                     -- nonoState (4)
+    body = body .. writeUInt32BE(nonoColor)                     -- nonoColor (4)
+    body = body .. writeUInt32BE(superNono)                     -- superNono (4)
     body = body .. writeUInt32BE(0)                             -- playerForm (4)
     body = body .. writeUInt32BE(0)                             -- transTime (4)
     local teamInfo = user.teamInfo or {}

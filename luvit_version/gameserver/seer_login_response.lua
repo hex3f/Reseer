@@ -279,14 +279,20 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = 1
     
     local nono = user.nono or {}
-    local isSuper = nono.isSuper or user.superNono
+    -- hasNono 可能在 user.hasNono 或 nono.hasNono
+    local hasNono = (user.hasNono and user.hasNono > 0) or (nono.hasNono and nono.hasNono > 0)
+    -- superNono 可能在多个位置
+    local superNono = nono.superNono or user.superNono or 0
+    
+    print(string.format("\27[33m[LOGIN-NONO] hasNono=%s, flag=%d, superNono=%d, color=0x%X\27[0m", 
+        tostring(hasNono), nono.flag or 0, superNono, nono.color or 0))
     
     -- hasNono (4 bytes) - line 827
-    nonoBuf:wuint(pos, user.hasNono and 1 or 0)
+    nonoBuf:wuint(pos, hasNono and 1 or 0)
     pos = pos + 4
     
     -- superNono (4 bytes) - line 828
-    nonoBuf:wuint(pos, isSuper and 1 or 0)
+    nonoBuf:wuint(pos, (superNono > 0) and 1 or 0)
     pos = pos + 4
     
     -- nonoState (4 bytes) - lines 829-834

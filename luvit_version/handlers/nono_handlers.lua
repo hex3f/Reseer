@@ -105,12 +105,12 @@ local function buildNonoFollowBody(userId, nonoData, isFollowing)
 end
 
 -- CMD 9001: NONO_OPEN (开启NONO)
--- 注意: 始终返回 state=3（NoNo 在房间）
+-- 返回 state=1 (跟随状态) 以便 NONO 显示
 local function handleNonoOpen(ctx)
     local nonoData = getNonoData(ctx)
-    local body = buildNonoInfoBody(ctx.userId, nonoData, 3)
+    local body = buildNonoInfoBody(ctx.userId, nonoData, 1)
     ctx.sendResponse(buildResponse(9001, ctx.userId, 0, body))
-    tprint("\27[32m[Handler] �?NONO_OPEN response (state=3)\27[0m")
+    tprint("\27[32m[Handler] → NONO_OPEN response (state=1)\27[0m")
     return true
 end
 
@@ -132,14 +132,13 @@ local function handleNonoChangeName(ctx)
 end
 
 -- CMD 9003: NONO_INFO (获取NONO信息)
--- 注意: 始终返回 state=3（NoNo 在房间），跟随状态由客户端维�?
+-- 返回 state=1 (跟随状态) 以便 NONO 显示
 local function handleNonoInfo(ctx)
     local nonoData = getNonoData(ctx)
-    -- 始终返回 state=3，表�?NoNo 在房�?
-    -- 跟随状态是会话级别的，不持久化
-    local body = buildNonoInfoBody(ctx.userId, nonoData, 3)
+    -- 返回 state=1 (跟随)，这样 NONO 才会显示
+    local body = buildNonoInfoBody(ctx.userId, nonoData, 1)
     ctx.sendResponse(buildResponse(9003, ctx.userId, 0, body))
-    tprint("\27[32m[Handler] �?NONO_INFO response (state=3)\27[0m")
+    tprint("\27[32m[Handler] → NONO_INFO response (state=1)\27[0m")
     return true
 end
 
