@@ -11,26 +11,54 @@ local buildResponse = Utils.buildResponse
 
 local NonoHandlers = {}
 
--- 获取或创建用户的NONO数据
+-- 获取或创建用户的NONO数据 (从配置读取默认值)
 local function getNonoData(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
     if not user.nono then
+        -- 从配置读取 NONO 默认值
+        local GameConfig = require('../game_config')
+        local nonoDefaults = GameConfig.InitialPlayer.nono or {}
+        
         user.nono = {
-            flag = 0x00000001,      -- 基本功能开启
-            state = 0x00000001,     -- 状态: 已激活
-            nick = "NoNo",          -- 默认名字
-            superNono = 1,          -- 超级诺诺
-            color = 0x00FBF4E1,     -- 颜色 (官服默认)
-            power = 80000,          -- 体力 (实际值*1000 = 80)
-            mate = 80000,           -- 心情 (实际值*1000 = 80)
-            iq = 100,               -- 智力
-            ai = 100,               -- AI
-            birth = os.time(),      -- 出生时间
-            chargeTime = 0,         -- 充电时间
-            superEnergy = 10000,    -- 超能能量
-            superLevel = 10,        -- 超能等级
-            superStage = 3,         -- 超能阶段 (1-4)
-            isFollowing = false     -- 是否跟随
+            -- 基础状态
+            hasNono = nonoDefaults.hasNono or 1,
+            flag = nonoDefaults.flag or 1,
+            state = nonoDefaults.state or 0,
+            nick = nonoDefaults.nick or "NoNo",
+            color = nonoDefaults.color or 1,
+            
+            -- VIP/超能NoNo
+            superNono = nonoDefaults.superNono or 0,
+            vipLevel = nonoDefaults.vipLevel or 0,
+            vipStage = nonoDefaults.vipStage or 1,
+            vipValue = nonoDefaults.vipValue or 0,
+            autoCharge = nonoDefaults.autoCharge or 0,
+            vipEndTime = nonoDefaults.vipEndTime or 0,
+            freshManBonus = nonoDefaults.freshManBonus or 0,
+            
+            -- 超能属性
+            superEnergy = nonoDefaults.superEnergy or 0,
+            superLevel = nonoDefaults.superLevel or 0,
+            superStage = nonoDefaults.superStage or 1,
+            
+            -- NoNo属性值
+            power = nonoDefaults.power or 80000,
+            mate = nonoDefaults.mate or 80000,
+            iq = nonoDefaults.iq or 0,
+            ai = nonoDefaults.ai or 0,
+            hp = nonoDefaults.hp or 100000,
+            maxHp = nonoDefaults.maxHp or 100000,
+            energy = nonoDefaults.energy or 100,
+            
+            -- 时间相关
+            birth = (nonoDefaults.birth == 0) and os.time() or (nonoDefaults.birth or os.time()),
+            chargeTime = nonoDefaults.chargeTime or 0,
+            expire = nonoDefaults.expire or 0,
+            
+            -- 其他
+            chip = nonoDefaults.chip or 0,
+            grow = nonoDefaults.grow or 0,
+            isFollowing = nonoDefaults.isFollowing or false
         }
         ctx.saveUser(ctx.userId, user)
     end

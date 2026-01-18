@@ -52,12 +52,15 @@ function SeerLoginResponse.makeLoginResponse(user)
     local basic = buffer.Buffer:new(4096)
     local pos = 1
     
+    -- 确保 nono 数据存在
+    local nono = user.nono or {}
+    
     -- userID (4 bytes) - line 757
     basic:wuint(pos, user.userid)
     pos = pos + 4
     
     -- regTime (4 bytes) - line 758
-    basic:wuint(pos, os.time() - 86400*365)
+    basic:wuint(pos, user.regTime or (os.time() - 86400*365))
     pos = pos + 4
     
     -- nick (16 bytes) - line 759
@@ -65,13 +68,16 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 16
     
     -- vip flags (4 bytes) - line 760-762
-    local vipFlags = 3  -- VIP + VIPED
-    if user.vip == false then vipFlags = 0 end
+    -- 根据 nono.superNono 决定 VIP 状态
+    local vipFlags = 0
+    if nono.superNono and nono.superNono > 0 then
+        vipFlags = 3  -- VIP + VIPED
+    end
     basic:wuint(pos, vipFlags)
     pos = pos + 4
     
     -- dsFlag (4 bytes) - line 763
-    basic:wuint(pos, 0)
+    basic:wuint(pos, user.dsFlag or 0)
     pos = pos + 4
     
     -- color (4 bytes) - line 764
@@ -79,86 +85,83 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 4
     
     -- texture (4 bytes) - line 765
-    basic:wuint(pos, 0)
+    basic:wuint(pos, user.texture or 1)
     pos = pos + 4
     
     -- energy (4 bytes) - line 766
-    local energy = 100
-    if user.nono and user.nono.energy then energy = user.nono.energy end
-    if user.energy then energy = user.energy end
-    basic:wuint(pos, energy)
+    basic:wuint(pos, user.energy or nono.energy or 100)
     pos = pos + 4
     
     -- coins (4 bytes) - line 767
-    basic:wuint(pos, user.coins or 99999)
+    basic:wuint(pos, user.coins or 2000)
     pos = pos + 4
     
     -- fightBadge (4 bytes) - line 768
-    basic:wuint(pos, 0)
+    basic:wuint(pos, user.fightBadge or 0)
     pos = pos + 4
     
     -- mapID (4 bytes) - line 769
-    basic:wuint(pos, user.mapID or 1)
+    basic:wuint(pos, user.mapID or user.mapId or 1)
     pos = pos + 4
     
     -- pos.x, pos.y (8 bytes) - line 770
     basic:wuint(pos, user.posX or 300)
     pos = pos + 4
-    basic:wuint(pos, user.posY or 300)
+    basic:wuint(pos, user.posY or 270)
     pos = pos + 4
     
     -- timeToday (4 bytes) - line 771
-    basic:wuint(pos, 0)
+    basic:wuint(pos, user.timeToday or 0)
     pos = pos + 4
     
     -- timeLimit (4 bytes) - line 772
-    basic:wuint(pos, 0x7FFFFFFF)
+    basic:wuint(pos, user.timeLimit or 86400)
     pos = pos + 4
     
     -- 4 boolean bytes (4 bytes) - lines 773-776
-    basic:wbyte(pos, 0) -- isClothHalfDay
+    basic:wbyte(pos, user.isClothHalfDay or 0)
     pos = pos + 1
-    basic:wbyte(pos, 0) -- isRoomHalfDay
+    basic:wbyte(pos, user.isRoomHalfDay or 0)
     pos = pos + 1
-    basic:wbyte(pos, 0) -- iFortressHalfDay
+    basic:wbyte(pos, user.iFortressHalfDay or 0)
     pos = pos + 1
-    basic:wbyte(pos, 0) -- isHQHalfDay
+    basic:wbyte(pos, user.isHQHalfDay or 0)
     pos = pos + 1
     
     -- loginCnt (4 bytes) - line 777
-    basic:wuint(pos, 100)
+    basic:wuint(pos, user.loginCnt or 1)
     pos = pos + 4
     
     -- inviter (4 bytes) - line 778
-    basic:wuint(pos, 0)
+    basic:wuint(pos, user.inviter or 0)
     pos = pos + 4
     
     -- newInviteeCnt (4 bytes) - line 779
-    basic:wuint(pos, 0)
+    basic:wuint(pos, user.newInviteeCnt or 0)
     pos = pos + 4
     
-    -- vipLevel (4 bytes) - line 780
-    basic:wuint(pos, user.vipLevel or 0)
+    -- vipLevel (4 bytes) - line 780 (从 nono 读取)
+    basic:wuint(pos, nono.vipLevel or 0)
     pos = pos + 4
     
-    -- vipValue (4 bytes) - line 781
-    basic:wuint(pos, 0)
+    -- vipValue (4 bytes) - line 781 (从 nono 读取)
+    basic:wuint(pos, nono.vipValue or 0)
     pos = pos + 4
     
-    -- vipStage (4 bytes) - line 782-789
-    basic:wuint(pos, 1)
+    -- vipStage (4 bytes) - line 782-789 (从 nono 读取)
+    basic:wuint(pos, nono.vipStage or 1)
     pos = pos + 4
     
-    -- autoCharge (4 bytes) - line 790
-    basic:wuint(pos, 0)
+    -- autoCharge (4 bytes) - line 790 (从 nono 读取)
+    basic:wuint(pos, nono.autoCharge or 0)
     pos = pos + 4
     
-    -- vipEndTime (4 bytes) - line 791
-    basic:wuint(pos, 0)
+    -- vipEndTime (4 bytes) - line 791 (从 nono 读取)
+    basic:wuint(pos, nono.vipEndTime or 0)
     pos = pos + 4
     
-    -- freshManBonus (4 bytes) - line 792
-    basic:wuint(pos, 0)
+    -- freshManBonus (4 bytes) - line 792 (从 nono 读取)
+    basic:wuint(pos, nono.freshManBonus or 0)
     pos = pos + 4
     
     parts[#parts+1] = tostring(basic):sub(1, pos-1)
@@ -174,27 +177,27 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = 1
     
     -- teacherID (4 bytes) - line 803
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.teacherID or 0)
     pos = pos + 4
     
     -- studentID (4 bytes) - line 804
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.studentID or 0)
     pos = pos + 4
     
     -- graduationCount (4 bytes) - line 805
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.graduationCount or 0)
     pos = pos + 4
     
     -- maxPuniLv (4 bytes) - line 806
-    buf:wuint(pos, 100)
+    buf:wuint(pos, user.maxPuniLv or 100)
     pos = pos + 4
     
     -- petMaxLev (4 bytes) - line 807
-    buf:wuint(pos, 100)
+    buf:wuint(pos, user.petMaxLev or 100)
     pos = pos + 4
     
     -- petAllNum (4 bytes) - line 808
-    buf:wuint(pos, user.petAllNum or 10)
+    buf:wuint(pos, user.petAllNum or 0)
     pos = pos + 4
     
     -- monKingWin (4 bytes) - line 809
@@ -202,71 +205,71 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 4
     
     -- curStage (4 bytes) - line 810 (client adds +1)
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.curStage or 0)
     pos = pos + 4
     
     -- maxStage (4 bytes) - line 811
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.maxStage or 0)
     pos = pos + 4
     
     -- curFreshStage (4 bytes) - line 812
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.curFreshStage or 0)
     pos = pos + 4
     
     -- maxFreshStage (4 bytes) - line 813
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.maxFreshStage or 0)
     pos = pos + 4
     
     -- maxArenaWins (4 bytes) - line 814
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.maxArenaWins or 0)
     pos = pos + 4
     
     -- twoTimes (4 bytes) - line 815
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.twoTimes or 0)
     pos = pos + 4
     
     -- threeTimes (4 bytes) - line 816
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.threeTimes or 0)
     pos = pos + 4
     
     -- autoFight (4 bytes) - line 817
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.autoFight or 0)
     pos = pos + 4
     
     -- autoFightTimes (4 bytes) - line 818
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.autoFightTimes or 0)
     pos = pos + 4
     
     -- energyTimes (4 bytes) - line 819
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.energyTimes or 0)
     pos = pos + 4
     
     -- learnTimes (4 bytes) - line 820
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.learnTimes or 0)
     pos = pos + 4
     
     -- monBtlMedal (4 bytes) - line 821
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.monBtlMedal or 0)
     pos = pos + 4
     
     -- recordCnt (4 bytes) - line 822
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.recordCnt or 0)
     pos = pos + 4
     
     -- obtainTm (4 bytes) - line 823
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.obtainTm or 0)
     pos = pos + 4
     
     -- soulBeadItemID (4 bytes) - line 824
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.soulBeadItemID or 0)
     pos = pos + 4
     
     -- expireTm (4 bytes) - line 825
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.expireTm or 0)
     pos = pos + 4
     
     -- fuseTimes (4 bytes) - line 826
-    buf:wuint(pos, 0)
+    buf:wuint(pos, user.fuseTimes or 0)
     pos = pos + 4
     
     parts[#parts+1] = tostring(buf):sub(1, pos-1)

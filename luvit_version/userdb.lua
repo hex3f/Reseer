@@ -172,6 +172,9 @@ function UserDB:getOrCreateGameData(userId)
             color = loginUser.color or color
         end
         
+        -- 获取 NoNo 默认配置
+        local nonoDefaults = GameConfig.InitialPlayer.nono or {}
+        
         -- 游戏数据 (仅游戏内需要的字段) - 使用 game_config 的初始值
         self.gameData[key] = {
             -- 基础信息
@@ -212,19 +215,80 @@ function UserDB:getOrCreateGameData(userId)
                 {id = 500001, usedCount = 1, allCount = 1}  -- 默认房间风格
             },
             
-            -- NoNo信息
+            -- NoNo信息 (从配置读取所有默认值，包含VIP信息)
             nono = {
-                flag = 0,
-                color = 0,
-                nick = "NoNo",
-                chip = 0,
-                grow = 0,     -- 成长值
-                expire = 0,   -- SuperNoNo过期时间
-                isSuper = false,
-                energy = 100, -- 电池能量
-                mate = 0,
-                ai = 0
+                -- 基础状态
+                hasNono = nonoDefaults.hasNono or 1,
+                flag = nonoDefaults.flag or 1,
+                state = nonoDefaults.state or 0,
+                nick = nonoDefaults.nick or "NoNo",
+                color = nonoDefaults.color or 1,
+                
+                -- VIP/超能NoNo
+                superNono = nonoDefaults.superNono or 0,
+                vipLevel = nonoDefaults.vipLevel or 0,
+                vipStage = nonoDefaults.vipStage or 1,
+                vipValue = nonoDefaults.vipValue or 0,
+                autoCharge = nonoDefaults.autoCharge or 0,
+                vipEndTime = nonoDefaults.vipEndTime or 0,
+                freshManBonus = nonoDefaults.freshManBonus or 0,
+                
+                -- 超能属性
+                superEnergy = nonoDefaults.superEnergy or 0,
+                superLevel = nonoDefaults.superLevel or 0,
+                superStage = nonoDefaults.superStage or 1,
+                
+                -- NoNo属性值
+                power = nonoDefaults.power or 80000,
+                mate = nonoDefaults.mate or 80000,
+                iq = nonoDefaults.iq or 0,
+                ai = nonoDefaults.ai or 0,
+                hp = nonoDefaults.hp or 100000,
+                maxHp = nonoDefaults.maxHp or 100000,
+                energy = nonoDefaults.energy or 100,
+                
+                -- 时间相关
+                birth = (nonoDefaults.birth == 0) and os.time() or (nonoDefaults.birth or os.time()),
+                chargeTime = nonoDefaults.chargeTime or 0,
+                expire = nonoDefaults.expire or 0,
+                
+                -- 其他
+                chip = nonoDefaults.chip or 0,
+                grow = nonoDefaults.grow or 0,
+                isFollowing = nonoDefaults.isFollowing or false
             },
+            
+            -- 其他玩家属性 (从配置读取)
+            texture = GameConfig.InitialPlayer.texture or 1,
+            dsFlag = GameConfig.InitialPlayer.dsFlag or 0,
+            badge = GameConfig.InitialPlayer.badge or 0,
+            curTitle = GameConfig.InitialPlayer.curTitle or 0,
+            fightBadge = GameConfig.InitialPlayer.fightBadge or 0,
+            timeToday = GameConfig.InitialPlayer.timeToday or 0,
+            timeLimit = GameConfig.InitialPlayer.timeLimit or 86400,
+            loginCnt = GameConfig.InitialPlayer.loginCnt or 1,
+            inviter = GameConfig.InitialPlayer.inviter or 0,
+            newInviteeCnt = GameConfig.InitialPlayer.newInviteeCnt or 0,
+            teacherID = GameConfig.InitialPlayer.teacherID or 0,
+            studentID = GameConfig.InitialPlayer.studentID or 0,
+            graduationCount = GameConfig.InitialPlayer.graduationCount or 0,
+            maxPuniLv = GameConfig.InitialPlayer.maxPuniLv or 100,
+            petMaxLev = GameConfig.InitialPlayer.petMaxLev or 100,
+            petAllNum = GameConfig.InitialPlayer.petAllNum or 0,
+            monKingWin = GameConfig.InitialPlayer.monKingWin or 0,
+            monBtlMedal = GameConfig.InitialPlayer.monBtlMedal or 0,
+            messWin = GameConfig.InitialPlayer.messWin or 0,
+            curStage = GameConfig.InitialPlayer.curStage or 0,
+            maxStage = GameConfig.InitialPlayer.maxStage or 0,
+            curFreshStage = GameConfig.InitialPlayer.curFreshStage or 0,
+            maxFreshStage = GameConfig.InitialPlayer.maxFreshStage or 0,
+            maxArenaWins = GameConfig.InitialPlayer.maxArenaWins or 0,
+            twoTimes = GameConfig.InitialPlayer.twoTimes or 0,
+            threeTimes = GameConfig.InitialPlayer.threeTimes or 0,
+            autoFight = GameConfig.InitialPlayer.autoFight or 0,
+            autoFightTimes = GameConfig.InitialPlayer.autoFightTimes or 0,
+            energyTimes = GameConfig.InitialPlayer.energyTimes or 0,
+            learnTimes = GameConfig.InitialPlayer.learnTimes or 0,
             
             -- 成就信息
             achievements = {

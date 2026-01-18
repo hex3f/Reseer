@@ -53,7 +53,7 @@ local conf = {
     -- [资源模式] 是否从官服下载资源
     -- true  = 从官服下载资源并缓存到 res_dir
     -- false = 仅使用本地资源（需要提前准备好资源文件）
-    use_official_resources = true,
+    use_official_resources = false,
     
     -- [流量记录] 是否启用流量记录（仅在官服代理模式下有效）
     -- true  = 记录所有 Flash ↔ 官服 的通信到控制台和文件

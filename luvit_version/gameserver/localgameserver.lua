@@ -1316,26 +1316,48 @@ function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     -- 从 game_config 获取默认 NONO 配置
     local nonoDefaults = GameConfig.InitialPlayer.nono or {}
     
-    -- 确保用户有 nono 数据
+    -- 确保用户有 nono 数据 (所有字段从配置读取)
     if not userData.nono then
         userData.nono = {
-            flag = nonoDefaults.flag or 0,
+            -- 基础状态
+            hasNono = nonoDefaults.hasNono or 1,
+            flag = nonoDefaults.flag or 1,
             state = nonoDefaults.state or 0,
             nick = nonoDefaults.nick or "NoNo",
-            superNono = nonoDefaults.superNono or 0,
             color = nonoDefaults.color or 1,
-            power = 10000,
-            mate = 10000,
-            iq = 0,
-            ai = 0,
-            birth = os.time(),
-            chargeTime = 500,
-            superEnergy = 0,
-            superLevel = 0,
-            superStage = 1,
-            hp = 10000,
-            maxHp = 10000,
-            isFollowing = false
+            
+            -- VIP/超能NoNo
+            superNono = nonoDefaults.superNono or 0,
+            vipLevel = nonoDefaults.vipLevel or 0,
+            vipStage = nonoDefaults.vipStage or 1,
+            vipValue = nonoDefaults.vipValue or 0,
+            autoCharge = nonoDefaults.autoCharge or 0,
+            vipEndTime = nonoDefaults.vipEndTime or 0,
+            freshManBonus = nonoDefaults.freshManBonus or 0,
+            
+            -- 超能属性
+            superEnergy = nonoDefaults.superEnergy or 0,
+            superLevel = nonoDefaults.superLevel or 0,
+            superStage = nonoDefaults.superStage or 1,
+            
+            -- NoNo属性值
+            power = nonoDefaults.power or 80000,
+            mate = nonoDefaults.mate or 80000,
+            iq = nonoDefaults.iq or 0,
+            ai = nonoDefaults.ai or 0,
+            hp = nonoDefaults.hp or 100000,
+            maxHp = nonoDefaults.maxHp or 100000,
+            energy = nonoDefaults.energy or 100,
+            
+            -- 时间相关
+            birth = (nonoDefaults.birth == 0) and os.time() or (nonoDefaults.birth or os.time()),
+            chargeTime = nonoDefaults.chargeTime or 0,
+            expire = nonoDefaults.expire or 0,
+            
+            -- 其他
+            chip = nonoDefaults.chip or 0,
+            grow = nonoDefaults.grow or 0,
+            isFollowing = nonoDefaults.isFollowing or false
         }
     end
     
@@ -1343,17 +1365,17 @@ function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     
     local responseBody = ""
     responseBody = responseBody .. writeUInt32BE(userId)                        -- userID
-    responseBody = responseBody .. writeUInt32BE(nono.flag or 0)                -- flag
+    responseBody = responseBody .. writeUInt32BE(nono.flag or 1)                -- flag
     responseBody = responseBody .. writeUInt32BE(nono.state or 0)               -- state
     responseBody = responseBody .. writeFixedString(nono.nick or "NoNo", 16)    -- nick
     responseBody = responseBody .. writeUInt32BE(nono.superNono or 0)           -- superNono
     responseBody = responseBody .. writeUInt32BE(nono.color or 1)               -- color
-    responseBody = responseBody .. writeUInt32BE(nono.power or 10000)           -- power
-    responseBody = responseBody .. writeUInt32BE(nono.mate or 10000)            -- mate
+    responseBody = responseBody .. writeUInt32BE(nono.power or 80000)           -- power
+    responseBody = responseBody .. writeUInt32BE(nono.mate or 80000)            -- mate
     responseBody = responseBody .. writeUInt32BE(nono.iq or 0)                  -- iq
     responseBody = responseBody .. writeUInt16BE(nono.ai or 0)                  -- ai
     responseBody = responseBody .. writeUInt32BE(nono.birth or os.time())       -- birth
-    responseBody = responseBody .. writeUInt32BE(nono.chargeTime or 500)        -- chargeTime
+    responseBody = responseBody .. writeUInt32BE(nono.chargeTime or 0)          -- chargeTime
     responseBody = responseBody .. string.rep("\xFF", 20)                       -- func (所有功能开启)
     responseBody = responseBody .. writeUInt32BE(nono.superEnergy or 0)         -- superEnergy
     responseBody = responseBody .. writeUInt32BE(nono.superLevel or 0)          -- superLevel
