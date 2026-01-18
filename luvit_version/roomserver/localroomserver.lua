@@ -34,6 +34,12 @@ function LocalRoomServer:new(sharedUserDB, sharedGameServer)
         -- 不再使用缓存，每次都从数据库加载最新数据
     }
     setmetatable(obj, LocalRoomServer)
+    
+    -- 创建共享的 NoNo 跟随状态表（跨服务器共享）
+    if not sharedGameServer.nonoFollowingStates then
+        sharedGameServer.nonoFollowingStates = {}  -- userId -> boolean
+    end
+    
     obj:start()
     return obj
 end
@@ -182,6 +188,7 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
         [2157] = self.handleSeeOnline,         -- 查看在线状态
         [2201] = self.handleAcceptTask,        -- 接受任务
         [2324] = self.handlePetRoomList,       -- 房间精灵列表
+        [9003] = self.handleNonoInfo,          -- NoNo信息 (需要在房间服务器处理)
         [80008] = self.handleHeartbeat,        -- 心跳包
     }
     
@@ -197,6 +204,14 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
         local action = body:byte(1) * 16777216 + body:byte(2) * 65536 + 
                        body:byte(3) * 256 + body:byte(4)
         clientData.nonoState = action  -- 更新会话级状态
+        
+        -- 同时更新共享状态表（供游戏服务器访问）
+        if self.gameServer and self.gameServer.nonoFollowingStates then
+            self.gameServer.nonoFollowingStates[userId] = (action == 1)
+            tprint(string.format("\27[35m[RoomServer] 更新共享 NoNo 跟随状态: userId=%d, following=%s\27[0m", 
+                userId, tostring(action == 1)))
+        end
+        
         tprint(string.format("\27[35m[RoomServer] 更新 nonoState=%d\27[0m", action))
     end
     
@@ -437,9 +452,14 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     local teamInfo = userData.teamInfo or {}
     local nonoData = userData.nono or {}  -- 获取 NONO 数据
     
-    -- 进入房间时重置 nonoState 为 0 (NONO 跟随是会话级行为，需要用户手动激活)
-    -- nonoState 存储在 clientData 中，不从数据库加载
-    clientData.nonoState = 0
+    -- 检查游戏服务器的共享 NoNo 跟随状态
+    -- 如果用户在游戏服务器中让 NoNo 跟随，进入房间时应该保持跟随状态
+    clientData.nonoState = 0  -- 默认不跟随
+    if self.gameServer and self.gameServer.nonoFollowingStates and self.gameServer.nonoFollowingStates[userId] then
+        -- 用户的 NoNo 正在跟随，保持跟随状态
+        clientData.nonoState = 1  -- 跟随中
+        tprint(string.format("\27[35m[RoomServer] 用户 %d 的 NoNo 正在跟随，保持跟随状态\27[0m", userId))
+    end
     
     -- 先发送 ENTER_MAP 响应
     -- 官服行为：如果用户装备了衣服，则发送衣服数据；否则 clothCount=0
@@ -497,14 +517,9 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     self:sendResponse(clientData, cmdId, userId, 0, "")
     tprint(string.format("\27[32m[RoomServer] → ROOM_LOGIN 成功\27[0m"))
     
-    -- 发送 NONO 回家消息，确保客户端重置 NONO 状态
-    -- 这样可以避免客户端残留的跟随状态导致重复 NONO
-    local nonoGoHomeBody = ""
-    nonoGoHomeBody = nonoGoHomeBody .. writeUInt32BE(userId)  -- userID
-    nonoGoHomeBody = nonoGoHomeBody .. writeUInt32BE(0)       -- flag=0
-    nonoGoHomeBody = nonoGoHomeBody .. writeUInt32BE(0)       -- state=0 (已回家)
-    self:sendResponse(clientData, 9019, userId, 0, nonoGoHomeBody)
-    tprint("\27[32m[RoomServer] → NONO_FOLLOW_OR_HOOM 回家 (重置客户端状态)\27[0m")
+    -- 注意: 不要在进入房间时发送 CMD 9019 回家命令
+    -- 客户端会根据 CMD 9003 (NONO_INFO) 的 state=3 自动显示房间里的 NoNo
+    -- CMD 9019 只在玩家主动点击跟随/回家时才发送
     
     -- 启动心跳定时器
     self:startHeartbeat(clientData, userId)
@@ -898,6 +913,65 @@ end
 function LocalRoomServer:handlePetRoomList(clientData, cmdId, userId, seqId, body)
     -- 响应: count(4) = 0 (没有精灵在房间)
     self:sendResponse(clientData, cmdId, userId, 0, writeUInt32BE(0))
+end
+
+-- CMD 9003: NoNo信息 (NONO_INFO)
+-- 在房间服务器中也需要处理，因为客户端会在房间中请求 NoNo 信息
+function LocalRoomServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
+    tprint("\27[35m[RoomServer] 处理 CMD 9003: NoNo信息\27[0m")
+    
+    local targetUserId = userId
+    if #body >= 4 then
+        targetUserId = readUInt32BE(body, 1)
+    end
+    
+    local userData = self:getOrCreateUser(targetUserId)
+    local nono = userData.nono or {}
+    
+    -- 检查共享的 NoNo 跟随状态
+    -- 如果用户的 NoNo 正在跟随，返回 state=3；否则返回 state=1
+    local stateValue = 1  -- 默认在房间
+    
+    if self.gameServer and self.gameServer.nonoFollowingStates and self.gameServer.nonoFollowingStates[targetUserId] then
+        -- 用户的 NoNo 正在跟随
+        stateValue = 3  -- 跟随中
+        tprint(string.format("\27[35m[RoomServer] 用户 %d 的 NoNo 正在跟随，返回 state=3\27[0m", targetUserId))
+    else
+        tprint(string.format("\27[35m[RoomServer] 用户 %d 的 NoNo 在房间，返回 state=1\27[0m", targetUserId))
+    end
+    
+    -- 构建 NoNo 信息响应 (90 bytes)
+    -- 返回 state=1 (NoNo在房间，不跟随): state[0]=true, state[1]=false → 显示 NoNo
+    -- 或 state=3 (NoNo跟随): state[0]=true, state[1]=true → 不显示 NoNo（正在跟随）
+    local responseBody = ""
+    responseBody = responseBody .. writeUInt32BE(targetUserId)              -- userId (4)
+    responseBody = responseBody .. writeUInt32BE(nono.flag or 1)            -- flag (4)
+    responseBody = responseBody .. writeUInt32BE(stateValue)                -- state (4)
+    responseBody = responseBody .. writeFixedString(nono.nick or "NONO", 16) -- nick (16)
+    responseBody = responseBody .. writeUInt32BE(nono.color or 0xFFFFFF)    -- color (4)
+    responseBody = responseBody .. writeUInt32BE(nono.hp or 10000)          -- hp (4)
+    responseBody = responseBody .. writeUInt32BE(nono.maxHp or 10000)       -- maxHp (4)
+    responseBody = responseBody .. writeUInt32BE(nono.level or 0)           -- level (4)
+    responseBody = responseBody .. writeUInt32BE(os.time())                 -- lastEatTime (4)
+    responseBody = responseBody .. writeUInt32BE(nono.energy or 500)        -- energy (4)
+    responseBody = responseBody .. writeUInt32BE(0xFFFFFFFF)                -- superNono (4) - 0xFFFFFFFF 表示未开通
+    responseBody = responseBody .. writeUInt32BE(0xFFFFFFFF)                -- superNonoTime (4)
+    responseBody = responseBody .. writeUInt32BE(0xFFFFFFFF)                -- superNonoEndTime (4)
+    responseBody = responseBody .. writeUInt32BE(0xFFFFFFFF)                -- superNonoType (4)
+    responseBody = responseBody .. writeUInt32BE(0xFFFFFFFF)                -- superNonoState (4)
+    responseBody = responseBody .. writeUInt32BE(0xFFFFFFFF)                -- superNonoLevel (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- changeColor (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- abilityMark (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- abilityValue (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- skillMark (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- skillValue (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- reserved1 (4)
+    responseBody = responseBody .. writeUInt32BE(0)                         -- reserved2 (4)
+    -- 总计: 90 bytes
+    
+    self:sendResponse(clientData, cmdId, userId, 0, responseBody)
+    tprint(string.format("\27[32m[RoomServer] → NONO_INFO: state=%d (%s)\27[0m", 
+        stateValue, stateValue == 1 and "在房间" or "跟随中"))
 end
 
 -- CMD 80008: 心跳包

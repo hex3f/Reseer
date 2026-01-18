@@ -236,8 +236,8 @@ function UserDB:getOrCreateGameData(userId)
                 mate = nonoDefaults.mate or 10000,
                 iq = nonoDefaults.iq or 0,
                 ai = nonoDefaults.ai or 0,
-                hp = nonoDefaults.hp or 100000,
-                maxHp = nonoDefaults.maxHp or 100000,
+                hp = nonoDefaults.hp or 10000,
+                maxHp = nonoDefaults.maxHp or 10000,
                 energy = nonoDefaults.energy or 100,
                 
                 -- 时间相关
@@ -295,6 +295,14 @@ function UserDB:getOrCreateGameData(userId)
         }
         -- 不再自动保存到磁盘，只在关闭时保存
         print(string.format("\27[32m[UserDB] 创建游戏数据: userId=%d (含默认家具)\27[0m", userId))
+    else
+        -- 数据迁移：修正错误的 NoNo HP 值 (100000 -> 10000)
+        local gameData = self.gameData[key]
+        if gameData.nono and gameData.nono.hp == 100000 then
+            print(string.format("\27[33m[UserDB] 迁移数据: 修正用户 %d 的 NoNo HP 值 (100000 -> 10000)\27[0m", userId))
+            gameData.nono.hp = 10000
+            gameData.nono.maxHp = 10000
+        end
     end
     return self.gameData[key]
 end

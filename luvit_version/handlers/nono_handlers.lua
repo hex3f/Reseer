@@ -9,6 +9,10 @@ local readUInt32BE = Utils.readUInt32BE
 local writeFixedString = Utils.writeFixedString
 local buildResponse = Utils.buildResponse
 
+-- 导入 Logger 模块
+local Logger = require('../logger')
+local tprint = Logger.tprint
+
 local NonoHandlers = {}
 
 -- 获取或创建用户的NONO数据 (从配置读取默认值)
@@ -23,7 +27,7 @@ local function getNonoData(ctx)
             -- 基础状态
             hasNono = nonoDefaults.hasNono or 1,
             flag = nonoDefaults.flag or 1,
-            state = nonoDefaults.state or 0,
+            -- 注意: 不保存 state，state 是会话级别的
             nick = nonoDefaults.nick or "NoNo",
             color = nonoDefaults.color or 0xFFFFFF,
             
@@ -46,8 +50,8 @@ local function getNonoData(ctx)
             mate = nonoDefaults.mate or 10000,
             iq = nonoDefaults.iq or 0,
             ai = nonoDefaults.ai or 0,
-            hp = nonoDefaults.hp or 100000,
-            maxHp = nonoDefaults.maxHp or 100000,
+            hp = nonoDefaults.hp or 10000,
+            maxHp = nonoDefaults.maxHp or 10000,
             energy = nonoDefaults.energy or 100,
             
             -- 时间相关
@@ -58,7 +62,7 @@ local function getNonoData(ctx)
             -- 其他
             chip = nonoDefaults.chip or 0,
             grow = nonoDefaults.grow or 0,
-            isFollowing = nonoDefaults.isFollowing or false
+            -- 注意: 不保存 isFollowing，跟随状态是会话级别的
         }
         ctx.saveUser(ctx.userId, user)
     end
@@ -77,11 +81,13 @@ end
 --           power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + 
 --           func(20 bytes) + superEnergy(4) + superLevel(4) + superStage(4)
 -- 总长度: 4+4+4+16+4+4+4+4+4+2+4+4+20+4+4+4 = 90 bytes
-local function buildNonoInfoBody(userId, nonoData)
+-- 注意: state 参数用于指定返回的状态（房间服务器始终返回 state=3）
+local function buildNonoInfoBody(userId, nonoData, forceState)
     local body = ""
     body = body .. writeUInt32BE(userId)                    -- userID
     body = body .. writeUInt32BE(nonoData.flag or 1)        -- flag (32 bits)
-    body = body .. writeUInt32BE(nonoData.state or 1)       -- state (32 bits)
+    -- 使用 forceState 或默认值 3（NoNo 在房间）
+    body = body .. writeUInt32BE(forceState or 3)           -- state (32 bits)
     body = body .. writeFixedString(nonoData.nick or "NONO", 16)  -- nick (官服用大写)
     body = body .. writeUInt32BE(nonoData.superNono or 1)   -- superNono
     body = body .. writeUInt32BE(nonoData.color or 0x00FFFFFF)  -- color (官服默认白色)
@@ -112,11 +118,12 @@ local function buildNonoFollowBody(userId, nonoData, isFollowing)
 end
 
 -- CMD 9001: NONO_OPEN (开启NONO)
+-- 注意: 始终返回 state=3（NoNo 在房间）
 local function handleNonoOpen(ctx)
     local nonoData = getNonoData(ctx)
-    local body = buildNonoInfoBody(ctx.userId, nonoData)
+    local body = buildNonoInfoBody(ctx.userId, nonoData, 3)
     ctx.sendResponse(buildResponse(9001, ctx.userId, 0, body))
-    print("\27[32m[Handler] → NONO_OPEN response\27[0m")
+    print("\27[32m[Handler] → NONO_OPEN response (state=3)\27[0m")
     return true
 end
 
@@ -138,11 +145,14 @@ local function handleNonoChangeName(ctx)
 end
 
 -- CMD 9003: NONO_INFO (获取NONO信息)
+-- 注意: 始终返回 state=3（NoNo 在房间），跟随状态由客户端维护
 local function handleNonoInfo(ctx)
     local nonoData = getNonoData(ctx)
-    local body = buildNonoInfoBody(ctx.userId, nonoData)
+    -- 始终返回 state=3，表示 NoNo 在房间
+    -- 跟随状态是会话级别的，不持久化
+    local body = buildNonoInfoBody(ctx.userId, nonoData, 3)
     ctx.sendResponse(buildResponse(9003, ctx.userId, 0, body))
-    print("\27[32m[Handler] → NONO_INFO response\27[0m")
+    print("\27[32m[Handler] → NONO_INFO response (state=3)\27[0m")
     return true
 end
 
@@ -271,6 +281,7 @@ end
 -- 官服响应根据 action 不同返回不同长度:
 --   action=1 (跟随): 36 bytes = userID(4) + flag(4) + state(4) + nick(16) + color(4) + chargeTime(4)
 --   action=0 (回家): 12 bytes = userID(4) + flag(4) + state(4)
+-- 注意: 跟随状态是会话级别的，不持久化到数据库
 local function handleNonoFollowOrHoom(ctx)
     local action = 0  -- 0=回家, 1=跟随
     if #ctx.body >= 4 then
@@ -278,12 +289,23 @@ local function handleNonoFollowOrHoom(ctx)
     end
     
     local nonoData = getNonoData(ctx)
-    nonoData.isFollowing = (action == 1)
-    saveNonoData(ctx, nonoData)
     
-    -- 注意: nonoState 不保存到数据库
-    -- nonoState 是会话级状态，重新进入房间时会重置为 0
-    -- 这样可以避免重复显示 NONO 的问题
+    -- 设置会话级别的跟随状态（用于跨服务器状态同步）
+    if ctx.clientData then
+        ctx.clientData.nonoFollowing = (action == 1)
+    end
+    
+    -- 同时设置到共享状态表（供房间服务器访问）
+    -- 这个状态表在游戏服务器和房间服务器之间共享
+    if ctx.gameServer and ctx.gameServer.nonoFollowingStates then
+        ctx.gameServer.nonoFollowingStates[ctx.userId] = (action == 1)
+        tprint(string.format("\27[35m[Handler] 设置共享 NoNo 跟随状态: userId=%d, following=%s\27[0m", 
+            ctx.userId, tostring(action == 1)))
+    end
+    
+    -- 注意: 不保存跟随状态到数据库
+    -- 跟随状态是会话级别的，重新登录后会重置
+    -- 这样可以确保每次登录时 NoNo 都在房间
     
     local body = ""
     if action == 1 then
@@ -310,7 +332,7 @@ local function handleNonoFollowOrHoom(ctx)
         ctx.broadcastToMap(buildResponse(9019, ctx.userId, 0, body), ctx.userId)
     end
     
-    print(string.format("\27[32m[Handler] → NONO_FOLLOW_OR_HOOM %s response (%d bytes)\27[0m", 
+    tprint(string.format("\27[32m[Handler] → NONO_FOLLOW_OR_HOOM %s response (%d bytes)\27[0m", 
         action == 1 and "跟随" or "回家", #body))
     return true
 end

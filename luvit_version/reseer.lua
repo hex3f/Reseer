@@ -289,6 +289,17 @@ local function saveAllData()
     end
 end
 
+-- Windows 兼容的 Ctrl+C 处理
+-- 在 Windows 上，使用定时器定期保存数据
+if package.config:sub(1,1) == '\\' then
+    -- Windows 系统
+    print("\27[33m[INFO] Windows 系统检测到，启用自动保存 (每30秒)\27[0m")
+    local timer = require('timer')
+    timer.setInterval(30000, function()
+        saveAllData()
+    end)
+end
+
 -- 监听进程退出信号 (仅 Unix/Linux 支持，Windows 会静默失败)
 pcall(function()
     process:on("SIGINT", function()

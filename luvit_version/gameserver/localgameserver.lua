@@ -121,6 +121,7 @@ function LocalGameServer:new()
         serverList = {},
         nextSeqId = 1,
         cryptoMap = {}, -- map<client, crypto>
+        nonoFollowingStates = {},  -- 共享的 NoNo 跟随状态表 (userId -> boolean)
     }
     setmetatable(obj, LocalGameServer)
     obj:loadUserData()
@@ -304,6 +305,7 @@ function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, seqId, b
         seqId = seqId,
         body = body,
         clientData = clientData,
+        gameServer = self_ref,  -- 添加游戏服务器引用（用于访问共享状态）
         
         -- 发送响应
         sendResponse = function(packet)
@@ -1465,7 +1467,7 @@ function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
             -- 基础状态
             hasNono = nonoDefaults.hasNono or 1,
             flag = nonoDefaults.flag or 1,
-            state = nonoDefaults.state or 0,
+            -- 注意: 不保存 state，state 是会话级别的
             nick = nonoDefaults.nick or "NoNo",
             color = nonoDefaults.color or 0xFFFFFF,
             
@@ -1488,8 +1490,8 @@ function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
             mate = nonoDefaults.mate or 10000,
             iq = nonoDefaults.iq or 0,
             ai = nonoDefaults.ai or 0,
-            hp = nonoDefaults.hp or 100000,
-            maxHp = nonoDefaults.maxHp or 100000,
+            hp = nonoDefaults.hp or 10000,
+            maxHp = nonoDefaults.maxHp or 10000,
             energy = nonoDefaults.energy or 100,
             
             -- 时间相关
@@ -1500,7 +1502,7 @@ function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
             -- 其他
             chip = nonoDefaults.chip or 0,
             grow = nonoDefaults.grow or 0,
-            isFollowing = nonoDefaults.isFollowing or false
+            -- 注意: 不保存 isFollowing，跟随状态是会话级别的
         }
     end
     
@@ -1509,7 +1511,7 @@ function LocalGameServer:handleNonoInfo(clientData, cmdId, userId, seqId, body)
     local responseBody = ""
     responseBody = responseBody .. writeUInt32BE(userId)                        -- userID
     responseBody = responseBody .. writeUInt32BE(nono.flag or 1)                -- flag
-    responseBody = responseBody .. writeUInt32BE(nono.state or 0)               -- state
+    responseBody = responseBody .. writeUInt32BE(1)                             -- state=1 (NoNo在房间，不跟随)
     responseBody = responseBody .. writeFixedString(nono.nick or "NoNo", 16)    -- nick
     responseBody = responseBody .. writeUInt32BE(nono.superNono or 0)           -- superNono
     responseBody = responseBody .. writeUInt32BE(nono.color or 0xFFFFFF)        -- color
