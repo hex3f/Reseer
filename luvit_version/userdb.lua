@@ -78,6 +78,11 @@ function UserDB:load()
 end
 
 function UserDB:save()
+    -- 官服模式下不保存
+    if not self.isLocalMode then
+        return
+    end
+    
     local data = json.stringify({
         users = self.users,
         gameData = self.gameData
