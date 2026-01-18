@@ -125,13 +125,12 @@ local function handleChallengeBoss(ctx)
     
     -- 发送 NOTE_READY_TO_FIGHT (2503)
     -- NoteReadyToFightInfo: userCount(4) + [FighetUserInfo + petCount(4) + PetInfo[]]...
-    -- Official Struct (from HEX analysis): 
-    -- Header: 00 00 00 03 (Count = 3, NOT 2!)
-    -- User 1: UID(4) + Nick(16) + PetCount(4) + PetInfo...
-    -- PetInfo (Battle): ... + SkillCount(4) + SkillID(4)*4 (Padding)
+    -- 结构: userCount(4) + User1 + User2
+    -- User: UID(4) + Nick(16) + PetCount(4) + PetInfo...
+    -- PetInfo: petId(4) + catchTime(4) + hp(4) + maxHp(4) + lv(4) + mode(4) + extra(4) + SkillCount(4) + Skills(4x4) + CatchMap(4)
     
     local body = ""
-    body = body .. writeUInt32BE(3)  -- userCount = 3 (Official!)
+    body = body .. writeUInt32BE(2)  -- userCount = 2 (玩家 + 敌人)
     
     -- Helper to build Battle Pet Info (with 4-slot padding)
     local function buildBattlePetInfo(pId, _catchTime, hp, maxHp, lv)
@@ -187,7 +186,7 @@ local function handleChallengeBoss(ctx)
     body = body .. buildBattlePetInfo(bossId, 0, 50, 50, 5)
     
     ctx.sendResponse(buildResponse(2503, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → CHALLENGE_BOSS %d (sent NOTE_READY_TO_FIGHT)\27[0m", bossId))
+    print(string.format("\27[32m[Handler] → CHALLENGE_BOSS %d (sent NOTE_READY_TO_FIGHT, body=%d bytes)\27[0m", bossId, #body))
     return true
 end
 
