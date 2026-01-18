@@ -383,6 +383,36 @@ ProtocolValidator.protocols = {
         maxSize = 36,  -- 跟随时返回36字节
         description = "跟随/回家: 回家=userID(4)+flag(4)+state(4); 跟随=+nick(16)+color(4)+chargeTime(4)"
     },
+    
+    -- ========== 好友系统 ==========
+    [2150] = {
+        name = "GET_RELATION_LIST",
+        minSize = 8,  -- friendCount(4) + blackCount(4)
+        maxSize = nil,
+        description = "好友/黑名单列表: friendCount(4) + blackCount(4) + [FriendInfo(8)]... + [BlackInfo(4)]..."
+    },
+    
+    [2157] = {
+        name = "SEE_ONLINE",
+        minSize = 8,
+        maxSize = 8,
+        description = "查看在线状态: userId(4) + isOnline(4)"
+    },
+    
+    -- ========== 系统扩展 ==========
+    [1004] = {
+        name = "MAP_HOT",
+        minSize = 4,  -- count(4)
+        maxSize = nil,
+        description = "地图热度: count(4) + [mapId(4) + hotValue(4)]..."
+    },
+    
+    [70001] = {
+        name = "GET_EXCHANGE_INFO",
+        minSize = 4,
+        maxSize = 4,
+        description = "荣誉值: honorValue(4)"
+    },
 }
 
 -- 验证包体大小

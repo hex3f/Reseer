@@ -72,10 +72,20 @@ local function handleSeeOnline(ctx)
     if #ctx.body >= 4 then
         targetId = readUInt32BE(ctx.body, 1)
     end
-    -- 返回在线状态: 0=离线, 1=在线
-    local body = writeUInt32BE(targetId) .. writeUInt32BE(1)  -- 假设在线
+    
+    -- 获取真实在线状态
+    local isOnline = 0
+    if ctx.onlineTracker and ctx.onlineTracker.isOnline then
+        isOnline = ctx.onlineTracker.isOnline(targetId) and 1 or 0
+    elseif ctx.userDB then
+        -- 备选方案: 检查用户是否有当前服务器记录
+        local serverId = ctx.userDB:getUserServer(targetId)
+        isOnline = (serverId and serverId > 0) and 1 or 0
+    end
+    
+    local body = writeUInt32BE(targetId) .. writeUInt32BE(isOnline)
     ctx.sendResponse(buildResponse(2157, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → SEE_ONLINE %d response\27[0m", targetId))
+    print(string.format("\27[32m[Handler] → SEE_ONLINE %d online=%d\27[0m", targetId, isOnline))
     return true
 end
 
@@ -93,8 +103,38 @@ local function handleRequestAnswer(ctx)
     return true
 end
 
+-- CMD 2150: GET_RELATION_LIST (获取好友/黑名单列表)
+-- 响应: friendCount(4) + blackCount(4) + [FriendInfo]... + [BlackInfo]...
+-- FriendInfo: userID(4) + timePoke(4)
+-- BlackInfo: userID(4)
+local function handleGetRelationList(ctx)
+    local user = ctx.getOrCreateUser(ctx.userId)
+    
+    -- 获取好友列表
+    local friends = user.friends or {}
+    local blacklist = user.blacklist or {}
+    
+    local body = writeUInt32BE(#friends) .. writeUInt32BE(#blacklist)
+    
+    -- 写入好友列表
+    for _, friend in ipairs(friends) do
+        body = body .. writeUInt32BE(friend.userID or 0)
+        body = body .. writeUInt32BE(friend.timePoke or 0)
+    end
+    
+    -- 写入黑名单列表
+    for _, black in ipairs(blacklist) do
+        body = body .. writeUInt32BE(black.userID or 0)
+    end
+    
+    ctx.sendResponse(buildResponse(2150, ctx.userId, 0, body))
+    print(string.format("\27[32m[Handler] → GET_RELATION_LIST friends=%d black=%d\27[0m", #friends, #blacklist))
+    return true
+end
+
 -- 注册所有处理器
 function FriendHandlers.register(Handlers)
+    Handlers.register(2150, handleGetRelationList)
     Handlers.register(2151, handleFriendAdd)
     Handlers.register(2152, handleFriendAnswer)
     Handlers.register(2153, handleFriendRemove)
