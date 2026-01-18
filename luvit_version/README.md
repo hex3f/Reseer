@@ -1,185 +1,153 @@
-# 赛尔号本地服务器 - RecSeer v2.0
+# 赛尔号私服 - 微服务架构
 
-## 🎯 系统架构
+## 🚀 快速启动
 
-```
-┌─────────────┐
-│   浏览器    │ http://127.0.0.1:32400/
-└──────┬──────┘
-       │
-       ├─ HTTP 请求 (资源)
-       │  └─> 本地资源服务器 (ressrv.lua)
-       │      ├─ 本地缓存存在 → 直接返回
-       │      └─ 本地缓存不存在 → 从官服下载并保存
-       │
-       └─ WebSocket 连接 (游戏通信)
-          └─> ws://127.0.0.1:7788
-              └─> WebSocket桥接服务器 (ws_tcp_bridge.js)
-                  └─> TCP连接到官服 (101.43.19.60:1863)
-```
-
-## 📦 核心组件
-
-### 1. 资源服务器 (ressrv.lua)
-- **端口**: 32400 (主) + 80 (备用)
-- **功能**: 
-  - 提供 Vue 前端应用
-  - 代理并缓存官服资源
-  - 自动保存资源到 `../gameres/root`
-  - 提供本地 `ServerR.xml` (指向本地桥接服务器)
-
-### 2. WebSocket 桥接服务器 (ws_tcp_bridge.js)
-- **端口**: 7788
-- **功能**: 
-  - 接收浏览器的 WebSocket 连接
-  - 转发到官服 TCP Socket (101.43.19.60:1863)
-  - 双向数据转发
-
-### 3. 登录服务器代理 (loginserver/trafficloggerlogin.lua)
-- **端口**: 1863
-- **功能**: 
-  - 记录登录流量
-  - 转发到官服登录服务器
-
-## 🚀 启动步骤
-
-### 方式一：使用启动脚本 (推荐)
 ```bash
 cd luvit_version
 start.bat
 ```
 
-### 方式二：手动启动
-```bash
-# 1. 启动 WebSocket 桥接服务器
-node ws_tcp_bridge.js
+然后访问：**http://127.0.0.1:32400/**
 
-# 2. 启动主服务器
-luvit reseer.lua
+## 📦 服务器架构
+
+```
+数据服务器 (5200) ← HTTP API
+    ↑
+    ├─ 游戏服务器 (5000)
+    └─ 房间服务器 (5100)
 ```
 
-## 🌐 访问地址
+### 启动的服务
 
-启动成功后，在浏览器访问：
-```
-http://127.0.0.1:32400/
-```
+1. **数据服务器** (5200) - 统一数据管理
+2. **资源服务器** (32400) - 提供网页和资源
+3. **登录IP服务器** (32401) - 提供 ip.txt
+4. **登录服务器** (1863) - 处理登录
+5. **游戏服务器** (5000) - 游戏逻辑
+6. **房间服务器** (5100) - 家园系统
 
-## 📊 交互流程
+## 🎯 核心特性
 
-1. **浏览器访问** `http://127.0.0.1:32400/`
-2. **加载 Vue 应用** + Ruffle 模拟器
-3. **Ruffle 加载** `Client1.swf` (从官服下载并缓存)
-4. **Flash 读取** `ServerR.xml` (本地配置，指向 `127.0.0.1:7788`)
-5. **JavaScript 创建** `WebSocket` → `ws://127.0.0.1:7788`
-6. **桥接服务器转发** 到官服 TCP (`101.43.19.60:1863`)
-7. **发送命令 105** 获取服务器列表
-8. **选择服务器** 后连接游戏服务器
+### 统一命令处理器
+- ✅ 处理器只写一次（`handlers/` 目录）
+- ✅ 游戏服务器和房间服务器共享
+- ✅ 自动支持同步和异步模式
+
+### 微服务架构
+- ✅ 数据集中管理
+- ✅ 服务独立部署
+- ✅ 易于扩展
 
 ## 📁 目录结构
 
 ```
 luvit_version/
-├── reseer.lua              # 主启动文件
-├── ressrv.lua              # 资源服务器
-├── ws_tcp_bridge.js        # WebSocket桥接服务器
-├── loginserver/            # 登录服务器
-├── gameserver/             # 游戏服务器
-└── logs/                   # 日志目录
-
-gameres/
-└── root/                   # 官服资源缓存目录
-    ├── Client1.swf
-    ├── static/
-    ├── assets/
-    └── ...
-
-gameres_proxy/
-└── root/                   # 本地修改的资源
-    ├── index.html          # 主页面
-    └── config/
-        └── ServerR.xml     # 本地配置 (指向127.0.0.1:7788)
+├── start.bat              # 启动脚本
+├── data_client.lua        # 数据客户端
+├── start_dataserver.lua   # 数据服务器
+├── start_gameserver.lua   # 游戏服务器
+├── start_roomserver.lua   # 房间服务器
+├── handlers/              # 统一命令处理器
+│   ├── nono_handlers.lua
+│   ├── pet_handlers.lua
+│   └── ...
+├── gameserver/            # 游戏服务器逻辑
+├── roomserver/            # 房间服务器逻辑
+└── docs/                  # 文档和分析文件
 ```
 
-## 🔧 配置说明
+## 🔧 配置
 
-### reseer.lua 配置项
+编辑启动脚本中的配置：
 
 ```lua
--- 资源模式
-use_official_resources = true    -- 从官服下载资源
-res_dir = "../gameres/root"      -- 资源保存目录
-
--- 服务器端口
-ressrv_port = 32400              -- 资源服务器端口
-login_port = 1863                -- 登录服务器端口
-
--- 流量记录
-trafficlogger = true             -- 启用流量记录
+local conf = {
+    dataserver_url = "http://127.0.0.1:5200",  -- 数据服务器地址
+    gameserver_port = 5000,
+    roomserver_port = 5100,
+}
 ```
 
-### ServerR.xml 配置
+## 📊 监控
 
-```xml
-<SubServer ip="127.0.0.1" port="7788"/>
+访问数据服务器 API：
+
+```bash
+# 健康检查
+curl http://127.0.0.1:5200/api/health
+
+# 统计信息
+curl http://127.0.0.1:5200/api/stats
+
+# 在线用户
+curl http://127.0.0.1:5200/api/session/online
 ```
-- 指向本地 WebSocket 桥接服务器
-- 桥接服务器会转发到官服 TCP
 
-## 📝 日志说明
+## 📖 文档
 
-### 控制台日志
-- 🌐 资源请求: 显示请求的 URL 和状态
-- 💾 资源保存: 显示保存的文件路径和大小
-- 🔌 WebSocket: 显示连接状态和数据转发
+详细文档在 `docs/` 目录：
+- `MICROSERVICE_ARCHITECTURE.md` - 微服务架构设计
+- 其他分析和修复文档
 
-### 文件日志
-- `logs/server.log` - 服务器运行日志
-- `sessionlog/*.bin` - 会话数据记录
+## 💡 开发指南
 
-## 🐛 调试工具
+### 添加新命令
 
-### 浏览器控制台
-打开浏览器开发者工具，可以看到：
-- 资源加载情况
-- WebSocket 连接状态
-- 网络请求详情
+1. 在 `handlers/` 创建或编辑处理器
+2. 使用 `ctx.dataClient` 访问数据（异步）
+3. 或使用 `ctx.getOrCreateUser()` （同步）
+4. 游戏服务器和房间服务器自动共享
 
-### 油猴脚本
-使用 `seer_socket_interceptor.user.js` 可以拦截和分析：
-- WebSocket 消息
-- Fetch 请求
-- XHR 请求
+### 示例
 
-## ❓ 常见问题
+```lua
+-- handlers/my_handler.lua
+local function handleMyCommand(ctx)
+    -- 异步模式（推荐）
+    if ctx.dataClient then
+        ctx.dataClient:getOrCreateUser(ctx.userId, function(success, result)
+            if success then
+                local user = result.data
+                -- 处理逻辑
+                ctx.sendResponse(...)
+            end
+        end)
+        return
+    end
+    
+    -- 同步模式（兼容）
+    local user = ctx.getOrCreateUser(ctx.userId)
+    -- 处理逻辑
+    ctx.sendResponse(...)
+end
+```
 
-### Q: 服务器列表加载不出来？
-A: 检查以下几点：
-1. WebSocket 桥接服务器是否启动 (端口 7788)
-2. `ServerR.xml` 是否指向 `127.0.0.1:7788`
-3. 浏览器控制台是否有 WebSocket 连接错误
+## 🎮 游戏功能
 
-### Q: 资源加载失败？
-A: 检查：
-1. 网络连接是否正常
-2. 官服地址是否可访问 (`61.160.213.26:12346`)
-3. 本地磁盘空间是否充足
+- ✅ 用户登录和注册
+- ✅ 地图系统
+- ✅ 精灵系统
+- ✅ 战斗系统
+- ✅ NoNo 系统（跨服务器状态同步）
+- ✅ 家园系统
+- ✅ 任务系统
+- ✅ 好友系统
 
-### Q: 如何清除缓存？
-A: 删除 `gameres/root` 目录下的文件，重新启动服务器会自动下载
+## 🐛 故障排除
 
-## 📚 技术栈
+### 服务器无法启动
+- 检查端口是否被占用
+- 确保 `luvit.exe` 存在
 
-- **后端**: Luvit (Lua) + Node.js
-- **前端**: Vue 3 + Ruffle (Flash 模拟器)
-- **协议**: HTTP + WebSocket + TCP Socket
+### 无法访问网页
+- 确认资源服务器已启动（端口 32400）
+- 检查防火墙设置
 
-## 🔗 相关链接
+### 数据不同步
+- 确认数据服务器已启动（端口 5200）
+- 检查 `dataserver_url` 配置
 
-- 官服地址: `http://61.160.213.26:12346/`
-- 官服 API: `http://45.125.46.70:8211/`
-- 官服登录服务器: `101.43.19.60:1863` (TCP)
-
-## 📄 许可证
+## 📝 许可
 
 本项目仅供学习和研究使用。

@@ -18,6 +18,34 @@ local SeerCommands = require('../seer_commands')
 -- 加载在线追踪模块
 local OnlineTracker = require('../handlers/online_tracker')
 
+-- ==================== 全局处理器注册系统 ====================
+-- 房间服务器也需要处理一些共用命令（如 NoNo 系统）
+local GlobalHandlers = {}
+local GlobalHandlerRegistry = {
+    handlers = {},
+    register = function(cmdId, handler)
+        GlobalHandlers[cmdId] = handler
+    end
+}
+
+-- 加载需要在房间服务器使用的处理器模块
+local handlerModules = {
+    '../handlers/nono_handlers',  -- NoNo 系统（房间和游戏服务器共用）
+}
+
+for _, modulePath in ipairs(handlerModules) do
+    local ok, module = pcall(require, modulePath)
+    if ok and module and module.register then
+        module.register(GlobalHandlerRegistry)
+        tprint(string.format("\27[36m[RoomServer] 已加载处理器模块: %s\27[0m", modulePath))
+    elseif not ok then
+        tprint(string.format("\27[33m[RoomServer] 加载处理器模块失败: %s - %s\27[0m", modulePath, tostring(module)))
+    end
+end
+
+tprint(string.format("\27[32m[RoomServer] 共注册 %d 个全局命令处理器\27[0m", 
+    (function() local n=0 for _ in pairs(GlobalHandlers) do n=n+1 end return n end)()))
+
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
 end
@@ -25,13 +53,14 @@ end
 -- 数据包结构:
 -- 17 字节头部: length(4) + version(1) + cmdId(4) + userId(4) + result(4)
 
-function LocalRoomServer:new(sharedUserDB, sharedGameServer, sessionManager)
+function LocalRoomServer:new(sharedUserDB, sharedGameServer, sessionManager, dataClient)
     local obj = {
         port = conf.roomserver_port or 5100,
         clients = {},
         userdb = sharedUserDB,      -- 共享用户数据库
         gameServer = sharedGameServer, -- 共享游戏服务器（用于命令处理）
         sessionManager = sessionManager,  -- 会话管理器引用
+        dataClient = dataClient,  -- 数据客户端（微服务模式）
         -- 不再使用缓存，每次都从数据库加载最新数据
     }
     setmetatable(obj, LocalRoomServer)
@@ -191,6 +220,57 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
     local handler = localHandlers[cmdId]
     if handler then
         handler(self, clientData, cmdId, userId, seqId, body)
+        return
+    end
+    
+    -- 尝试使用全局处理器（如 NoNo 系统）
+    local globalHandler = GlobalHandlers[cmdId]
+    if globalHandler then
+        -- 构建上下文对象（与游戏服务器兼容）
+        -- 获取 UserDB 实例（单例模式）
+        local dbInstance = self.userdb:new()
+        
+        local ctx = {
+            userId = userId,
+            cmdId = cmdId,
+            seqId = seqId,
+            body = body,
+            clientData = clientData,
+            sessionManager = self.sessionManager,
+            dataClient = self.dataClient,  -- 添加数据客户端
+            
+            -- 提供必要的辅助函数
+            getOrCreateUser = function(uid)
+                return dbInstance:getOrCreateGameData(uid)
+            end,
+            
+            saveUser = function(uid, user)
+                dbInstance:saveGameData(uid, user)
+            end,
+            
+            sendResponse = function(packet)
+                pcall(function()
+                    clientData.socket:write(packet)
+                end)
+            end,
+            
+            broadcastToMap = function(packet, excludeUserId)
+                -- 房间服务器的广播实现
+                for _, client in ipairs(self.clients) do
+                    if client.userId ~= excludeUserId and client.loggedIn then
+                        pcall(function()
+                            client.socket:write(packet)
+                        end)
+                    end
+                end
+            end,
+        }
+        
+        -- 调用全局处理器
+        local ok, err = pcall(globalHandler, ctx)
+        if not ok then
+            tprint(string.format("\27[31m[RoomServer] 全局处理器错误 CMD=%d: %s\27[0m", cmdId, tostring(err)))
+        end
         return
     end
     

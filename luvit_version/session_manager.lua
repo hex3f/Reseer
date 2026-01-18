@@ -39,7 +39,7 @@ function SessionManager:new()
         serverConnections = {},
     }
     setmetatable(obj, SessionManager)
-    tprint("\27[36m[SessionManager] 会话管理器已初始化\27[0m")
+    -- 移除初始化日志，让启动更清爽
     return obj
 end
 
