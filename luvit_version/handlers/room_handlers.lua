@@ -145,6 +145,8 @@ end
 --   session(24 bytes) + ip(4 bytes) + port(2 bytes) = 30 bytes total
 -- 注意：由于房间服务器已合并到游戏服务器，返回相同的地址
 -- 客户端会检测到是同一服务器（isIlk=true），不会创建新连接
+-- 
+-- 重要修改：动态返回客户端当前连接的IP/Port，确保 isIlk=true，避免服务器跳转
 local function handleGetRoomAddress(ctx)
     local targetUserId = ctx.userId
     if #ctx.body >= 4 then
@@ -154,25 +156,57 @@ local function handleGetRoomAddress(ctx)
     -- 生成 session（24字节，可以为空）
     local session = string.rep("\0", 24)
     
-    -- 游戏服务器 IP: 127.0.0.1 (0x7F000001)
-    local ip = string.char(0x7F, 0x00, 0x00, 0x01)
+    -- 动态获取服务器 IP 和 Port
+    -- 优先使用 ctx 中的连接信息，否则使用全局配置
+    local serverIP = ctx.serverIP or (conf and conf.server_ip) or "127.0.0.1"
+    local serverPort = ctx.serverPort or (conf and conf.gameserver_port) or 5000
     
-    -- 游戏服务器端口: 5000 (大端序)
-    local port = writeUInt16BE(5000)
+    -- 如果 ctx 中有 roomSocket 的 IP/Port 信息（客户端当前连接的地址），使用它
+    -- 这样可以确保返回的地址与客户端当前连接一致，isIlk=true
+    if ctx.connectedIP then
+        serverIP = ctx.connectedIP
+    end
+    if ctx.connectedPort then
+        serverPort = ctx.connectedPort
+    end
+    
+    -- 将 IP 转换为 4 字节格式 (大端序)
+    local ip
+    local ipParts = {}
+    for part in string.gmatch(serverIP, "(%d+)") do
+        table.insert(ipParts, tonumber(part))
+    end
+    if #ipParts == 4 then
+        ip = string.char(ipParts[1], ipParts[2], ipParts[3], ipParts[4])
+    else
+        -- 默认 127.0.0.1
+        ip = string.char(0x7F, 0x00, 0x00, 0x01)
+    end
+    
+    -- 端口 (大端序)
+    local port = writeUInt16BE(serverPort)
     
     -- 构建响应: session(24) + ip(4) + port(2) = 30 bytes
     local body = session .. ip .. port
     
     ctx.sendResponse(buildResponse(10002, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → GET_ROOM_ADDRES response (target=%d, ip=127.0.0.1:5000, isIlk=true)\27[0m", 
-        targetUserId))
+    print(string.format("\27[32m[Handler] → GET_ROOM_ADDRES response (target=%d, ip=%s:%d, isIlk=true)\27[0m", 
+        targetUserId, serverIP, serverPort))
     return true
 end
 
 -- CMD 10003: LEAVE_ROOM (离开房间)
+-- 响应：返回空响应，客户端会自动处理离开逻辑
 local function handleLeaveRoom(ctx)
+    local user = ctx.getOrCreateUser(ctx.userId)
+    
+    -- 更新用户位置到默认地图（如果需要）
+    if not user.lastMapId or user.lastMapId == 0 then
+        user.lastMapId = 1
+    end
+    
     ctx.sendResponse(buildResponse(10003, ctx.userId, 0, ""))
-    print("\27[32m[Handler] → LEAVE_ROOM response\27[0m")
+    print(string.format("\27[32m[Handler] → LEAVE_ROOM response\27[0m"))
     return true
 end
 

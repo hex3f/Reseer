@@ -299,6 +299,12 @@ end
 -- 处理器模块使用 ctx 对象访问服务器功能
 function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, seqId, body)
     local self_ref = self
+    
+    -- 获取服务器 IP 和 Port (用于 GET_ROOM_ADDRES 等需要返回服务器地址的命令)
+    -- 优先从配置读取，如果没有配置则使用默认值
+    local serverIP = (conf and conf.server_ip) or "127.0.0.1"
+    local serverPort = (conf and conf.gameserver_port) or self.port or 5000
+    
     local ctx = {
         userId = userId,
         cmdId = cmdId,
@@ -308,6 +314,10 @@ function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, seqId, b
         gameServer = self_ref,  -- 添加游戏服务器引用（用于访问共享状态）
         sessionManager = self_ref.sessionManager,  -- 添加会话管理器引用
         dataClient = self_ref.dataClient,  -- 添加数据客户端（微服务模式）
+        
+        -- 服务器连接信息 (用于 GET_ROOM_ADDRES 返回正确的地址，确保 isIlk=true)
+        serverIP = serverIP,
+        serverPort = serverPort,
         
         -- 发送响应
         sendResponse = function(packet)

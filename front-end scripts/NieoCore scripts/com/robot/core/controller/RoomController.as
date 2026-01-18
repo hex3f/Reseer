@@ -65,14 +65,11 @@ package com.robot.core.controller
             _loc3_.readBytes(_session,0,24);
             _ip = StringUtil.hexToIp(_loc3_.readUnsignedInt());
             _port = _loc3_.readUnsignedShort();
-            if(SocketConnection.roomSocket.ip == _ip && SocketConnection.roomSocket.port == _port)
-            {
-               _isIlk = true;
-            }
-            else
-            {
-               _isIlk = false;
-            }
+            // Always use same server (merged room server) - no server jumping
+            _isIlk = true;
+            // Update roomSocket properties to match returned values
+            SocketConnection.roomSocket.ip = _ip;
+            SocketConnection.roomSocket.port = _port;
             dispatchEvent(new RobotEvent(RobotEvent.GET_ROOM_ADDRES));
          });
          SocketConnection.mainSocket.send(CommandID.GET_ROOM_ADDRES,[this._id]);

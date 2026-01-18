@@ -217,41 +217,10 @@ package com.robot.core.controller
             this.initMapFunction(false);
             return;
          }
-         if(this._newMapID < MapManager.ID_MAX)
-         {
-            MapManager.type = ConnectionType.MAIN;
-            if(MainManager.actorInfo.mapID > MapManager.ID_MAX)
-            {
-               this._roomCol.addEventListener(RobotEvent.LEAVE_ROOM,this.onRoomLeave);
-               this._roomCol.outRoom(this._newMapID);
-            }
-            else
-            {
-               SocketConnection.send(CommandID.ENTER_MAP,this._mapType,this._newMapID,MapManager.initPos.x,MapManager.initPos.y);
-            }
-         }
-         else
-         {
-            MapManager.type = ConnectionType.ROOM;
-            if(MainManager.actorInfo.mapID > MapManager.ID_MAX)
-            {
-               if(this._roomCol.isIlk)
-               {
-                  SocketConnection.send(CommandID.ENTER_MAP,this._mapType,this._newMapID,MapManager.initPos.x,MapManager.initPos.y);
-               }
-               else
-               {
-                  this._roomCol.addEventListener(RobotEvent.LEAVE_ROOM,this.onRoomLeave);
-                  this._roomCol.close();
-               }
-            }
-            else
-            {
-               this._roomCol.addEventListener(Event.CONNECT,this.onRoomConnect);
-               this._roomCol.addEventListener(ErrorEvent.ERROR,this.onRoomError);
-               this._roomCol.connect();
-            }
-         }
+         // Always use MAIN connection type - no server jumping for home maps
+         // Home maps (mapID > ID_MAX) are now treated like normal maps
+         MapManager.type = ConnectionType.MAIN;
+         SocketConnection.send(CommandID.ENTER_MAP,this._mapType,this._newMapID,MapManager.initPos.x,MapManager.initPos.y);
       }
       
       private function initMapFunction(param1:Boolean = true) : void
@@ -431,29 +400,14 @@ package com.robot.core.controller
          }
          else if(MapManager.isInMap)
          {
-            if(this._newMapID > MapManager.ID_MAX)
+            // Unified map switching - home maps (mapID > ID_MAX) use same flow as normal maps
+            // No separate room server connection needed
+            if(this._newMapID == MapManager.FRESH_TRIALS || this._newMapID == MapManager.TOWER_MAP || this.isChangeLocal)
             {
-               if(this._roomCol == null)
-               {
-                  this._roomCol = new RoomController();
-               }
-               this._roomCol.addEventListener(RobotEvent.GET_ROOM_ADDRES,this.onRoomAddres);
-               this._roomCol.getRoomAddres(this._newMapID);
-            }
-            else if(RoomController.isClose)
-            {
-               RoomController.isClose = false;
                this.comeInMap();
+               return;
             }
-            else
-            {
-               if(this._newMapID == MapManager.FRESH_TRIALS || this._newMapID == MapManager.TOWER_MAP || this.isChangeLocal)
-               {
-                  this.comeInMap();
-                  return;
-               }
-               SocketConnection.send(CommandID.LEAVE_MAP);
-            }
+            SocketConnection.send(CommandID.LEAVE_MAP);
          }
          else
          {
