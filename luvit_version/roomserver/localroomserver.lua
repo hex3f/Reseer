@@ -31,6 +31,7 @@ local GlobalHandlerRegistry = {
 -- 加载需要在房间服务器使用的处理器模块
 local handlerModules = {
     '../handlers/nono_handlers',  -- NoNo 系统（房间和游戏服务器共用）
+    '../handlers/pet_handlers',   -- 精灵系统（房间和游戏服务器共用）
 }
 
 for _, modulePath in ipairs(handlerModules) do
