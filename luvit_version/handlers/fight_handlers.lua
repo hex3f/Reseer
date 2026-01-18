@@ -206,12 +206,90 @@ local function handleReadyToFight(ctx)
     local catchTime = user.catchId or (0x69686700 + petId)
     local bossId = user.currentBossId or NOVICE_BOSS_ID
     
+    -- 获取玩家精灵数据 (从 XML)
+    local playerPetData = SeerPets.getData(petId)
+    local playerLevel = 5  -- 新手精灵等级
+    local playerSkills = {}
+    
+    -- 从 XML 读取精灵可学习技能
+    local playerMoves = SeerPets.getLearnableMoves(petId, playerLevel)
+    if playerMoves and #playerMoves > 0 then
+        for i = 1, math.min(4, #playerMoves) do
+            if playerMoves[i] and playerMoves[i].id then
+                table.insert(playerSkills, playerMoves[i].id)
+            end
+        end
+    end
+    -- 如果没有技能，使用默认
+    if #playerSkills == 0 then
+        playerSkills = {10006, 20004}
+    end
+    
+    -- 获取敌人精灵数据 (从 XML)
+    local enemyPetData = SeerPets.getData(bossId)
+    local enemyLevel = 1  -- BOSS等级
+    local enemySkills = {}
+    
+    local enemyMoves = SeerPets.getLearnableMoves(bossId, enemyLevel)
+    if enemyMoves and #enemyMoves > 0 then
+        for i = 1, math.min(4, #enemyMoves) do
+            if enemyMoves[i] and enemyMoves[i].id then
+                table.insert(enemySkills, enemyMoves[i].id)
+            end
+        end
+    end
+    if #enemySkills == 0 then
+        enemySkills = {10001}  -- 默认撞击
+    end
+    
+    -- 创建战斗实例
+    -- 注意：SeerPets 使用 atk/def/spd，战斗系统使用 attack/defence/speed
+    local playerStats = {
+        id = petId,
+        name = playerPetData and playerPetData.defName or "精灵",
+        level = playerLevel,
+        hp = 100,
+        maxHp = 100,
+        attack = playerPetData and playerPetData.atk or 39,
+        defence = playerPetData and playerPetData.def or 35,
+        spAtk = playerPetData and playerPetData.spAtk or 78,
+        spDef = playerPetData and playerPetData.spDef or 36,
+        speed = playerPetData and playerPetData.spd or 39,
+        type = playerPetData and playerPetData.type or 8,
+        skills = playerSkills,
+        catchTime = catchTime
+    }
+    
+    local enemyStats = {
+        id = bossId,
+        name = enemyPetData and enemyPetData.defName or "野生精灵",
+        level = enemyLevel,
+        hp = 50,
+        maxHp = 50,
+        attack = enemyPetData and enemyPetData.atk or 20,
+        defence = enemyPetData and enemyPetData.def or 20,
+        spAtk = enemyPetData and enemyPetData.spAtk or 20,
+        spDef = enemyPetData and enemyPetData.spDef or 20,
+        speed = enemyPetData and enemyPetData.spd or 20,
+        type = enemyPetData and enemyPetData.type or 8,
+        skills = enemySkills,
+        catchTime = 0
+    }
+    
+    -- 创建 SeerBattle 战斗实例并保存到用户数据
+    user.battle = SeerBattle.createBattle(ctx.userId, playerStats, enemyStats)
+    user.inFight = true
+    ctx.saveUserDB()
+    
+    print(string.format("\27[36m[Handler] READY_TO_FIGHT: 创建战斗 petId=%d vs bossId=%d, 玩家技能=%s, 敌人技能=%s\27[0m", 
+        petId, bossId, table.concat(playerSkills, ","), table.concat(enemySkills, ",")))
+    
     -- 发送 NOTE_START_FIGHT (2504)
     -- FightStartInfo: isCanAuto(4) + FightPetInfo x 2
     local body = ""
     body = body .. writeUInt32BE(0)  -- isCanAuto
-    body = body .. buildFightPetInfo(ctx.userId, petId, catchTime, 100, 100, 16, 0)
-    body = body .. buildFightPetInfo(0, bossId, 0, 50, 50, 5, 1)  -- catchable=1
+    body = body .. buildFightPetInfo(ctx.userId, petId, catchTime, 100, 100, playerLevel, 0)
+    body = body .. buildFightPetInfo(0, bossId, 0, 50, 50, enemyLevel, 1)  -- catchable=1
     
     ctx.sendResponse(buildResponse(2504, ctx.userId, 0, body))
     print("\27[32m[Handler] → READY_TO_FIGHT (sent NOTE_START_FIGHT)\27[0m")
