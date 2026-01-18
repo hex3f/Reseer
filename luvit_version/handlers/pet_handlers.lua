@@ -27,9 +27,29 @@ Pets.load()
 -- 官服格式 (183 bytes): 基础信息 + 属性 + 努力值 + 技能 + 捕获信息 + 特效 + skinID
 local function buildFullPetInfo(petId, catchTime, level)
     level = level or 5
+    catchTime = catchTime or 0
     
     -- 使用精灵数据库创建实例
     local pet = Pets.createStarterPet(petId, level)
+    
+    -- 确保所有字段都有默认值
+    pet.iv = pet.iv or 31
+    pet.nature = pet.nature or 0
+    pet.exp = pet.exp or 0
+    pet.hp = pet.hp or 100
+    pet.maxHp = pet.maxHp or 100
+    pet.attack = pet.attack or 50
+    pet.defence = pet.defence or 50
+    pet.s_a = pet.s_a or 50
+    pet.s_d = pet.s_d or 50
+    pet.speed = pet.speed or 50
+    pet.catchMap = pet.catchMap or 301
+    pet.catchLevel = pet.catchLevel or level
+    
+    -- 确保 ev 表存在
+    if not pet.ev then
+        pet.ev = {hp=0, atk=0, def=0, spa=0, spd=0, spe=0}
+    end
     
     local body = ""
     -- 基础信息 (60 bytes)
@@ -39,12 +59,11 @@ local function buildFullPetInfo(petId, catchTime, level)
     body = body .. writeUInt32BE(pet.nature)     -- nature (性格) (4)
     body = body .. writeUInt32BE(level)          -- level (4)
     
-    -- 经验值信息 (16 bytes)
+    -- 经验值信息 (12 bytes) - 注意：没有 padding
     local expInfo = Pets.getExpInfo(petId, level, pet.exp)
-    body = body .. writeUInt32BE(expInfo.exp)        -- exp (4)
-    body = body .. writeUInt32BE(expInfo.lvExp)      -- lvExp (4)
-    body = body .. writeUInt32BE(expInfo.nextLvExp)  -- nextLvExp (4)
-    body = body .. writeUInt32BE(0)                  -- padding (4)
+    body = body .. writeUInt32BE(expInfo.exp or 0)        -- exp (4)
+    body = body .. writeUInt32BE(expInfo.lvExp or 0)      -- lvExp (4)
+    body = body .. writeUInt32BE(expInfo.nextLvExp or 0)  -- nextLvExp (4)
     
     -- 战斗属性 (28 bytes)
     body = body .. writeUInt32BE(pet.hp)         -- hp (4)
@@ -56,29 +75,35 @@ local function buildFullPetInfo(petId, catchTime, level)
     body = body .. writeUInt32BE(pet.speed)      -- speed (4)
     
     -- 努力值 (24 bytes)
-    body = body .. writeUInt32BE(pet.ev.hp)      -- ev_hp (4)
-    body = body .. writeUInt32BE(pet.ev.atk)     -- ev_attack (4)
-    body = body .. writeUInt32BE(pet.ev.def)     -- ev_defence (4)
-    body = body .. writeUInt32BE(pet.ev.spa)     -- ev_sa (4)
-    body = body .. writeUInt32BE(pet.ev.spd)     -- ev_sd (4)
-    body = body .. writeUInt32BE(pet.ev.spe)     -- ev_sp (4)
+    body = body .. writeUInt32BE(pet.ev.hp or 0)      -- ev_hp (4)
+    body = body .. writeUInt32BE(pet.ev.atk or 0)     -- ev_attack (4)
+    body = body .. writeUInt32BE(pet.ev.def or 0)     -- ev_defence (4)
+    body = body .. writeUInt32BE(pet.ev.spa or 0)     -- ev_sa (4)
+    body = body .. writeUInt32BE(pet.ev.spd or 0)     -- ev_sd (4)
+    body = body .. writeUInt32BE(pet.ev.spe or 0)     -- ev_sp (4)
     
-    -- 技能列表 (动态长度)
-    local validSkills = {}
+    -- 技能列表 (固定 4 个技能槽)
     local rawSkills = pet.skills or {10001, 0, 0, 0}
+    
+    -- 计算实际技能数量（非0的技能）
+    local actualSkillCount = 0
     for i = 1, 4 do
         local sid = rawSkills[i] or 0
         if sid > 0 then
-            table.insert(validSkills, sid)
+            actualSkillCount = actualSkillCount + 1
         end
     end
     
-    body = body .. writeUInt32BE(#validSkills)   -- skillNum (4)
+    body = body .. writeUInt32BE(actualSkillCount)   -- skillNum (实际技能数量) (4)
     
-    -- 写入有效技能 (每个技能 8 bytes)
-    for _, sid in ipairs(validSkills) do
-        local skill = Skills.get(sid)
-        local pp = skill and skill.pp or 20
+    -- 写入 4 个技能槽 (每个技能 8 bytes，即使是0也要写)
+    for i = 1, 4 do
+        local sid = rawSkills[i] or 0
+        local pp = 0
+        if sid > 0 then
+            local skill = Skills.get(sid)
+            pp = skill and skill.pp or 20
+        end
         body = body .. writeUInt32BE(sid)        -- skillID (4)
         body = body .. writeUInt32BE(pp)         -- pp (4)
     end

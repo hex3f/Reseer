@@ -76,10 +76,8 @@ function Handlers.loadAll()
     require('./special_handlers').register(Handlers)
     -- 交换命令
     require('./exchange_handlers').register(Handlers)
-    -- 工作命令
-    require('./work_handlers').register(Handlers)
-    -- 新功能命令
-    require('./xin_handlers').register(Handlers)
+    -- 工作命令 (work_handlers 已删除 - 前端不使用)
+    -- 新功能命令 (xin_handlers 已删除 - 前端不使用)
     -- 其他命令
     require('./misc_handlers').register(Handlers)
     

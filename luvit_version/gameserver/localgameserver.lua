@@ -75,8 +75,8 @@ local handlerModules = {
     '../handlers/special_handlers',
     '../handlers/system_handlers',
     '../handlers/teacher_handlers',
-    '../handlers/work_handlers',
-    '../handlers/xin_handlers',
+    -- work_handlers 已移除 - 前端不使用这些命令
+    -- xin_handlers 已移除 - 前端不使用 50001-52102 命令
 }
 
 for _, modulePath in ipairs(handlerModules) do

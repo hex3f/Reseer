@@ -50,8 +50,8 @@ local handlerModules = {
     '../handlers/special_handlers',
     '../handlers/system_handlers',
     '../handlers/teacher_handlers',
-    '../handlers/work_handlers',
-    '../handlers/xin_handlers',
+    -- work_handlers 已移除 - 前端不使用这些命令
+    -- xin_handlers 已移除 - 前端不使用 50001-52102 命令
 }
 
 for _, modulePath in ipairs(handlerModules) do
@@ -270,9 +270,19 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
             end,
             
             sendResponse = function(packet)
-                pcall(function()
+                local ok, err = pcall(function()
                     clientData.socket:write(packet)
                 end)
+                if ok then
+                    -- 解析包头获取 cmdId 用于日志
+                    if #packet >= 9 then
+                        local cmdId = packet:byte(6) * 16777216 + packet:byte(7) * 65536 + 
+                                     packet:byte(8) * 256 + packet:byte(9)
+                        tprint(string.format("\27[32m[RoomServer] 全局处理器发送 CMD=%d LEN=%d\27[0m", cmdId, #packet))
+                    end
+                else
+                    tprint(string.format("\27[31m[RoomServer] 全局处理器发送失败: %s\27[0m", tostring(err)))
+                end
             end,
             
             broadcastToMap = function(packet, excludeUserId)

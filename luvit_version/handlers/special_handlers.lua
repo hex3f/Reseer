@@ -255,6 +255,15 @@ local function handleUseSkillFull(ctx)
     return true
 end
 
+-- CMD 2393: LEIYI_TRAIN_GET_STATUS (雷伊训练获取状态)
+-- 从 xin_handlers 移过来，前端真实使用
+local function handleLeiyiTrainGetStatus(ctx)
+    local body = writeUInt32BE(0)  -- status
+    ctx.sendResponse(buildResponse(2393, ctx.userId, 0, body))
+    print("\27[32m[Handler] → LEIYI_TRAIN_GET_STATUS response\27[0m")
+    return true
+end
+
 -- 注册所有处理器
 function SpecialHandlers.register(Handlers)
     -- 这些处理器可以覆盖基础处理器，提供更完整的响应
@@ -266,7 +275,10 @@ function SpecialHandlers.register(Handlers)
     -- Handlers.register(2102, handleChatFull)
     -- Handlers.register(2405, handleUseSkillFull)
     
-    print("\27[36m[Handlers] 特殊命令处理器已加载 (未激活)\27[0m")
+    -- 雷伊训练状态 (从 xin_handlers 移过来)
+    Handlers.register(2393, handleLeiyiTrainGetStatus)
+    
+    print("\27[36m[Handlers] 特殊命令处理器已加载\27[0m")
 end
 
 -- 导出单独的处理函数供其他模块使用
