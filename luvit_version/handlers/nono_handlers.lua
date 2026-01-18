@@ -132,13 +132,48 @@ local function handleNonoChangeName(ctx)
 end
 
 -- CMD 9003: NONO_INFO (获取NONO信息)
--- 返回 state=1 (跟随状态) 以便 NONO 显示
+-- 根据当前跟随状态返回正确的 state 值
+-- state 是一个位掩码: bit0=是否有NONO, bit1=是否跟随
+-- state=1 (0b01): 有 NONO，不跟随（在房间休息）
+-- state=3 (0b11): 有 NONO，正在跟随
+-- 
+-- 首次登录时，NONO 默认在家休息 (state=1)
+-- 只有用户主动触发跟随后，才会变成 state=3
 local function handleNonoInfo(ctx)
     local nonoData = getNonoData(ctx)
-    -- 返回 state=1 (跟随)，这样 NONO 才会显示
-    local body = buildNonoInfoBody(ctx.userId, nonoData, 1)
+    
+    -- 检查会话级别的跟随状态
+    -- 默认为 false (在家休息)
+    local isFollowing = false
+    if ctx.sessionManager and ctx.sessionManager.getNonoFollowing then
+        isFollowing = ctx.sessionManager:getNonoFollowing(ctx.userId)
+    elseif ctx.clientData and ctx.clientData.nonoFollowing then
+        isFollowing = ctx.clientData.nonoFollowing
+    end
+    
+    -- 根据跟随状态决定 state 值
+    -- state=3: 跟随中 (bit0=1, bit1=1)
+    -- state=1: 在房间 (bit0=1, bit1=0) - 默认状态
+    local stateValue = isFollowing and 3 or 1
+    
+    local body = buildNonoInfoBody(ctx.userId, nonoData, stateValue)
     ctx.sendResponse(buildResponse(9003, ctx.userId, 0, body))
-    tprint("\27[32m[Handler] → NONO_INFO response (state=1)\27[0m")
+    
+    -- 如果 NONO 正在跟随，发送 NONO_FOLLOW_OR_HOOM 响应来触发跟随显示
+    if isFollowing then
+        local followBody = ""
+        followBody = followBody .. writeUInt32BE(ctx.userId)                    -- userID (4)
+        followBody = followBody .. writeUInt32BE(0)                             -- flag=0 (4)
+        followBody = followBody .. writeUInt32BE(1)                             -- state=1 跟随中 (4)
+        followBody = followBody .. writeFixedString(nonoData.nick or "NONO", 16) -- nick (16)
+        followBody = followBody .. writeUInt32BE(nonoData.color or 0xFFFFFF)    -- color (4)
+        followBody = followBody .. writeUInt32BE(nonoData.chargeTime or 500)    -- chargeTime (4)
+        ctx.sendResponse(buildResponse(9019, ctx.userId, 0, followBody))
+        tprint(string.format("\27[32m[Handler] → NONO_INFO + auto NONO_FOLLOW (state=%d)\27[0m", stateValue))
+    else
+        tprint(string.format("\27[32m[Handler] → NONO_INFO response (state=%d, at home)\27[0m", stateValue))
+    end
+    
     return true
 end
 
