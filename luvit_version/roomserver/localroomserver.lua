@@ -29,9 +29,29 @@ local GlobalHandlerRegistry = {
 }
 
 -- 加载需要在房间服务器使用的处理器模块
+-- 与游戏服务器共享所有处理器，实现真正的微服务架构
 local handlerModules = {
-    '../handlers/nono_handlers',  -- NoNo 系统（房间和游戏服务器共用）
-    '../handlers/pet_handlers',   -- 精灵系统（房间和游戏服务器共用）
+    '../handlers/nono_handlers',
+    '../handlers/pet_handlers',
+    '../handlers/pet_advanced_handlers',
+    '../handlers/task_handlers',
+    '../handlers/fight_handlers',
+    '../handlers/item_handlers',
+    '../handlers/friend_handlers',
+    '../handlers/mail_handlers',
+    '../handlers/map_handlers',
+    '../handlers/room_handlers',
+    '../handlers/team_handlers',
+    '../handlers/teampk_handlers',
+    '../handlers/arena_handlers',
+    '../handlers/exchange_handlers',
+    '../handlers/game_handlers',
+    '../handlers/misc_handlers',
+    '../handlers/special_handlers',
+    '../handlers/system_handlers',
+    '../handlers/teacher_handlers',
+    '../handlers/work_handlers',
+    '../handlers/xin_handlers',
 }
 
 for _, modulePath in ipairs(handlerModules) do
