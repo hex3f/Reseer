@@ -346,6 +346,43 @@ ProtocolValidator.protocols = {
             return 4 + itemCount * 16
         end
     },
+    
+    -- ========== 精灵高级功能 ==========
+    [2316] = {
+        name = "PET_HATCH_GET",
+        minSize = 16,
+        maxSize = 16,
+        description = "孵化精灵信息: status(4) + petId(4) + hatchTime(4) + remainTime(4)"
+    },
+    
+    [2318] = {
+        name = "PET_SET_EXP",
+        minSize = 4,
+        maxSize = 4,
+        description = "经验池分配响应: newPoolExp(4) - 返回经验池剩余经验"
+    },
+    
+    [2319] = {
+        name = "PET_GET_EXP",
+        minSize = 4,
+        maxSize = 4,
+        description = "获取经验池: expPool(4) - 返回经验池总经验"
+    },
+    
+    -- ========== NONO系统扩展 ==========
+    [9014] = {
+        name = "NONO_CLOSE_OPEN",
+        minSize = 0,
+        maxSize = 0,
+        description = "NONO开关: 空包体"
+    },
+    
+    [9019] = {
+        name = "NONO_FOLLOW_OR_HOOM",
+        minSize = 12,  -- 回家时返回12字节
+        maxSize = 36,  -- 跟随时返回36字节
+        description = "跟随/回家: 回家=userID(4)+flag(4)+state(4); 跟随=+nick(16)+color(4)+chargeTime(4)"
+    },
 }
 
 -- 验证包体大小
