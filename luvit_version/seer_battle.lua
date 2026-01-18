@@ -602,12 +602,19 @@ function SeerBattle.executeTurn(battle, playerSkillId)
     for i, sid in ipairs(battle.player.skills) do
         if sid == playerSkillId then
             battle.player.skillPP[i] = math.max(0, (battle.player.skillPP[i] or 0) - 1)
-            -- if battle.player.skillPP[i] <= 0 then ... end (Assume client checks 0 PP)
             break
         end
     end
     
-    local enemySkillId = SeerBattle.aiSelectSkill(battle.enemy, battle.player, battle.enemy.skills)
+    -- 使用 BattleAI 模块选择敌人技能
+    local enemySkillId
+    if battle.aiType then
+        local BattleAI = require('./seer_battle_ai')
+        enemySkillId = BattleAI.selectSkill(battle.aiType, battle.enemy, battle.player, {turn = battle.turn})
+    else
+        -- 默认AI
+        enemySkillId = SeerBattle.aiSelectSkill(battle.enemy, battle.player, battle.enemy.skills)
+    end
     local enemySkill = SeerSkills.get(enemySkillId) or {power = 40, type = 8, category = 1}
     
     -- 扣除敌人PP
