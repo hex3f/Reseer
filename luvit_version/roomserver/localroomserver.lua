@@ -200,6 +200,9 @@ function LocalRoomServer:handleCommand(clientData, cmdId, userId, seqId, body)
             if cmdId == 2604 then  -- CHANGE_CLOTH
                 self.users[userId] = nil
                 tprint(string.format("\27[35m[RoomServer] 清除用户 %d 的缓存（衣服已更新）\27[0m", userId))
+            elseif cmdId == 9019 then  -- NONO_FOLLOW_OR_HOOM
+                self.users[userId] = nil
+                tprint(string.format("\27[35m[RoomServer] 清除用户 %d 的缓存（NONO状态已更新）\27[0m", userId))
             end
             return
         end
@@ -448,6 +451,11 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     local userData = self:getOrCreateUser(userId)
     local nickname = userData.nick or userData.nickname or ("赛尔" .. userId)
     local teamInfo = userData.teamInfo or {}
+    local nonoData = userData.nono or {}  -- 获取 NONO 数据
+    
+    -- 进入房间时重置 nonoState 为 0 (NONO 跟随是会话级行为，需要用户手动激活)
+    -- 这避免了从保存数据中加载旧的 nonoState=1 导致重复 NONO
+    userData.nonoState = 0
     
     -- 先发送 ENTER_MAP 响应
     -- 官服行为：如果用户装备了衣服，则发送衣服数据；否则 clothCount=0
@@ -475,9 +483,9 @@ function LocalRoomServer:handleRoomLogin(clientData, cmdId, userId, seqId, body)
     enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- fightFlag (4)
     enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- teacherID (4)
     enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- studentID (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoState or 1)   -- nonoState (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoColor or 0)   -- nonoColor (4)
-    enterMapBody = enterMapBody .. writeUInt32BE(userData.superNono or 0)   -- superNono (4)
+    enterMapBody = enterMapBody .. writeUInt32BE(userData.nonoState or 0)   -- nonoState (4) 默认0=不跟随
+    enterMapBody = enterMapBody .. writeUInt32BE(nonoData.color or 0xFFFFFF)   -- nonoColor (从nonoData读取)
+    enterMapBody = enterMapBody .. writeUInt32BE(nonoData.superNono or 0)   -- superNono (从nonoData读取，与NONO_INFO一致)
     enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- playerForm (4)
     enterMapBody = enterMapBody .. writeUInt32BE(0)                         -- transTime (4)
     -- TeamInfo (24 bytes)
@@ -689,6 +697,7 @@ function LocalRoomServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     local clothes = userData.clothes or {}
     local clothCount = type(clothes) == "table" and #clothes or 0
     local teamInfo = userData.teamInfo or {}
+    local nonoData = userData.nono or {}  -- 获取 NONO 数据
     
     -- 房间服务器 ENTER_MAP 格式: 144 + clothCount * 8 bytes (与官服一致)
     local responseBody = ""
@@ -712,9 +721,9 @@ function LocalRoomServer:handleEnterMap(clientData, cmdId, userId, seqId, body)
     responseBody = responseBody .. writeUInt32BE(0)                         -- fightFlag (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- teacherID (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- studentID (4)
-    responseBody = responseBody .. writeUInt32BE(userData.nonoState or 1)   -- nonoState (4)
-    responseBody = responseBody .. writeUInt32BE(userData.nonoColor or 0)   -- nonoColor (4)
-    responseBody = responseBody .. writeUInt32BE(userData.superNono or 0)   -- superNono (4)
+    responseBody = responseBody .. writeUInt32BE(userData.nonoState or 0)   -- nonoState (4) 默认0=不跟随
+    responseBody = responseBody .. writeUInt32BE(nonoData.color or 0xFFFFFF)   -- nonoColor (从nonoData)
+    responseBody = responseBody .. writeUInt32BE(nonoData.superNono or 0)   -- superNono (从nonoData)
     responseBody = responseBody .. writeUInt32BE(0)                         -- playerForm (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- transTime (4)
     -- TeamInfo (24 bytes)
@@ -754,6 +763,7 @@ function LocalRoomServer:handleListMapPlayer(clientData, cmdId, userId, seqId, b
     local clothes = userData.clothes or {}
     local clothCount = type(clothes) == "table" and #clothes or 0
     local teamInfo = userData.teamInfo or {}
+    local nonoData = userData.nono or {}  -- 获取 NONO 数据
     
     local responseBody = writeUInt32BE(1)  -- 1个玩家 (4 bytes)
     
@@ -778,9 +788,9 @@ function LocalRoomServer:handleListMapPlayer(clientData, cmdId, userId, seqId, b
     responseBody = responseBody .. writeUInt32BE(0)                         -- fightFlag (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- teacherID (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- studentID (4)
-    responseBody = responseBody .. writeUInt32BE(userData.nonoState or 1)   -- nonoState (4)
-    responseBody = responseBody .. writeUInt32BE(userData.nonoColor or 0)   -- nonoColor (4)
-    responseBody = responseBody .. writeUInt32BE(userData.superNono or 0)   -- superNono (4)
+    responseBody = responseBody .. writeUInt32BE(userData.nonoState or 0)   -- nonoState (4) 默认0=不跟随
+    responseBody = responseBody .. writeUInt32BE(nonoData.color or 0xFFFFFF)   -- nonoColor (从nonoData)
+    responseBody = responseBody .. writeUInt32BE(nonoData.superNono or 0)   -- superNono (从nonoData)
     responseBody = responseBody .. writeUInt32BE(0)                         -- playerForm (4)
     responseBody = responseBody .. writeUInt32BE(0)                         -- transTime (4)
     -- TeamInfo (24 bytes)

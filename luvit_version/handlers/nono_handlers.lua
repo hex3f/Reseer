@@ -76,26 +76,26 @@ end
 -- NonoInfo: userID(4) + flag(4) + state(4) + nick(16) + superNono(4) + color(4) + 
 --           power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + 
 --           func(20 bytes) + superEnergy(4) + superLevel(4) + superStage(4)
--- 总长度: 4+4+4+16+4+4+4+4+4+2+4+4+20+4+4+4 = 86 bytes
+-- 总长度: 4+4+4+16+4+4+4+4+4+2+4+4+20+4+4+4 = 90 bytes
 local function buildNonoInfoBody(userId, nonoData)
     local body = ""
     body = body .. writeUInt32BE(userId)                    -- userID
     body = body .. writeUInt32BE(nonoData.flag or 1)        -- flag (32 bits)
     body = body .. writeUInt32BE(nonoData.state or 1)       -- state (32 bits)
-    body = body .. writeFixedString(nonoData.nick or "NoNo", 16)  -- nick
+    body = body .. writeFixedString(nonoData.nick or "NONO", 16)  -- nick (官服用大写)
     body = body .. writeUInt32BE(nonoData.superNono or 1)   -- superNono
-    body = body .. writeUInt32BE(nonoData.color or 0x00FBF4E1)  -- color
-    body = body .. writeUInt32BE(nonoData.power or 80000)   -- power (*1000)
-    body = body .. writeUInt32BE(nonoData.mate or 80000)    -- mate (*1000)
-    body = body .. writeUInt32BE(nonoData.iq or 100)        -- iq
-    body = body .. writeUInt16BE(nonoData.ai or 100)        -- ai
+    body = body .. writeUInt32BE(nonoData.color or 0x00FFFFFF)  -- color (官服默认白色)
+    body = body .. writeUInt32BE(nonoData.power or 10000)   -- power (官服默认10000)
+    body = body .. writeUInt32BE(nonoData.mate or 10000)    -- mate (官服默认10000)
+    body = body .. writeUInt32BE(nonoData.iq or 0)          -- iq (官服默认0)
+    body = body .. writeUInt16BE(nonoData.ai or 0)          -- ai (官服默认0)
     body = body .. writeUInt32BE(nonoData.birth or os.time())  -- birth
-    body = body .. writeUInt32BE(nonoData.chargeTime or 0)  -- chargeTime
+    body = body .. writeUInt32BE(nonoData.chargeTime or 500)   -- chargeTime (官服默认500)
     -- func: 20 bytes (160 bits of function flags) - 所有功能开启
     body = body .. string.rep("\xFF", 20)
-    body = body .. writeUInt32BE(nonoData.superEnergy or 10000)  -- superEnergy
-    body = body .. writeUInt32BE(nonoData.superLevel or 10)      -- superLevel
-    body = body .. writeUInt32BE(nonoData.superStage or 3)       -- superStage
+    body = body .. writeUInt32BE(nonoData.superEnergy or 0)     -- superEnergy (官服默认0)
+    body = body .. writeUInt32BE(nonoData.superLevel or 0)      -- superLevel (官服默认0)
+    body = body .. writeUInt32BE(nonoData.superStage or 0)      -- superStage (官服默认0)
     return body
 end
 
