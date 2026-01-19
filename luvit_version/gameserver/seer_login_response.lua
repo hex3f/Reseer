@@ -5,6 +5,7 @@ local buffer = require "buffer"
 require "../easybytewrite"
 local Config = require("../game_config")
 local RecUtils = require("../handlers/utils")
+local SeerPets = require("../seer_pets")
 
 local SeerLoginResponse = {}
 

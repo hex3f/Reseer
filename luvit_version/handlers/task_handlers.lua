@@ -5,6 +5,7 @@ local Utils = require('./utils')
 local writeUInt32BE = Utils.writeUInt32BE
 local readUInt32BE = Utils.readUInt32BE
 local buildResponse = Utils.buildResponse
+local SeerPets = require('../seer_pets')
 
 local TaskHandlers = {}
 
@@ -63,7 +64,56 @@ local function buildTaskCompleteResponse(taskId, param, user)
         captureTm = 0x69686700 + petId
         user.currentPetId = petId
         user.catchId = captureTm
-        print(string.format("\27[36m[Handler] COMPLETE_TASK %d: Choice=%d -> petId=%d\27[0m", taskId, param, petId))
+        
+        -- ★ 关键修复：创建完整精灵对象并添加到 user.pets 数组
+        -- 这样登录响应才能正确序列化发送给客户端
+        local starterLevel = 5
+        local petData = SeerPets.get(petId)
+        local stats = SeerPets.getStats(petId, starterLevel, 31, {hp=0, atk=0, def=0, spAtk=0, spDef=0, spd=0})
+        local skills = SeerPets.getSkillsForLevel(petId, starterLevel)
+        
+        local newPet = {
+            id = petId,
+            name = petData and petData.defName or "",
+            dv = 31,  -- 个体值
+            nature = math.random(0, 24),  -- 随机性格
+            level = starterLevel,
+            exp = 0,
+            catchTime = captureTm,
+            catchMap = 102,  -- 新手教程地图
+            catchLevel = starterLevel,
+            skinID = 0,
+            -- 属性
+            hp = stats.hp,
+            maxHp = stats.hp,
+            attack = stats.attack,
+            defence = stats.defence,
+            s_a = stats.spAtk,
+            s_d = stats.spDef,
+            speed = stats.speed,
+            -- 努力值
+            ev_hp = 0,
+            ev_attack = 0,
+            ev_defence = 0,
+            ev_sa = 0,
+            ev_sd = 0,
+            ev_sp = 0,
+            -- 技能 (转换为技能对象格式)
+            skills = {}
+        }
+        
+        -- 转换技能格式
+        for i, skillId in ipairs(skills) do
+            if skillId and skillId > 0 then
+                table.insert(newPet.skills, {id = skillId, pp = 20})
+            end
+        end
+        
+        -- 添加到 user.pets 数组
+        user.pets = user.pets or {}
+        table.insert(user.pets, newPet)
+        
+        print(string.format("\27[36m[Handler] COMPLETE_TASK %d: Choice=%d -> petId=%d, 已添加到背包\27[0m", taskId, param, petId))
     elseif rewards.petId and rewards.petId > 0 then
         petId = rewards.petId
     end
