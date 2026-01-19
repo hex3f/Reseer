@@ -194,33 +194,42 @@ local function handleChallengeBoss(ctx)
         pb = pb .. writeUInt32BE(hp)        -- hp
         pb = pb .. writeUInt32BE(maxHp)     -- maxHp
         
-        -- Get Skills for Pet using SeerPets.getLearnableMoves
+        -- Get Skills for Pet using SeerPets.getSkillsForLevel
         local skills = {}
-        local success, moves = pcall(function()
-            return SeerPets.getLearnableMoves(pId, lv)
+        local success, skillIds = pcall(function()
+            return SeerPets.getSkillsForLevel(pId, lv)
         end)
         
-        if success and moves and #moves > 0 then
-            -- 获取最后学会的4个技能
-            local startIdx = math.max(1, #moves - 3)
-            for i = startIdx, #moves do
-                if moves[i] and moves[i].id then
-                    table.insert(skills, {id = moves[i].id, pp = moves[i].maxPP or 20})
+        if success and skillIds and #skillIds > 0 then
+            for _, skillId in ipairs(skillIds) do
+                if skillId > 0 then
+                    local skillData = SeerSkills.get(skillId)
+                    -- Default PP to 20 if logic fails, but try to get MaxPP
+                    local pp = skillData and skillData.maxPP or 20
+                    table.insert(skills, {id = skillId, pp = pp})
+                else
+                    table.insert(skills, {id = 0, pp = 0})
                 end
             end
         end
         
-        -- 如果没有技能，使用默认技能
+        -- 如果没有技能，使用默认技能 (Fallback, shouldn't happen with correct logic)
         if #skills == 0 then
-            skills = {{id = 10006, pp = 35}, {id = 20004, pp = 40}}
+             -- Default fallback just in case
+            skills = {{id = 10006, pp = 35}, {id = 20004, pp = 40}, {id=0, pp=0}, {id=0, pp=0}}
         end
         
-        pb = pb .. writeUInt32BE(#skills > 4 and 4 or #skills) -- skillNum
+        pb = pb .. writeUInt32BE(4) -- skillNum Fixed to 4 usually? Or #skills? Official uses 4 slots.
+        -- Ensure 4 slots
+        for i = #skills + 1, 4 do
+            table.insert(skills, {id = 0, pp = 0})
+        end
+
         -- 每个技能需要 id(4) + pp(4) = 8 字节
         for i=1, 4 do
             if skills[i] then
                 pb = pb .. writeUInt32BE(skills[i].id)
-                pb = pb .. writeUInt32BE(skills[i].pp or 20)
+                pb = pb .. writeUInt32BE(skills[i].pp or 0)
             else
                 pb = pb .. writeUInt32BE(0) .. writeUInt32BE(0)
             end
