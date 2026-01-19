@@ -148,7 +148,7 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 4
     
     -- vipStage (4 bytes) - line 782-789 (从 nono 读取)
-    basic:wuint(pos, nono.vipStage or 1)
+    basic:wuint(pos, nono.vipStage or 0)
     pos = pos + 4
     
     -- autoCharge (4 bytes) - line 790 (从 nono 读取)
@@ -156,7 +156,12 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 4
     
     -- vipEndTime (4 bytes) - line 791 (从 nono 读取)
-    basic:wuint(pos, nono.vipEndTime or 0)
+    -- 如果是超能NONO且时间无效，则设为永不过期；否则保持原值
+    local endTime = nono.vipEndTime or 0
+    if (superNono > 0) and (endTime == 0) then
+        endTime = 0x7FFFFFFF
+    end
+    basic:wuint(pos, endTime)
     pos = pos + 4
     
     -- freshManBonus (4 bytes) - line 792 (从 nono 读取)
@@ -295,7 +300,8 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 4
     
     -- nonoState (4 bytes) - lines 829-834
-    nonoBuf:wuint(pos, nono.flag or 0)
+    -- 官服通常发送 0xFFFFFFFF (全1)，表示所有状态/位都已设置
+    nonoBuf:wuint(pos, nono.flag or 0xFFFFFFFF)
     pos = pos + 4
     
     -- nonoColor (4 bytes) - line 835

@@ -143,6 +143,23 @@ local function handleLoginIn(ctx)
     ctx.sendResponse(buildResponse(1001, ctx.userId, 0, responseBody))
     print(string.format("\27[32m[Handler] → LOGIN_IN response (user=%d)\27[0m", ctx.userId))
     
+    -- 如果用户已经是超能NONO，发送 VIP_CO (8006) 强制更新客户端状态
+    -- 这是必须的，因为客户端依赖 VIP_CO 来刷新 MainManager.actorInfo.superNono
+    local nono = user.nono or {}
+    if nono.superNono and nono.superNono > 0 then
+        local vipBody = ""
+        vipBody = vipBody .. writeUInt32BE(ctx.userId)                -- userId
+        vipBody = vipBody .. writeUInt32BE(2)                         -- vipFlag=2 (超能NONO)
+        vipBody = vipBody .. writeUInt32BE(nono.autoCharge or 0)      -- autoCharge
+        local endTime = nono.vipEndTime
+        if not endTime or endTime == 0 then
+            endTime = 0x7FFFFFFF
+        end
+        vipBody = vipBody .. writeUInt32BE(endTime)      -- vipEndTime
+        ctx.sendResponse(buildResponse(8006, ctx.userId, 0, vipBody))
+        print(string.format("\27[35m[Handler] → VIP_CO 发送超能NONO状态 (endTime=%d)\27[0m", endTime))
+    end
+    
     -- 标记已登录并启动心跳（如果支持）
     if ctx.clientData then
         ctx.clientData.loggedIn = true

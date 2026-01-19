@@ -95,9 +95,15 @@ local function handleEnterMap(ctx)
     body = body .. writeUInt32BE(0)                             -- fightFlag (4)
     body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
     body = body .. writeUInt32BE(user.studentID or 0)           -- studentID (4)
-    body = body .. writeUInt32BE(user.nonoState or 0)           -- nonoState (4)
-    body = body .. writeUInt32BE(user.nonoColor or 0)           -- nonoColor (4)
-    body = body .. writeUInt32BE(user.superNono or 0)           -- superNono (4)
+    -- nonoState, nonoColor, superNono (从 user.nono 读取)
+    local nono = user.nono or {}
+    local nonoState = nono.flag or user.nonoState or 0
+    local nonoColor = nono.color or user.nonoColor or 0
+    local superNono = nono.superNono or user.superNono or 0
+
+    body = body .. writeUInt32BE(nonoState)                     -- nonoState (4)
+    body = body .. writeUInt32BE(nonoColor)                     -- nonoColor (4)
+    body = body .. writeUInt32BE(superNono)                     -- superNono (4)
     body = body .. writeUInt32BE(0)                             -- playerForm (4)
     body = body .. writeUInt32BE(0)                             -- transTime (4)
     -- TeamInfo (完整版本：24 bytes)
@@ -210,9 +216,15 @@ local function buildUserInfo(userId, user)
     body = body .. writeUInt32BE(0)                             -- fightFlag (4)
     body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
     body = body .. writeUInt32BE(user.studentID or 0)           -- studentID (4)
-    body = body .. writeUInt32BE(user.nonoState or 0)           -- nonoState (4)
-    body = body .. writeUInt32BE(user.nonoColor or 0)           -- nonoColor (4)
-    body = body .. writeUInt32BE(user.superNono or 0)           -- superNono (4)
+    -- nonoState, nonoColor, superNono (从 user.nono 读取)
+    local nono = user.nono or {}
+    local nonoState = nono.flag or user.nonoState or 0
+    local nonoColor = nono.color or user.nonoColor or 0
+    local superNono = nono.superNono or user.superNono or 0
+    
+    body = body .. writeUInt32BE(nonoState)                     -- nonoState (4)
+    body = body .. writeUInt32BE(nonoColor)                     -- nonoColor (4)
+    body = body .. writeUInt32BE(superNono)                     -- superNono (4)
     body = body .. writeUInt32BE(0)                             -- playerForm (4)
     body = body .. writeUInt32BE(0)                             -- transTime (4)
     -- TeamInfo (完整版本)
