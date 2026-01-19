@@ -61,6 +61,17 @@ local function handleRoomLogin(ctx)
     -- 这样客户端就能正确进入房间
     local nickname = user.nick or user.nickname or user.username or ("赛尔" .. ctx.userId)
     local petId = user.currentPetId or 0
+    local catchTime = user.catchId or 0
+    -- 获取当前宠物的 DV 值
+    local petDV = 31  -- 默认满值
+    if user.pets and user.currentPetId then
+        for _, pet in ipairs(user.pets) do
+            if pet.id == user.currentPetId or pet.catchTime == user.catchId then
+                petDV = pet.dv or pet.DV or 31
+                break
+            end
+        end
+    end
     local clothes = user.clothes or {}
     local clothCount = #clothes
     
@@ -102,7 +113,7 @@ local function handleRoomLogin(ctx)
     body = body .. writeUInt32BE(0)                             -- changeShape (4)
     body = body .. writeUInt32BE(catchTime)                     -- spiritTime (4)
     body = body .. writeUInt32BE(petId)                         -- spiritID (4)
-    body = body .. writeUInt32BE(31)                            -- petDV (4)
+    body = body .. writeUInt32BE(petDV)                            -- petDV (4)
     body = body .. writeUInt32BE(0)                             -- petSkin (4)
     body = body .. writeUInt32BE(0)                             -- fightFlag (4)
     body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
