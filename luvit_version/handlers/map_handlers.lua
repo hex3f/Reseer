@@ -632,6 +632,36 @@ local function handleAimat(ctx)
     return true
 end
 
+-- CMD 2063: CHANGE_COLOR (改变角色颜色)
+-- 请求: newColor(4)
+-- 响应: userID(4) + newColor(4) + coinCost(4) + remainCoins(4)
+local function handleChangeColor(ctx)
+    local newColor = 0xFFFFFF  -- 默认白色
+    if #ctx.body >= 4 then
+        newColor = readUInt32BE(ctx.body, 1)
+    end
+    
+    local user = ctx.getOrCreateUser(ctx.userId)
+    
+    -- 改变颜色可能需要消耗金币 (官服为0，即免费)
+    local coinCost = 0
+    local remainCoins = user.coins or 0
+    
+    -- 更新用户颜色
+    user.color = newColor
+    ctx.saveUserDB()
+    
+    -- 构建响应: userID(4) + newColor(4) + coinCost(4) + remainCoins(4)
+    local body = writeUInt32BE(ctx.userId) ..
+        writeUInt32BE(newColor) ..
+        writeUInt32BE(coinCost) ..
+        writeUInt32BE(remainCoins)
+    
+    ctx.sendResponse(buildResponse(2063, ctx.userId, 0, body))
+    print(string.format("\27[32m[Handler] → CHANGE_COLOR 0x%06X response (coins=%d)\27[0m", newColor, remainCoins))
+    return true
+end
+
 -- CMD 2111: PEOPLE_TRANSFROM (变身)
 -- TransformInfo: userID(4) + changeShape(4)
 local function handlePeopleTransform(ctx)
@@ -654,6 +684,7 @@ function MapHandlers.register(Handlers)
     Handlers.register(2051, handleGetSimUserInfo)
     Handlers.register(2052, handleGetMoreUserInfo)
     Handlers.register(2061, handleChangeNickName)
+    Handlers.register(2063, handleChangeColor)
     Handlers.register(2101, handlePeopleWalk)
     Handlers.register(2102, handleChat)
     Handlers.register(2103, handleDanceAction)

@@ -616,12 +616,15 @@ function LocalGameServer:getOrCreateUser(userId)
                 self.users[userId][k] = v
             end
             
-            -- 再合并登录用户数据 (优先级更高，包含注册时选择的 color)
+            -- 合并登录用户数据 (仅作为回退值，不覆盖已保存的游戏数据)
+            -- 这样玩家修改的颜色/昵称等数据才能正确持久化
             if loginUser then
-                if loginUser.color then
+                -- color: 只有当游戏数据中没有时，才使用注册时的颜色
+                if self.users[userId].color == nil and loginUser.color then
                     self.users[userId].color = loginUser.color
                 end
-                if loginUser.username then
+                -- nick/nickname: 只有当游戏数据中没有时，才使用用户名
+                if self.users[userId].nick == nil and loginUser.username then
                     self.users[userId].nick = loginUser.username
                     self.users[userId].nickname = loginUser.username
                 end
