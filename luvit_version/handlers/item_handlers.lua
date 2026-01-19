@@ -18,6 +18,80 @@ local ITEM_TYPE = {
     NONO_ITEM_END = 299999,    -- NONO道具结束
 }
 
+local GameConfig = require('../game_config')
+local fs = require('fs')
+
+-- 缓存物品价格表
+local ItemPrices = {}
+
+-- 加载物品配置 (简单的 XML 解析)
+local function loadItemPrices()
+    local path = 'data/items.xml'
+    -- 尝试从不同路径寻找 data/items.xml
+    if not fs.existsSync(path) then
+        path = '../data/items.xml'
+    end
+    if not fs.existsSync(path) then
+        path = 'luvit_version/data/items.xml'
+    end
+    
+    if fs.existsSync(path) then
+        print("Loading item prices from " .. path .. " ...")
+        local content = fs.readFileSync(path)
+        -- 匹配 <Item ID="x" ... Price="y" ...>
+        -- 注意: XML 属性顺序可能不同，所以用捕获组匹配整个标签内容，再提取 ID 和 Price
+        for itemStr in string.gmatch(content, '<Item%s+[^>]+>') do
+            local id = string.match(itemStr, 'ID="(%d+)"')
+            local price = string.match(itemStr, 'Price="(%d+)"')
+            
+            if id then
+                local itemId = tonumber(id)
+                local itemPrice = tonumber(price) or 0
+                ItemPrices[itemId] = itemPrice
+            end
+        end
+        print("Loaded prices for " .. table.count(ItemPrices) .. " items.")
+    else
+        print("\27[31m[Error] Item price file not found: " .. path .. "\27[0m")
+    end
+end
+
+-- 辅助函数：获取表大小
+function table.count(t)
+    local c = 0
+    for _ in pairs(t) do c = c + 1 end
+    return c
+end
+
+-- 初始化时加载价格
+loadItemPrices()
+
+-- 辅助函数：获取物品价格
+local function getItemPrice(itemId)
+    return ItemPrices[itemId] or 0
+end
+
+-- 辅助函数：检查物品是否唯一
+local function isUniqueItem(itemId)
+    local config = GameConfig.Items or {}
+    local ranges = config.UniqueRanges or {}
+    local ids = config.UniqueIDs or {}
+    
+    -- 检查ID列表
+    for _, id in ipairs(ids) do
+        if itemId == id then return true end
+    end
+    
+    -- 检查范围
+    for _, range in ipairs(ranges) do
+        if itemId >= range.min and itemId <= range.max then
+            return true
+        end
+    end
+    
+    return false
+end
+
 -- CMD 2601: ITEM_BUY (购买物品)
 -- 前端 BuyItemInfo 解析顺序: cash(4) + itemID(4) + itemNum(4) + itemLevel(4)
 local function handleItemBuy(ctx)
@@ -30,16 +104,40 @@ local function handleItemBuy(ctx)
         count = readUInt32BE(ctx.body, 5)
     end
     
-    -- 获取用户数据并添加物品
+    -- 获取用户数据
     local user = ctx.getOrCreateUser(ctx.userId)
     user.items = user.items or {}
     user.coins = user.coins or 100000
     
-    -- TODO: 扣除金币 (需要物品价格表)
-    -- local price = getItemPrice(itemId) * count
-    -- user.coins = user.coins - price
-    
     local itemKey = tostring(itemId)
+    
+    -- 检查唯一性
+    if isUniqueItem(itemId) and user.items[itemKey] then
+        print(string.format("\27[33m[Handler] ITEM_BUY: 物品 %d 是唯一物品且用户已拥有，返回错误码 103203\27[0m", itemId))
+        -- 返回错误码 103203 (你不能拥有过多此物品！)
+        -- 对应 ParseSocketError.as case 103203
+        ctx.sendResponse(buildResponse(2601, ctx.userId, 103203, ""))
+        return true
+    end
+    
+    -- 价格检查与扣款
+    local unitPrice = getItemPrice(itemId)
+    local totalCost = unitPrice * count
+    
+    if user.coins < totalCost then
+        print(string.format("\27[31m[Handler] ITEM_BUY: 金币不足! 需要 %d, 拥有 %d\27[0m", totalCost, user.coins))
+        -- 应该返回错误码？暂时不做任何操作或返回失败
+        -- 这里的 0 可能是错误码位置？暂时还是返回成功包但金币不变，客户端可能会显示购买失败
+        -- 或者发送专门的错误包
+        return true
+    end
+    
+    -- 扣钱
+    if totalCost > 0 then
+        user.coins = user.coins - totalCost
+        print(string.format("\27[32m[Handler] ITEM_BUY: 扣除 %d 金币 (单价 %d), 剩余 %d\27[0m", totalCost, unitPrice, user.coins))
+    end
+    
     if user.items[itemKey] then
         user.items[itemKey].count = (user.items[itemKey].count or 1) + count
     else
@@ -50,7 +148,7 @@ local function handleItemBuy(ctx)
     end
     ctx.saveUser(ctx.userId, user)
     
-    -- 返回成功 (匹配前端 BuyItemInfo 解析格式)
+    -- 返回成功
     local body = writeUInt32BE(user.coins) ..     -- cash (剩余金币)
                 writeUInt32BE(itemId) ..          -- itemID
                 writeUInt32BE(count) ..           -- itemNum
@@ -238,13 +336,47 @@ local function handleMultiItemBuy(ctx)
         end
     end
     
-    -- 获取用户数据并添加物品
+    -- 获取用户数据
     local user = ctx.getOrCreateUser(ctx.userId)
     user.items = user.items or {}
     user.coins = user.coins or 100000
     
-    -- 添加所有物品
+    -- 计算总价和预检查
+    local totalCost = 0
+    local validItems = {}
+    
     for _, itemId in ipairs(itemIds) do
+        local itemKey = tostring(itemId)
+        local price = getItemPrice(itemId)
+        
+        -- 唯一性检查: 如果已拥有唯一物品，不需要再买也不需要扣钱
+        if isUniqueItem(itemId) and user.items[itemKey] then
+            print(string.format("\27[33m[Handler] MULTI_ITEM_BUY: 跳过重复唯一物品 %d\27[0m", itemId))
+        else
+            totalCost = totalCost + price
+            table.insert(validItems, itemId)
+        end
+    end
+    
+    -- 钱够不够？
+    if user.coins < totalCost then
+        print(string.format("\27[31m[Handler] MULTI_ITEM_BUY: 金币不足! 需要 %d, 拥有 %d\27[0m", totalCost, user.coins))
+        -- 返回错误码: 赛尔豆余额不足 (10016 或 103107)
+        local body = writeUInt32BE(10016) .. writeUInt32BE(user.coins)
+        ctx.sendResponse(buildResponse(2606, ctx.userId, 0, body))
+        return true
+    end
+    
+    -- 扣钱
+    if totalCost > 0 then
+        user.coins = user.coins - totalCost
+        print(string.format("\27[32m[Handler] MULTI_ITEM_BUY: 扣除总价 %d 金币\27[0m", totalCost))
+    end
+    
+    local addedCount = 0
+    
+    -- 真正添加物品
+    for _, itemId in ipairs(validItems) do
         local itemKey = tostring(itemId)
         if user.items[itemKey] then
             user.items[itemKey].count = (user.items[itemKey].count or 1) + 1
@@ -254,17 +386,20 @@ local function handleMultiItemBuy(ctx)
                 expireTime = 0x057E40  -- 永久
             }
         end
+        addedCount = addedCount + 1
     end
     ctx.saveUser(ctx.userId, user)
     
     -- 返回成功 (匹配官服格式: result + remainCoins)
+    -- 注意: 这里第一个 writeUInt32BE 是 result code，不是 result 字段（buildResponse里有result参数）
+    -- 官服通常把业务结果放在 body 里，buildResponse 的 result 参数设为 0
     local body = writeUInt32BE(0) ..              -- result (0=成功)
                 writeUInt32BE(user.coins)         -- 剩余金币
     ctx.sendResponse(buildResponse(2606, ctx.userId, 0, body))
     
     local itemIdsStr = table.concat(itemIds, ",")
-    print(string.format("\27[32m[Handler] → MULTI_ITEM_BUY %d items [%s] response (coins=%d)\27[0m", 
-        itemCount, itemIdsStr, user.coins))
+    print(string.format("\27[32m[Handler] → MULTI_ITEM_BUY %d items [%s] response (added=%d, new_coins=%d)\27[0m", 
+        itemCount, itemIdsStr, addedCount, user.coins))
     return true
 end
 

@@ -158,7 +158,8 @@ function SeerLoginResponse.makeLoginResponse(user)
     -- vipEndTime (4 bytes) - line 791 (从 nono 读取)
     -- 如果是超能NONO且时间无效，则设为永不过期；否则保持原值
     local endTime = nono.vipEndTime or 0
-    if (superNono > 0) and (endTime == 0) then
+    local isSuper = superNono or 0
+    if (isSuper > 0) and (endTime == 0) then
         endTime = 0x7FFFFFFF
     end
     basic:wuint(pos, endTime)
