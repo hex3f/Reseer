@@ -70,7 +70,9 @@ local function handleRoomLogin(ctx)
     -- 在房间中，如果 NONO 存在，应该设置为 state=1 (跟随) 才会显示
     local nonoState = 0
     if (nono.hasNono and nono.hasNono > 0) or (nono.flag and nono.flag > 0) then
-        nonoState = 1  -- NONO 跟随状态（会显示）
+        -- state=3 (0b11): Bit0=HasNoNo, Bit1=Show/Follow
+        -- 必须设置 Bit1 (Value 2) 才能让客户端正确显示 NoNo
+        nonoState = 3
     end
     local nonoColor = nono.color or 0xFFFFFF
     -- superNono 应该是 0 或 1，不是 vipLevel
@@ -90,7 +92,9 @@ local function handleRoomLogin(ctx)
     if user.viped then vipFlags = vipFlags + 2 end
     body = body .. writeUInt32BE(vipFlags)                      -- vipFlags (4)
     body = body .. writeUInt32BE(user.vipStage or 0)            -- vipStage (4)
-    body = body .. writeUInt32BE(0)                             -- actionType (4)
+    -- actionType: 飞行模式(flyMode>0)时为1，否则为0
+    local actionType = (user.flyMode and user.flyMode > 0) and 1 or 0
+    body = body .. writeUInt32BE(actionType)                             -- actionType (4)
     body = body .. writeUInt32BE(x)                             -- pos.x (4)
     body = body .. writeUInt32BE(y)                             -- pos.y (4)
     body = body .. writeUInt32BE(0)                             -- action (4)

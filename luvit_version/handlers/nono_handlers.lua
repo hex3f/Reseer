@@ -160,7 +160,10 @@ local function handleNonoInfo(ctx)
     ctx.sendResponse(buildResponse(9003, ctx.userId, 0, body))
     
     -- 如果 NONO 正在跟随，发送 NONO_FOLLOW_OR_HOOM 响应来触发跟随显示
-    if isFollowing then
+    -- 注意: 如果正在飞行 (flyMode > 0)，不要发送 CMD 9019，因为那会强制客户端切换到普通跟随模式，导致飞行载具失效
+    local user = ctx.getOrCreateUser(ctx.userId)
+    local isFlying = user and user.flyMode and user.flyMode > 0
+    if isFollowing and not isFlying then
         local followBody = ""
         followBody = followBody .. writeUInt32BE(ctx.userId)                    -- userID (4)
         followBody = followBody .. writeUInt32BE(0)                             -- flag=0 (4)

@@ -82,7 +82,9 @@ local function handleEnterMap(ctx)
     if user.viped then vipFlags = vipFlags + 2 end
     body = body .. writeUInt32BE(vipFlags)                      -- vipFlags (4)
     body = body .. writeUInt32BE(user.vipStage or 0)            -- vipStage (4)
-    body = body .. writeUInt32BE(0)                             -- actionType (4)
+    -- actionType: 飞行模式(flyMode>0)时为1，否则为0
+    local actionType = (user.flyMode and user.flyMode > 0) and 1 or 0
+    body = body .. writeUInt32BE(actionType)                             -- actionType (4)
     body = body .. writeUInt32BE(x)                             -- pos.x (4)
     body = body .. writeUInt32BE(y)                             -- pos.y (4)
     body = body .. writeUInt32BE(0)                             -- action (4)
@@ -98,6 +100,25 @@ local function handleEnterMap(ctx)
     -- nonoState, nonoColor, superNono (从 user.nono 读取)
     local nono = user.nono or {}
     local nonoState = nono.flag or user.nonoState or 0
+    
+    -- 检查会话中的跟随状态
+    local isFollowing = false
+    if ctx.sessionManager and ctx.sessionManager.getNonoFollowing then
+        isFollowing = ctx.sessionManager:getNonoFollowing(ctx.userId)
+    end
+    
+    -- 如果在跟随中，必须确保 bit 1 (Value 2) 被设置
+    if isFollowing then
+        -- 简单按位或逻辑: 如果 nonoState < 2 (即 bit 1 未设置), +2
+        local hasBit1 = (nonoState % 4) >= 2
+        if not hasBit1 then
+            nonoState = nonoState + 2
+        end
+        -- 确保 Bit 0 (Has NoNo) 也设置
+        if nonoState % 2 == 0 then
+            nonoState = nonoState + 1
+        end
+    end
     local nonoColor = nono.color or user.nonoColor or 0
     local superNono = nono.superNono or user.superNono or 0
 
@@ -147,26 +168,35 @@ local function handleEnterMap(ctx)
         print(string.format("\27[33m[Handler] 检测到家园地图 %d，发送房间数据\27[0m", mapId))
         
         -- 发送 NONO_INFO (9003) 让房间中显示 NONO
-        local nono = user.nono or {}
-        local nonoBody = ""
-        nonoBody = nonoBody .. writeUInt32BE(ctx.userId)                    -- userID
-        nonoBody = nonoBody .. writeUInt32BE(nono.flag or 1)                -- flag
-        nonoBody = nonoBody .. writeUInt32BE(1)                             -- state=1 (NONO在家)
-        nonoBody = nonoBody .. writeFixedString(nono.nick or "NONO", 16)    -- nick
-        nonoBody = nonoBody .. writeUInt32BE(nono.superNono or 0)           -- superNono
-        nonoBody = nonoBody .. writeUInt32BE(nono.color or 0xFFFFFF)        -- color
-        nonoBody = nonoBody .. writeUInt32BE(nono.power or 10000)           -- power
-        nonoBody = nonoBody .. writeUInt32BE(nono.mate or 10000)            -- mate
-        nonoBody = nonoBody .. writeUInt32BE(nono.iq or 0)                  -- iq
-        nonoBody = nonoBody .. writeUInt16BE(nono.ai or 0)                  -- ai
-        nonoBody = nonoBody .. writeUInt32BE(nono.birth or os.time())       -- birth
-        nonoBody = nonoBody .. writeUInt32BE(nono.chargeTime or 500)        -- chargeTime
-        nonoBody = nonoBody .. string.rep("\xFF", 20)                       -- func (所有功能开启)
-        nonoBody = nonoBody .. writeUInt32BE(nono.superEnergy or 0)         -- superEnergy
-        nonoBody = nonoBody .. writeUInt32BE(nono.superLevel or 0)          -- superLevel
-        nonoBody = nonoBody .. writeUInt32BE(nono.superStage or 0)          -- superStage
-        ctx.sendResponse(buildResponse(9003, ctx.userId, 0, nonoBody))
-        print("\27[32m[Handler] → NONO_INFO (9003) for home room (state=1, NONO在家)\27[0m")
+        -- 注意: 如果正在飞行或跟随，NoNo 已经作为玩家附件显示，
+        -- 此时发送 9003 会导致客户端认为 NoNo 是独立实体从而脱离玩家
+        -- 因此: 只有当 NoNo "在家" (不跟随且不飞行) 时才发送此包
+        local isAttached = (isFollowing or (user.flyMode and user.flyMode > 0))
+        
+        if not isAttached then
+            local nono = user.nono or {}
+            local nonoBody = ""
+            nonoBody = nonoBody .. writeUInt32BE(ctx.userId)                    -- userID
+            nonoBody = nonoBody .. writeUInt32BE(nono.flag or 1)                -- flag
+            nonoBody = nonoBody .. writeUInt32BE(1)                             -- state=1 (NONO在家)
+            nonoBody = nonoBody .. writeFixedString(nono.nick or "NONO", 16)    -- nick
+            nonoBody = nonoBody .. writeUInt32BE(nono.superNono or 0)           -- superNono
+            nonoBody = nonoBody .. writeUInt32BE(nono.color or 0xFFFFFF)        -- color
+            nonoBody = nonoBody .. writeUInt32BE(nono.power or 10000)           -- power
+            nonoBody = nonoBody .. writeUInt32BE(nono.mate or 10000)            -- mate
+            nonoBody = nonoBody .. writeUInt32BE(nono.iq or 0)                  -- iq
+            nonoBody = nonoBody .. writeUInt16BE(nono.ai or 0)                  -- ai
+            nonoBody = nonoBody .. writeUInt32BE(nono.birth or os.time())       -- birth
+            nonoBody = nonoBody .. writeUInt32BE(nono.chargeTime or 500)        -- chargeTime
+            nonoBody = nonoBody .. string.rep("\xFF", 20)                       -- func (所有功能开启)
+            nonoBody = nonoBody .. writeUInt32BE(nono.superEnergy or 0)         -- superEnergy
+            nonoBody = nonoBody .. writeUInt32BE(nono.superLevel or 0)          -- superLevel
+            nonoBody = nonoBody .. writeUInt32BE(nono.superStage or 0)          -- superStage
+            ctx.sendResponse(buildResponse(9003, ctx.userId, 0, nonoBody))
+            print("\27[32m[Handler] → NONO_INFO (9003) for home room (state=1, NONO在家)\27[0m")
+        else
+            print(string.format("\27[33m[Handler] 检测到跟随/飞行状态 (state=3/Fly)，跳过发送 NONO_INFO (9003) 以避免显示冲突\27[0m"))
+        end
     end
     
     return true
@@ -537,6 +567,8 @@ local function handleOnOrOffFlying(ctx)
     -- 保存飞行状态到用户数据
     local user = ctx.getOrCreateUser(ctx.userId)
     user.flyMode = flyMode
+    -- 同步更新 actionType: 飞行模式(>0)时 actionType=1，否则=0
+    user.actionType = (flyMode > 0) and 1 or 0
     ctx.saveUserDB()
     
     -- 构建响应: userId + flyMode
