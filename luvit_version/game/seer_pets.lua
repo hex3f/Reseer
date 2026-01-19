@@ -2,8 +2,7 @@
 -- 赛尔号精灵数据加载器
 -- 从 data/spt.xml 加载完整精灵信息，建立与技能的引用关系
 
-local fs = require("fs")
-local xml_parser = require("./gameserver/xml_parser")
+local XmlLoader = require("../core/xml_loader")
 
 local SeerPets = {}
 SeerPets.pets = {}
@@ -15,30 +14,10 @@ function SeerPets.load()
     
     print("\27[36m[SeerPets] 正在加载精灵数据...\27[0m")
     
-    -- 使用 pcall 捕获文件读取错误
-    local success, content = pcall(function()
-        return fs.readFileSync("data/spt.xml")
-    end)
-    
-    if not success or not content then
-        print("\27[31m[SeerPets] 无法读取精灵数据文件 data/spt.xml\27[0m")
-        if not success then
-            print("\27[31m[SeerPets] 错误详情: " .. tostring(content) .. "\27[0m")
-        end
-        return
-    end
-    
-    -- 移除 UTF-8 BOM (Byte Order Mark)
-    if content:sub(1, 3) == "\xEF\xBB\xBF" then
-        content = content:sub(4)
-        print("\27[33m[SeerPets] 已移除 UTF-8 BOM\27[0m")
-    end
-    
-    local parser = xml_parser:new()
-    local tree = parser:parse(content)
+    local tree, err = XmlLoader.load("data/spt.xml")
     
     if not tree then
-        print("\27[31m[SeerPets] XML解析失败 - parser:parse 返回 nil\27[0m")
+        print("\27[31m[SeerPets] XML解析失败: " .. (err or "unknown") .. "\27[0m")
         return
     end
     
@@ -395,7 +374,11 @@ function SeerPets.getStats(petId, level, dv, ev)
     end
     
     level = level or 1
-    dv = dv or 31
+    
+    -- 安全处理 DV (如果传入的是函数或非法值)
+    if type(dv) == "function" then dv = dv() end
+    dv = tonumber(dv) or 31
+    
     ev = ev or {hp = 0, atk = 0, def = 0, spAtk = 0, spDef = 0, spd = 0}
     
     -- 如果ev是数字，转换为表

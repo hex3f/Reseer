@@ -5,7 +5,7 @@ local Utils = require('./utils')
 local writeUInt32BE = Utils.writeUInt32BE
 local readUInt32BE = Utils.readUInt32BE
 local buildResponse = Utils.buildResponse
-local SeerPets = require('../seer_pets')
+local SeerPets = require('../game/seer_pets')
 
 local TaskHandlers = {}
 

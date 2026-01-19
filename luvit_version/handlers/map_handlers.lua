@@ -1,57 +1,155 @@
 -- 地图相关命令处理器
 -- 包括: 进入/离开地图、玩家列表、移动、聊天等
+-- Protocol Version: 2026-01-20 (Refactored using BinaryWriter)
 
 local Utils = require('./utils')
-local writeUInt32BE = Utils.writeUInt32BE
-local writeUInt16BE = Utils.writeUInt16BE
-local readUInt32BE = Utils.readUInt32BE
-local writeFixedString = Utils.writeFixedString
+local BinaryWriter = require('../utils/binary_writer')
+local BinaryReader = require('../utils/binary_reader')
 local buildResponse = Utils.buildResponse
 local OnlineTracker = require('./online_tracker')
 
 local MapHandlers = {}
 
+-- ==================== 协议构建 Helper ====================
+
+-- 构建 UserInfo (setForPeoleInfo)
+-- 对应前端: com.robot.core.info.UserInfo.setForPeoleInfo
+local function buildPeopleInfo(userId, user, sysTime)
+    user = user or {}
+    sysTime = sysTime or os.time()
+    
+    local writer = BinaryWriter.new()
+    
+    -- 1. 基本信息
+    writer:writeInt32BE(sysTime)                -- sysTime (4) (Int)
+    writer:writeUInt32BE(userId)                -- userID (4)
+    local nickname = user.nick or user.nickname or ("Seer" .. userId)
+    writer:writeStringFixed(nickname, 16)       -- nick (16)
+    writer:writeUInt32BE(user.color or 0xFFFFFF)-- color (4)
+    writer:writeUInt32BE(user.texture or 0)     -- texture (4)
+    
+    -- 2. VIP Flags (bit 0=vip, bit 1=viped)
+    local vipFlags = 0
+    local nono = user.nono or {}
+    local superNono = nono.superNono or user.superNono or 0
+    if superNono > 0 then
+        vipFlags = 3
+    end
+    writer:writeUInt32BE(vipFlags)              -- vipFlags (4)
+    
+    writer:writeUInt32BE(nono.vipStage or 0)    -- vipStage (4)
+    
+    local actionType = (user.flyMode and user.flyMode > 0) and 1 or 0
+    writer:writeUInt32BE(actionType)            -- actionType (4)
+    
+    -- 3. Pos & Action
+    writer:writeUInt32BE(user.x or 500)         -- pos.x (4)
+    writer:writeUInt32BE(user.y or 300)         -- pos.y (4)
+    writer:writeUInt32BE(0)                     -- action (4)
+    writer:writeUInt32BE(0)                     -- direction (4)
+    writer:writeUInt32BE(0)                     -- changeShape (4)
+    
+    -- 4. Pet & Spirit
+    local catchTime = user.catchId or 0
+    local petId = user.currentPetId or 0
+    local petDV = 31
+    -- 尝试查找 DV
+    if user.pets then
+        for _, p in ipairs(user.pets) do
+            if p.id == petId then 
+                petDV = p.dv or 31 
+                break
+            end
+        end
+    end
+    
+    writer:writeUInt32BE(catchTime)             -- spiritTime (4)
+    writer:writeUInt32BE(petId)                 -- spiritID (4)
+    writer:writeUInt32BE(petDV)                 -- petDV (4)
+    writer:writeUInt32BE(0)                     -- petSkin (4)
+    writer:writeUInt32BE(0)                     -- fightFlag (4)
+    
+    -- 5. Teacher/Student
+    writer:writeUInt32BE(user.teacherID or 0)
+    writer:writeUInt32BE(user.studentID or 0)
+    
+    -- 6. NoNo State
+    -- nonoState (Uint -> 32 bits)
+    local nonoState = nono.flag or user.nonoState or 0
+    -- 逻辑修正: 如果 actionType=1 (Fly)，则 nonoState 不应该显示跟随(bit 1)?
+    -- 前端 setForPeoleInfo 直接读取通过 BitUtil.getBit 解析 bits
+    writer:writeUInt32BE(nonoState)             -- nonoState (4)
+    writer:writeUInt32BE(nono.color or 0)       -- nonoColor (4)
+    writer:writeUInt32BE(superNono > 0 and 1 or 0) -- superNono (4) (Boolean)
+    
+    writer:writeUInt32BE(0)                     -- playerForm (4) (Boolean)
+    writer:writeUInt32BE(0)                     -- transTime (4)
+    
+    -- 7. TeamInfo (Inline)
+    -- id(4), coreCount(4), isShow(4), logoBg(2), logoIcon(2), logoColor(2), txtColor(2), logoWord(4)
+    local team = user.teamInfo or {}
+    writer:writeUInt32BE(team.id or 0)
+    writer:writeUInt32BE(team.coreCount or 0)
+    writer:writeUInt32BE(team.isShow and 1 or 0)
+    writer:writeUInt16BE(team.logoBg or 0)
+    writer:writeUInt16BE(team.logoIcon or 0)
+    writer:writeUInt16BE(team.logoColor or 0)
+    writer:writeUInt16BE(team.txtColor or 0)
+    writer:writeStringFixed(team.logoWord or "", 4)
+    
+    -- 8. Clothes
+    local clothes = user.clothes or {}
+    writer:writeUInt32BE(#clothes)              -- count (4)
+    for _, cloth in ipairs(clothes) do
+        local cid = 0
+        local clev = 0
+        if type(cloth) == "table" then
+            cid = cloth.id or 0
+            clev = cloth.level or 0
+        elseif type(cloth) == "number" then
+            cid = cloth
+            clev = 0
+        end
+        writer:writeUInt32BE(cid)
+        writer:writeUInt32BE(clev)
+    end
+    
+    -- 9. Title
+    writer:writeUInt32BE(user.curTitle or 0)
+    
+    return writer:toString()
+end
+
+-- ==================== 命令处理器 ====================
+
 -- CMD 2001: ENTER_MAP (进入地图)
--- 请求: mapType(4) + mapId(4) + x(4) + y(4)
--- EnterMapInfo响应: UserInfo结构
 local function handleEnterMap(ctx)
+    local reader = BinaryReader.new(ctx.body)
     local mapType = 0
     local mapId = 0
-    local x = 500
-    local y = 300
+    local x, y = 500, 300
     
-    if #ctx.body >= 4 then
-        mapType = readUInt32BE(ctx.body, 1)
-    end
-    if #ctx.body >= 8 then
-        mapId = readUInt32BE(ctx.body, 5)
-    end
-    if #ctx.body >= 12 then
-        x = readUInt32BE(ctx.body, 9)
-    end
-    if #ctx.body >= 16 then
-        y = readUInt32BE(ctx.body, 13)
+    if reader:getRemaining() ~= "" then
+        mapType = reader:readUInt32BE()
+        mapId = reader:readUInt32BE()
+        x = reader:readUInt32BE()
+        y = reader:readUInt32BE()
     end
     
-    -- 验证 mapId，如果为0则使用默认地图或用户上次的地图
-    if mapId == 0 then
-        local user = ctx.getOrCreateUser(ctx.userId)
-        mapId = user.mapId or user.mapID or 515  -- 默认新手教程地图
-        print(string.format("\27[33m[Handler] ENTER_MAP: mapId=0, 使用默认地图 %d\27[0m", mapId))
-    end
-    
+    -- 验证与默认地图逻辑
     local user = ctx.getOrCreateUser(ctx.userId)
+    if mapId == 0 then
+        mapId = user.mapId or 1
+    end
     
-    -- 保存玩家地图位置（用于下次登录恢复）
-    -- 只保存非新手地图的位置
-    if mapId ~= 515 then
+    -- 更新用户状态
+    if mapId ~= 515 then -- 不是教程地图
         user.mapId = mapId
-        user.mapID = mapId  -- 兼容两种字段名
+        user.mapID = mapId
+        user.lastMapId = mapId
         user.posX = x
         user.posY = y
-        user.lastMapId = mapId
     end
-    
     user.mapType = mapType
     user.x = x
     user.y = y
@@ -60,152 +158,50 @@ local function handleEnterMap(ctx)
     -- 更新在线追踪
     OnlineTracker.updatePlayerMap(ctx.userId, mapId, mapType)
     
-    print(string.format("\27[36m[Handler] ENTER_MAP: mapType=%d, mapId=%d, pos=(%d,%d)\27[0m", mapType, mapId, x, y))
+    print(string.format("\27[36m[Handler] ENTER_MAP: type=%d, id=%d, pos=(%d,%d)\27[0m", mapType, mapId, x, y))
     
-    -- 使用真实用户数据构建响应
-    local nickname = user.nick or user.nickname or user.username or ("赛尔" .. ctx.userId)
-    local petId = user.currentPetId or 0
-    local catchTime = user.catchId or 0
-    -- 获取当前宠物的 DV 值
-    local petDV = 31  -- 默认满值
-    if user.pets and user.currentPetId then
-        for _, pet in ipairs(user.pets) do
-            if pet.id == user.currentPetId or pet.catchTime == user.catchId then
-                petDV = pet.dv or pet.DV or 31
-                break
-            end
-        end
-    end
-    local clothes = user.clothes or {}
-    local clothCount = #clothes
-    
-    -- 构建 UserInfo 响应 (setForPeoleInfo 格式 - 根据客户端代码)
-    local body = ""
-    body = body .. writeUInt32BE(os.time())                     -- sysTime (4) ← 第一个字段！
-    body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
-    body = body .. writeFixedString(nickname, 16)               -- nick (16)
-    body = body .. writeUInt32BE(user.color or 0xFFFFFF)        -- color (4)
-    body = body .. writeUInt32BE(user.texture or 0)             -- texture (4)
-    -- vipFlags: bit 0 = vip, bit 1 = viped
-    local vipFlags = 0
-    if user.vip then vipFlags = vipFlags + 1 end
-    if user.viped then vipFlags = vipFlags + 2 end
-    body = body .. writeUInt32BE(vipFlags)                      -- vipFlags (4)
-    body = body .. writeUInt32BE(user.vipStage or 0)            -- vipStage (4)
-    -- actionType: 飞行模式(flyMode>0)时为1，否则为0
-    local actionType = (user.flyMode and user.flyMode > 0) and 1 or 0
-    body = body .. writeUInt32BE(actionType)                             -- actionType (4)
-    body = body .. writeUInt32BE(x)                             -- pos.x (4)
-    body = body .. writeUInt32BE(y)                             -- pos.y (4)
-    body = body .. writeUInt32BE(0)                             -- action (4)
-    body = body .. writeUInt32BE(0)                             -- direction (4)
-    body = body .. writeUInt32BE(0)                             -- changeShape (4)
-    body = body .. writeUInt32BE(catchTime)                     -- spiritTime (4)
-    body = body .. writeUInt32BE(petId)                         -- spiritID (4)
-    body = body .. writeUInt32BE(petDV)                            -- petDV (4)
-    body = body .. writeUInt32BE(0)                             -- petSkin (4) ← 注意：不是 petShiny！
-    body = body .. writeUInt32BE(0)                             -- fightFlag (4)
-    body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
-    body = body .. writeUInt32BE(user.studentID or 0)           -- studentID (4)
-    -- nonoState, nonoColor, superNono (从 user.nono 读取)
-    local nono = user.nono or {}
-    local nonoState = nono.flag or user.nonoState or 0
-    
-    -- 检查会话中的跟随状态
-    local isFollowing = false
-    if ctx.sessionManager and ctx.sessionManager.getNonoFollowing then
-        isFollowing = ctx.sessionManager:getNonoFollowing(ctx.userId)
-    end
-    
-    -- 如果在跟随中，必须确保 bit 1 (Value 2) 被设置
-    if isFollowing then
-        -- 简单按位或逻辑: 如果 nonoState < 2 (即 bit 1 未设置), +2
-        local hasBit1 = (nonoState % 4) >= 2
-        if not hasBit1 then
-            nonoState = nonoState + 2
-        end
-        -- 确保 Bit 0 (Has NoNo) 也设置
-        if nonoState % 2 == 0 then
-            nonoState = nonoState + 1
-        end
-    end
-    local nonoColor = nono.color or user.nonoColor or 0
-    local superNono = nono.superNono or user.superNono or 0
-
-    body = body .. writeUInt32BE(nonoState)                     -- nonoState (4)
-    body = body .. writeUInt32BE(nonoColor)                     -- nonoColor (4)
-    body = body .. writeUInt32BE(superNono)                     -- superNono (4)
-    body = body .. writeUInt32BE(0)                             -- playerForm (4)
-    body = body .. writeUInt32BE(0)                             -- transTime (4)
-    -- TeamInfo (完整版本：24 bytes)
-    local teamInfo = user.teamInfo or {}
-    body = body .. writeUInt32BE(teamInfo.id or 0)              -- teamInfo.id (4)
-    body = body .. writeUInt32BE(teamInfo.coreCount or 0)       -- teamInfo.coreCount (4)
-    body = body .. writeUInt32BE(teamInfo.isShow or 0)          -- teamInfo.isShow (4)
-    body = body .. writeUInt16BE(teamInfo.logoBg or 0)          -- teamInfo.logoBg (2)
-    body = body .. writeUInt16BE(teamInfo.logoIcon or 0)        -- teamInfo.logoIcon (2)
-    body = body .. writeUInt16BE(teamInfo.logoColor or 0)       -- teamInfo.logoColor (2)
-    body = body .. writeUInt16BE(teamInfo.txtColor or 0)        -- teamInfo.txtColor (2)
-    body = body .. writeFixedString(teamInfo.logoWord or "", 4) -- teamInfo.logoWord (4)
-    body = body .. writeUInt32BE(clothCount)                    -- clothCount (4)
-    
-    -- 添加服装列表
-    for _, cloth in ipairs(clothes) do
-        local clothId = cloth
-        local clothLevel = 0
-        if type(cloth) == "table" then
-            clothId = cloth.id or 0
-            clothLevel = cloth.level or 0
-        end
-        body = body .. writeUInt32BE(clothId)                   -- clothId (4)
-        body = body .. writeUInt32BE(clothLevel)                -- clothLevel (4)
-    end
-    -- curTitle (4 bytes)
-    body = body .. writeUInt32BE(user.curTitle or 0)            -- curTitle (4)
-    
+    -- 构建响应 (UserInfo setForPeoleInfo)
+    local body = buildPeopleInfo(ctx.userId, user, os.time())
     ctx.sendResponse(buildResponse(2001, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → ENTER_MAP %d at (%d,%d) with %d clothes\27[0m", mapId, x, y, clothCount))
     
     -- 主动推送 LIST_MAP_PLAYER (包含自己)
-    -- 使用完整的 UserInfo 格式（与 buildUserInfo 一致）
-    local playerListBody = writeUInt32BE(1) .. body  -- count=1 + 自己的 UserInfo
-    ctx.sendResponse(buildResponse(2003, ctx.userId, 0, playerListBody))
-    print(string.format("\27[32m[Handler] → LIST_MAP_PLAYER (auto-push, 1 player)\27[0m"))
+    -- count(4) + [PeopleInfo]
+    local listWriter = BinaryWriter.new()
+    listWriter:writeUInt32BE(1)
+    listWriter:writeBytes(body)
+    ctx.sendResponse(buildResponse(2003, ctx.userId, 0, listWriter:toString()))
     
-    -- 检测是否进入家园地图 (mapId 大于 10000 或等于用户ID)
-    -- 如果是家园，需要额外发送房间相关数据
+    -- 家园地图特殊逻辑
     if mapId > 10000 or mapId == ctx.userId then
-        print(string.format("\27[33m[Handler] 检测到家园地图 %d，发送房间数据\27[0m", mapId))
+        local isFollowing = false
+        if ctx.sessionManager and ctx.sessionManager.getNonoFollowing then
+            isFollowing = ctx.sessionManager:getNonoFollowing(ctx.userId)
+        end
+        local isFlying = (user.flyMode and user.flyMode > 0)
         
-        -- 发送 NONO_INFO (9003) 让房间中显示 NONO
-        -- 注意: 如果正在飞行或跟随，NoNo 已经作为玩家附件显示，
-        -- 此时发送 9003 会导致客户端认为 NoNo 是独立实体从而脱离玩家
-        -- 因此: 只有当 NoNo "在家" (不跟随且不飞行) 时才发送此包
-        local isAttached = (isFollowing or (user.flyMode and user.flyMode > 0))
-        
-        if not isAttached then
+        -- 只有当 NoNo "在家" (不跟随且不飞行) 时才发送 9003
+        if not isFollowing and not isFlying then
             local nono = user.nono or {}
-            local nonoBody = ""
-            nonoBody = nonoBody .. writeUInt32BE(ctx.userId)                    -- userID
-            nonoBody = nonoBody .. writeUInt32BE(nono.flag or 1)                -- flag
-            nonoBody = nonoBody .. writeUInt32BE(1)                             -- state=1 (NONO在家)
-            nonoBody = nonoBody .. writeFixedString(nono.nick or "NONO", 16)    -- nick
-            nonoBody = nonoBody .. writeUInt32BE(nono.superNono or 0)           -- superNono
-            nonoBody = nonoBody .. writeUInt32BE(nono.color or 0xFFFFFF)        -- color
-            nonoBody = nonoBody .. writeUInt32BE(nono.power or 10000)           -- power
-            nonoBody = nonoBody .. writeUInt32BE(nono.mate or 10000)            -- mate
-            nonoBody = nonoBody .. writeUInt32BE(nono.iq or 0)                  -- iq
-            nonoBody = nonoBody .. writeUInt16BE(nono.ai or 0)                  -- ai
-            nonoBody = nonoBody .. writeUInt32BE(nono.birth or os.time())       -- birth
-            nonoBody = nonoBody .. writeUInt32BE(nono.chargeTime or 500)        -- chargeTime
-            nonoBody = nonoBody .. string.rep("\xFF", 20)                       -- func (所有功能开启)
-            nonoBody = nonoBody .. writeUInt32BE(nono.superEnergy or 0)         -- superEnergy
-            nonoBody = nonoBody .. writeUInt32BE(nono.superLevel or 0)          -- superLevel
-            nonoBody = nonoBody .. writeUInt32BE(nono.superStage or 0)          -- superStage
-            ctx.sendResponse(buildResponse(9003, ctx.userId, 0, nonoBody))
-            print("\27[32m[Handler] → NONO_INFO (9003) for home room (state=1, NONO在家)\27[0m")
-        else
-            print(string.format("\27[33m[Handler] 检测到跟随/飞行状态 (state=3/Fly)，跳过发送 NONO_INFO (9003) 以避免显示冲突\27[0m"))
+            local nw = BinaryWriter.new()
+            nw:writeUInt32BE(ctx.userId)
+            nw:writeUInt32BE(nono.flag or 1)
+            nw:writeUInt32BE(1) -- state=1 (NONO在家)
+            nw:writeStringFixed(nono.nick or "NoNo", 16)
+            nw:writeUInt32BE(nono.superNono or 0)
+            nw:writeUInt32BE(nono.color or 0)
+            nw:writeUInt32BE(nono.power or 100)
+            nw:writeUInt32BE(nono.mate or 100)
+            nw:writeUInt32BE(nono.iq or 0)
+            nw:writeUInt16BE(nono.ai or 0)
+            nw:writeUInt32BE(nono.birth or os.time())
+            nw:writeUInt32BE(nono.chargeTime or 0)
+            nw:writeStringFixed("", 20) -- func (20 bytes padding or full FFs)
+            nw:writeUInt32BE(nono.superEnergy or 0)
+            nw:writeUInt32BE(nono.superLevel or 0)
+            nw:writeUInt32BE(nono.superStage or 0)
+            
+            ctx.sendResponse(buildResponse(9003, ctx.userId, 0, nw:toString()))
+            print("\27[32m[Handler] → NONO_INFO (9003) sent for Home\27[0m")
         end
     end
     
@@ -213,469 +209,312 @@ local function handleEnterMap(ctx)
 end
 
 -- CMD 2002: LEAVE_MAP (离开地图)
--- 响应: userId(4)
 local function handleLeaveMap(ctx)
-    local body = writeUInt32BE(ctx.userId)
-    ctx.sendResponse(buildResponse(2002, ctx.userId, 0, body))
-    print("\27[32m[Handler] → LEAVE_MAP response\27[0m")
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(ctx.userId)
+    ctx.sendResponse(buildResponse(2002, ctx.userId, 0, writer:toString()))
     return true
 end
 
--- 构建完整的 UserInfo (用于 LIST_MAP_PLAYER，根据客户端 setForPeoleInfo)
-local function buildUserInfo(userId, user)
-    local nickname = user.nick or user.nickname or user.username or ("赛尔" .. userId)
-    local petId = user.currentPetId or 0
-    local catchTime = user.catchId or 0
-    local x = user.x or 500
-    local y = user.y or 300
-    local clothes = user.clothes or {}
-    local clothCount = #clothes
-    
-    local body = ""
-    body = body .. writeUInt32BE(os.time())                     -- sysTime (4)
-    body = body .. writeUInt32BE(userId)                        -- userID (4)
-    body = body .. writeFixedString(nickname, 16)               -- nick (16)
-    body = body .. writeUInt32BE(user.color or 0xFFFFFF)        -- color (4)
-    body = body .. writeUInt32BE(user.texture or 0)             -- texture (4)
-    -- vipFlags
-    local vipFlags = 0
-    if user.vip then vipFlags = vipFlags + 1 end
-    if user.viped then vipFlags = vipFlags + 2 end
-    body = body .. writeUInt32BE(vipFlags)                      -- vipFlags (4)
-    body = body .. writeUInt32BE(user.vipStage or 0)            -- vipStage (4)
-    body = body .. writeUInt32BE(0)                             -- actionType (4)
-    body = body .. writeUInt32BE(x)                             -- pos.x (4)
-    body = body .. writeUInt32BE(y)                             -- pos.y (4)
-    body = body .. writeUInt32BE(0)                             -- action (4)
-    body = body .. writeUInt32BE(0)                             -- direction (4)
-    body = body .. writeUInt32BE(0)                             -- changeShape (4)
-    body = body .. writeUInt32BE(catchTime)                     -- spiritTime (4)
-    body = body .. writeUInt32BE(petId)                         -- spiritID (4)
-    body = body .. writeUInt32BE(31)                            -- petDV (4)
-    body = body .. writeUInt32BE(0)                             -- petSkin (4)
-    body = body .. writeUInt32BE(0)                             -- fightFlag (4)
-    body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
-    body = body .. writeUInt32BE(user.studentID or 0)           -- studentID (4)
-    -- nonoState, nonoColor, superNono (从 user.nono 读取)
-    local nono = user.nono or {}
-    local nonoState = nono.flag or user.nonoState or 0
-    local nonoColor = nono.color or user.nonoColor or 0
-    local superNono = nono.superNono or user.superNono or 0
-    
-    body = body .. writeUInt32BE(nonoState)                     -- nonoState (4)
-    body = body .. writeUInt32BE(nonoColor)                     -- nonoColor (4)
-    body = body .. writeUInt32BE(superNono)                     -- superNono (4)
-    body = body .. writeUInt32BE(0)                             -- playerForm (4)
-    body = body .. writeUInt32BE(0)                             -- transTime (4)
-    -- TeamInfo (完整版本)
-    local teamInfo = user.teamInfo or {}
-    body = body .. writeUInt32BE(teamInfo.id or 0)              -- teamInfo.id (4)
-    body = body .. writeUInt32BE(teamInfo.coreCount or 0)       -- teamInfo.coreCount (4)
-    body = body .. writeUInt32BE(teamInfo.isShow or 0)          -- teamInfo.isShow (4)
-    body = body .. writeUInt16BE(teamInfo.logoBg or 0)          -- teamInfo.logoBg (2)
-    body = body .. writeUInt16BE(teamInfo.logoIcon or 0)        -- teamInfo.logoIcon (2)
-    body = body .. writeUInt16BE(teamInfo.logoColor or 0)       -- teamInfo.logoColor (2)
-    body = body .. writeUInt16BE(teamInfo.txtColor or 0)        -- teamInfo.txtColor (2)
-    body = body .. writeFixedString(teamInfo.logoWord or "", 4) -- teamInfo.logoWord (4)
-    body = body .. writeUInt32BE(clothCount)                    -- clothCount (4)
-    
-    -- 添加服装列表
-    for _, cloth in ipairs(clothes) do
-        local clothId = cloth
-        local clothLevel = 0
-        if type(cloth) == "table" then
-            clothId = cloth.id or 0
-            clothLevel = cloth.level or 0
-        end
-        body = body .. writeUInt32BE(clothId)                   -- clothId (4)
-        body = body .. writeUInt32BE(clothLevel)                -- clothLevel (4)
-    end
-    -- curTitle (4 bytes)
-    body = body .. writeUInt32BE(user.curTitle or 0)            -- curTitle (4)
-    
-    return body
-end
-
 -- CMD 2003: LIST_MAP_PLAYER (地图玩家列表)
--- MapPlayerListInfo: playerCount(4) + [UserInfo]...
 local function handleListMapPlayer(ctx)
-    local user = ctx.getOrCreateUser(ctx.userId)
     local currentMapId = OnlineTracker.getPlayerMap(ctx.userId)
-    
-    -- 获取同地图的所有玩家
     local playersInMap = OnlineTracker.getPlayersInMap(currentMapId)
     
-    local body = writeUInt32BE(#playersInMap)
-    for _, playerId in ipairs(playersInMap) do
-        local playerUser = ctx.getOrCreateUser(playerId)
-        body = body .. buildUserInfo(playerId, playerUser)
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(#playersInMap)
+    
+    for _, pid in ipairs(playersInMap) do
+        local pUser = ctx.getOrCreateUser(pid)
+        local pInfo = buildPeopleInfo(pid, pUser, os.time())
+        writer:writeBytes(pInfo)
     end
     
-    ctx.sendResponse(buildResponse(2003, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → LIST_MAP_PLAYER response (%d players in map %d)\27[0m", 
-        #playersInMap, currentMapId))
+    ctx.sendResponse(buildResponse(2003, ctx.userId, 0, writer:toString()))
+    print(string.format("\27[32m[Handler] → LIST_MAP_PLAYER (%d players in map %d)\27[0m", #playersInMap, currentMapId))
     return true
 end
 
 -- CMD 2004: MAP_OGRE_LIST (地图怪物列表)
--- 响应格式: 9个槽位 × (monsterID(4) + shiny(4)) = 72字节
--- monsterID=0 表示该位置没有怪物
--- shiny=1 表示稀有/闪光精灵
 local function handleMapOgreList(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
-    local mapId = user.mapId or 8
+    local mapId = user.mapId or 1
     
-    -- 地图野怪配置 (可扩展)
-    -- 格式: mapId -> {槽位索引 -> {petId, shiny, spawnRate}}
+    -- Config: { [slot] = {petId, shiny} }
     local MAP_OGRES = {
-        [8] = {  -- 新手地图
-            [0] = {petId = 10, shiny = 0},   -- 皮皮
-            [1] = {petId = 58, shiny = 0},   -- 比比鼠
-        },
-        [301] = {  -- 克洛斯星
-            [0] = {petId = 1, shiny = 0},    -- 布布种子
-            [1] = {petId = 4, shiny = 0},    -- 伊优
-            [2] = {petId = 7, shiny = 0},    -- 小火猴
-            [3] = {petId = 10, shiny = 0},   -- 皮皮
-        },
+        [8] = { [0] = {10,0}, [1] = {58,0} },
+        [301] = { [0] = {1,0}, [1] = {4,0}, [2] = {7,0}, [3] = {10,0} }
     }
     
     local ogres = MAP_OGRES[mapId] or {}
-    local body = ""
+    local writer = BinaryWriter.new()
     
-    -- 构建9个槽位的数据
     for i = 0, 8 do
-        local ogre = ogres[i]
-        if ogre then
-            -- 稀有精灵随机出现 (10%几率变成闪光)
-            local shiny = ogre.shiny
-            if shiny == 0 and math.random() < 0.1 then
-                shiny = 1
-            end
-            body = body .. writeUInt32BE(ogre.petId)
-            body = body .. writeUInt32BE(shiny)
+        local data = ogres[i]
+        if data then
+            local pid = data[1]
+            local shiny = data[2]
+            if shiny == 0 and math.random() < 0.1 then shiny = 1 end
+            writer:writeUInt32BE(pid)
+            writer:writeUInt32BE(shiny)
         else
-            body = body .. writeUInt32BE(0)  -- 无怪物
-            body = body .. writeUInt32BE(0)
+            writer:writeUInt32BE(0)
+            writer:writeUInt32BE(0)
         end
     end
     
-    ctx.sendResponse(buildResponse(2004, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → MAP_OGRE_LIST response (map=%d)\27[0m", mapId))
+    ctx.sendResponse(buildResponse(2004, ctx.userId, 0, writer:toString()))
     return true
 end
 
--- CMD 2051: GET_SIM_USERINFO (获取简单用户信息)
--- 响应结构: userID(4) + nick(16) + color(4) + texture(4) + vip(4) + status(4) + 
---           mapType(4) + mapID(4) + isCanBeTeacher(4) + teacherID(4) + studentID(4) + 
---           graduationCount(4) + vipLevel(4) + teamId(4) + teamIsShow(4) + 
---           clothCount(4) + [clothId(4) + clothLevel(4)]...
+-- CMD 2051: GET_SIM_USERINFO
 local function handleGetSimUserInfo(ctx)
-    -- 解析请求的目标用户ID
-    local targetUserId = ctx.userId
-    if #ctx.body >= 4 then
-        targetUserId = readUInt32BE(ctx.body, 1)
-    end
+    local reader = BinaryReader.new(ctx.body)
+    local targetId = ctx.userId
+    if reader:getRemaining() ~= "" then targetId = reader:readUInt32BE() end
     
-    local user = ctx.getOrCreateUser(targetUserId)
+    local user = ctx.getOrCreateUser(targetId)
+    local writer = BinaryWriter.new()
+    
+    local nickname = user.nick or user.nickname or ("Seer" .. targetId)
+    writer:writeUInt32BE(targetId)
+    writer:writeStringFixed(nickname, 16)
+    writer:writeUInt32BE(user.color or 0x3399FF)
+    writer:writeUInt32BE(user.texture or 0)
+    writer:writeUInt32BE(user.vip or 0)
+    writer:writeUInt32BE(0) -- status
+    writer:writeUInt32BE(user.mapType or 0)
+    writer:writeUInt32BE(user.mapId or 1)
+    writer:writeUInt32BE(user.isCanBeTeacher and 1 or 0)
+    writer:writeUInt32BE(user.teacherID or 0)
+    writer:writeUInt32BE(user.studentID or 0)
+    writer:writeUInt32BE(user.graduationCount or 0)
+    writer:writeUInt32BE(user.vipLevel or 0)
+    writer:writeUInt32BE(user.teamId or 0)
+    writer:writeUInt32BE(user.teamIsShow and 1 or 0)
+    
     local clothes = user.clothes or {}
-    
-    local body = writeUInt32BE(targetUserId) ..                    -- userID (4)
-        writeFixedString(user.nick or user.nickname or user.username or ("赛尔" .. targetUserId), 16) ..              -- nick (16)
-        writeUInt32BE(user.color or 0x3399FF) ..                   -- color (4)
-        writeUInt32BE(user.texture or 0) ..                        -- texture (4)
-        writeUInt32BE(user.vip or 1) ..                            -- vip (4)
-        writeUInt32BE(0) ..                                        -- status (4)
-        writeUInt32BE(user.mapType or 0) ..                        -- mapType (4)
-        writeUInt32BE(user.mapId or 1) ..                          -- mapID (4)
-        writeUInt32BE(0) ..                                        -- isCanBeTeacher (4)
-        writeUInt32BE(user.teacherID or 0) ..                      -- teacherID (4)
-        writeUInt32BE(user.studentID or 0) ..                      -- studentID (4)
-        writeUInt32BE(user.graduationCount or 0) ..                -- graduationCount (4)
-        writeUInt32BE(user.vipLevel or 10) ..                      -- vipLevel (4)
-        writeUInt32BE(user.teamId or 0) ..                         -- teamId (4)
-        writeUInt32BE(user.teamIsShow and 1 or 0) ..               -- teamIsShow (4)
-        writeUInt32BE(#clothes)                                    -- clothCount (4)
-    
-    -- 添加服装列表
-    for _, clothId in ipairs(clothes) do
-        body = body .. writeUInt32BE(clothId) .. writeUInt32BE(0)  -- clothId + clothLevel
+    writer:writeUInt32BE(#clothes)
+    for _, c in ipairs(clothes) do
+        local cid = (type(c)=="table") and c.id or c
+        writer:writeUInt32BE(cid)
+        writer:writeUInt32BE(0)
     end
     
-    ctx.sendResponse(buildResponse(2051, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → GET_SIM_USERINFO for user %d response\27[0m", targetUserId))
+    ctx.sendResponse(buildResponse(2051, ctx.userId, 0, writer:toString()))
     return true
 end
 
--- CMD 2052: GET_MORE_USERINFO (获取详细用户信息)
--- 响应结构: userID(4) + nick(16) + regTime(4) + petAllNum(4) + petMaxLev(4) + 
---           bossAchievement(200) + graduationCount(4) + monKingWin(4) + 
---           messWin(4) + maxStage(4) + maxArenaWins(4) + curTitle(4)
--- 总长度: 4+16+4+4+4+200+4+4+4+4+4+4 = 256 bytes
+-- CMD 2052: GET_MORE_USERINFO
 local function handleGetMoreUserInfo(ctx)
-    -- 解析请求的目标用户ID
-    local targetUserId = ctx.userId
-    if #ctx.body >= 4 then
-        targetUserId = readUInt32BE(ctx.body, 1)
-    end
+    local reader = BinaryReader.new(ctx.body)
+    local targetId = ctx.userId
+    if reader:getRemaining() ~= "" then targetId = reader:readUInt32BE() end
     
-    local user = ctx.getOrCreateUser(targetUserId)
+    local user = ctx.getOrCreateUser(targetId)
+    local writer = BinaryWriter.new()
     
-    local body = writeUInt32BE(targetUserId) ..                    -- userID (4)
-        writeFixedString(user.nick or user.nickname or user.username or ("赛尔" .. targetUserId), 16) ..              -- nick (16)
-        writeUInt32BE(user.regTime or os.time()) ..                -- regTime (4)
-        writeUInt32BE(user.petAllNum or 1) ..                      -- petAllNum (4)
-        writeUInt32BE(user.petMaxLev or 100) ..                    -- petMaxLev (4)
-        string.rep("\0", 200) ..                                   -- bossAchievement (200 bytes!)
-        writeUInt32BE(user.graduationCount or 0) ..                -- graduationCount (4)
-        writeUInt32BE(user.monKingWin or 0) ..                     -- monKingWin (4)
-        writeUInt32BE(user.messWin or 0) ..                        -- messWin (4)
-        writeUInt32BE(user.maxStage or 0) ..                       -- maxStage (4)
-        writeUInt32BE(user.maxArenaWins or 0) ..                   -- maxArenaWins (4)
-        writeUInt32BE(user.curTitle or 0)                          -- curTitle (4)
+    writer:writeUInt32BE(targetId)
+    local nickname = user.nick or user.nickname or ("Seer" .. targetId)
+    writer:writeStringFixed(nickname, 16)
+    writer:writeUInt32BE(user.regTime or os.time())
+    writer:writeUInt32BE(user.petAllNum or 0)
+    writer:writeUInt32BE(user.petMaxLev or 100)
+    writer:writeStringFixed("", 200) -- bossAchievement
+    writer:writeUInt32BE(user.graduationCount or 0)
+    writer:writeUInt32BE(user.monKingWin or 0)
+    writer:writeUInt32BE(user.messWin or 0)
+    writer:writeUInt32BE(user.maxStage or 0)
+    writer:writeUInt32BE(user.maxArenaWins or 0)
+    writer:writeUInt32BE(user.curTitle or 0)
     
-    ctx.sendResponse(buildResponse(2052, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → GET_MORE_USERINFO for user %d response\27[0m", targetUserId))
+    ctx.sendResponse(buildResponse(2052, ctx.userId, 0, writer:toString()))
     return true
 end
 
--- CMD 2061: CHANGE_NICK_NAME (修改昵称)
--- ChangeUserNameInfo: userId(4) + nickName(16)
+-- CMD 2061: CHANGE_NICK_NAME
 local function handleChangeNickName(ctx)
-    local newNick = ""
-    if #ctx.body >= 16 then
-        newNick = Utils.readFixedString(ctx.body, 1, 16)
-    end
+    local reader = BinaryReader.new(ctx.body)
+    local newNick = reader:readStringFixed(16)
     
     local user = ctx.getOrCreateUser(ctx.userId)
     user.nick = newNick
     ctx.saveUserDB()
     
-    print(string.format("\27[36m[Handler] 用户 %d 修改昵称为: %s\27[0m", ctx.userId, newNick))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeStringFixed(newNick, 16)
     
-    local body = writeUInt32BE(ctx.userId) .. writeFixedString(newNick, 16)
-    ctx.sendResponse(buildResponse(2061, ctx.userId, 0, body))
-    print("\27[32m[Handler] → CHANGE_NICK_NAME response\27[0m")
+    ctx.sendResponse(buildResponse(2061, ctx.userId, 0, writer:toString()))
+    print(string.format("\27[32m[Handler] User %d changed nick to %s\27[0m", ctx.userId, newNick))
     return true
 end
 
--- CMD 2101: PEOPLE_WALK (人物移动)
--- 请求格式: walkType(4) + x(4) + y(4) + amfLen(4) + amfData...
--- 响应格式: walkType(4) + userId(4) + x(4) + y(4) + amfLen(4) + amfData...
--- 需要广播给同地图其他玩家
-local function handlePeopleWalk(ctx)
-    local walkType = 0
-    local x = 0
-    local y = 0
-    local amfLen = 0
-    local amfData = ""
-    
-    if #ctx.body >= 4 then
-        walkType = readUInt32BE(ctx.body, 1)
-    end
-    if #ctx.body >= 8 then
-        x = readUInt32BE(ctx.body, 5)
-    end
-    if #ctx.body >= 12 then
-        y = readUInt32BE(ctx.body, 9)
-    end
-    if #ctx.body >= 16 then
-        amfLen = readUInt32BE(ctx.body, 13)
-        if #ctx.body >= 16 + amfLen then
-            amfData = ctx.body:sub(17, 16 + amfLen)
-        end
-    end
-    
-    -- 更新用户位置
-    local user = ctx.getOrCreateUser(ctx.userId)
-    user.x = x
-    user.y = y
-    
-    -- 更新活跃时间
-    OnlineTracker.updateActivity(ctx.userId)
-    
-    -- 构建响应 (包含完整的 AMF 数据)
-    local body = writeUInt32BE(walkType) ..       -- walkType
-                writeUInt32BE(ctx.userId) ..      -- userId
-                writeUInt32BE(x) ..               -- x
-                writeUInt32BE(y) ..               -- y
-                writeUInt32BE(amfLen) ..          -- amfLen
-                amfData                           -- amfData (透传)
-    
-    local response = buildResponse(2101, ctx.userId, 0, body)
-    
-    -- 获取当前地图并广播给同地图所有玩家
-    local currentMapId = OnlineTracker.getPlayerMap(ctx.userId)
-    if currentMapId > 0 then
-        -- 广播给同地图所有玩家 (包括自己)
-        local playersInMap = OnlineTracker.getPlayersInMap(currentMapId)
-        for _, playerId in ipairs(playersInMap) do
-            OnlineTracker.sendToPlayer(playerId, response)
-        end
-    else
-        -- 如果没有地图信息，只回复给自己
-        ctx.sendResponse(response)
-    end
-    
-    return true
-end
-
--- CMD 2102: CHAT (聊天)
--- ChatInfo: senderID(4) + senderNickName(16) + toID(4) + msgLen(4) + msg
-local function handleChat(ctx)
-    local chatType = 0
-    local msgLen = 0
-    local message = ""
-    
-    if #ctx.body >= 4 then
-        chatType = readUInt32BE(ctx.body, 1)
-    end
-    if #ctx.body >= 8 then
-        msgLen = readUInt32BE(ctx.body, 5)
-        if #ctx.body >= 8 + msgLen then
-            message = ctx.body:sub(9, 8 + msgLen)
-        end
-    end
-    
-    local user = ctx.getOrCreateUser(ctx.userId)
-    local nickname = user.nick or user.nickname or user.username or ("赛尔" .. ctx.userId)
-    
-    -- 构建聊天响应
-    local body = writeUInt32BE(ctx.userId) ..
-                writeFixedString(nickname, 16) ..
-                writeUInt32BE(0) ..              -- toID (0=公共)
-                writeUInt32BE(#message) ..
-                message
-    
-    local response = buildResponse(2102, ctx.userId, 0, body)
-    
-    -- 广播给同地图所有玩家
-    local currentMapId = OnlineTracker.getPlayerMap(ctx.userId)
-    if currentMapId > 0 then
-        local playersInMap = OnlineTracker.getPlayersInMap(currentMapId)
-        for _, playerId in ipairs(playersInMap) do
-            OnlineTracker.sendToPlayer(playerId, response)
-        end
-    else
-        ctx.sendResponse(response)
-    end
-    
-    print(string.format("\27[32m[Handler] → CHAT: %s\27[0m", message:sub(1, 20)))
-    return true
-end
-
--- CMD 2112: ON_OR_OFF_FLYING (NONO飞行模式开关)
--- 请求: flyMode(4) - 0=关闭, 1-4=飞行样式
--- 响应: userId(4) + flyMode(4)
--- 需要广播给同地图其他玩家
-local function handleOnOrOffFlying(ctx)
-    local flyMode = 0
-    if #ctx.body >= 4 then
-        flyMode = readUInt32BE(ctx.body, 1)
-    end
-    
-    -- 保存飞行状态到用户数据
-    local user = ctx.getOrCreateUser(ctx.userId)
-    user.flyMode = flyMode
-    -- 同步更新 actionType: 飞行模式(>0)时 actionType=1，否则=0
-    user.actionType = (flyMode > 0) and 1 or 0
-    ctx.saveUserDB()
-    
-    -- 构建响应: userId + flyMode
-    local body = writeUInt32BE(ctx.userId) .. writeUInt32BE(flyMode)
-    local response = buildResponse(2112, ctx.userId, 0, body)
-    
-    -- 发送给自己
-    ctx.sendResponse(response)
-    
-    -- 广播给同地图其他玩家
-    if ctx.broadcastToMap then
-        ctx.broadcastToMap(response, ctx.userId)
-    end
-    
-    print(string.format("\27[32m[Handler] → ON_OR_OFF_FLYING mode=%d\27[0m", flyMode))
-    return true
-end
-
--- CMD 2103: DANCE_ACTION (舞蹈动作)
-local function handleDanceAction(ctx)
-    local actionId = 0
-    local actionType = 0
-    if #ctx.body >= 8 then
-        actionId = readUInt32BE(ctx.body, 1)
-        actionType = readUInt32BE(ctx.body, 5)
-    end
-    local body = writeUInt32BE(ctx.userId) ..
-        writeUInt32BE(actionId) ..
-        writeUInt32BE(actionType)
-    ctx.sendResponse(buildResponse(2103, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → DANCE_ACTION %d response\27[0m", actionId))
-    return true
-end
-
--- CMD 2104: AIMAT (瞄准/交互)
-local function handleAimat(ctx)
-    local targetType, targetId, x, y = 0, 0, 0, 0
-    if #ctx.body >= 16 then
-        targetType = readUInt32BE(ctx.body, 1)
-        targetId = readUInt32BE(ctx.body, 5)
-        x = readUInt32BE(ctx.body, 9)
-        y = readUInt32BE(ctx.body, 13)
-    end
-    local body = writeUInt32BE(ctx.userId) ..
-        writeUInt32BE(targetType) ..
-        writeUInt32BE(targetId) ..
-        writeUInt32BE(x) ..
-        writeUInt32BE(y)
-    ctx.sendResponse(buildResponse(2104, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → AIMAT type=%d id=%d pos=(%d,%d)\27[0m", targetType, targetId, x, y))
-    return true
-end
-
--- CMD 2063: CHANGE_COLOR (改变角色颜色)
--- 请求: newColor(4)
--- 响应: userID(4) + newColor(4) + coinCost(4) + remainCoins(4)
+-- CMD 2063: CHANGE_COLOR
 local function handleChangeColor(ctx)
-    local newColor = 0xFFFFFF  -- 默认白色
-    if #ctx.body >= 4 then
-        newColor = readUInt32BE(ctx.body, 1)
-    end
+    local reader = BinaryReader.new(ctx.body)
+    local newColor = reader:readUInt32BE()
     
     local user = ctx.getOrCreateUser(ctx.userId)
-    
-    -- 改变颜色可能需要消耗金币 (官服为0，即免费)
-    local coinCost = 0
-    local remainCoins = user.coins or 0
-    
-    -- 更新用户颜色
     user.color = newColor
     ctx.saveUserDB()
     
-    -- 构建响应: userID(4) + newColor(4) + coinCost(4) + remainCoins(4)
-    local body = writeUInt32BE(ctx.userId) ..
-        writeUInt32BE(newColor) ..
-        writeUInt32BE(coinCost) ..
-        writeUInt32BE(remainCoins)
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeUInt32BE(newColor)
+    writer:writeUInt32BE(0) -- cost
+    writer:writeUInt32BE(user.coins or 0) -- remain
     
-    ctx.sendResponse(buildResponse(2063, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → CHANGE_COLOR 0x%06X response (coins=%d)\27[0m", newColor, remainCoins))
+    ctx.sendResponse(buildResponse(2063, ctx.userId, 0, writer:toString()))
+    print(string.format("\27[32m[Handler] User %d changed color to 0x%X\27[0m", ctx.userId, newColor))
     return true
 end
 
--- CMD 2111: PEOPLE_TRANSFROM (变身)
--- TransformInfo: userID(4) + changeShape(4)
-local function handlePeopleTransform(ctx)
-    local transformId = 0
-    if #ctx.body >= 4 then
-        transformId = readUInt32BE(ctx.body, 1)
+-- CMD 2101: PEOPLE_WALK
+local function handlePeopleWalk(ctx)
+    local reader = BinaryReader.new(ctx.body)
+    local walkType = reader:readUInt32BE()
+    local x = reader:readUInt32BE()
+    local y = reader:readUInt32BE()
+    local amfLen = reader:readUInt32BE()
+    local amfData = reader:readBytes(amfLen)
+    
+    -- Update User
+    local user = ctx.getOrCreateUser(ctx.userId)
+    user.x = x
+    user.y = y
+    OnlineTracker.updateActivity(ctx.userId)
+    
+    -- Construct Response
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(walkType)
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeUInt32BE(x)
+    writer:writeUInt32BE(y)
+    writer:writeUInt32BE(amfLen)
+    writer:writeBytes(amfData)
+    
+    local resp = buildResponse(2101, ctx.userId, 0, writer:toString())
+    
+    -- Broadcast
+    local mapId = OnlineTracker.getPlayerMap(ctx.userId)
+    if mapId > 0 then
+        local players = OnlineTracker.getPlayersInMap(mapId)
+        for _, pid in ipairs(players) do
+            OnlineTracker.sendToPlayer(pid, resp)
+        end
+    else
+        ctx.sendResponse(resp)
     end
-    local body = writeUInt32BE(ctx.userId) .. writeUInt32BE(transformId)
-    ctx.sendResponse(buildResponse(2111, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → PEOPLE_TRANSFROM %d response\27[0m", transformId))
+    
     return true
 end
 
--- 注册所有处理器
+-- CMD 2102: CHAT
+local function handleChat(ctx)
+    local reader = BinaryReader.new(ctx.body)
+    local chatType = reader:readUInt32BE() -- Unused by client in response?
+    local msgLen = reader:readUInt32BE()
+    local msg = reader:readBytes(msgLen)
+    
+    local user = ctx.getOrCreateUser(ctx.userId)
+    local nickname = user.nick or user.nickname or ("Seer" .. ctx.userId)
+    
+    -- Client ChatInfo: senderID(4), senderNick(16), toID(4), msgLen(4), msg
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeStringFixed(nickname, 16)
+    writer:writeUInt32BE(0) -- toID (0=public)
+    writer:writeUInt32BE(#msg)
+    writer:writeBytes(msg)
+    
+    local resp = buildResponse(2102, ctx.userId, 0, writer:toString())
+    
+    local mapId = OnlineTracker.getPlayerMap(ctx.userId)
+    if mapId > 0 then
+        local players = OnlineTracker.getPlayersInMap(mapId)
+        for _, pid in ipairs(players) do
+            OnlineTracker.sendToPlayer(pid, resp)
+        end
+    else
+        ctx.sendResponse(resp)
+    end
+    
+    print(string.format("\27[32m[Handler] CHAT: %s\27[0m", msg))
+    return true
+end
+
+-- CMD 2111: PEOPLE_TRANSFROM
+local function handlePeopleTransform(ctx)
+    local reader = BinaryReader.new(ctx.body)
+    local transId = reader:readUInt32BE()
+    
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeUInt32BE(transId)
+    
+    ctx.sendResponse(buildResponse(2111, ctx.userId, 0, writer:toString()))
+    return true
+end
+
+-- CMD 2112: ON_OR_OFF_FLYING
+local function handleOnOrOffFlying(ctx)
+    local reader = BinaryReader.new(ctx.body)
+    local flyMode = reader:readUInt32BE()
+    
+    local user = ctx.getOrCreateUser(ctx.userId)
+    user.flyMode = flyMode
+    user.actionType = (flyMode > 0) and 1 or 0
+    ctx.saveUserDB()
+    
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeUInt32BE(flyMode)
+    
+    local resp = buildResponse(2112, ctx.userId, 0, writer:toString())
+    ctx.sendResponse(resp)
+    
+    if ctx.broadcastToMap then
+        ctx.broadcastToMap(resp, ctx.userId)
+    end
+    
+    return true
+end
+
+-- CMD 2103: DANCE_ACTION
+local function handleDanceAction(ctx)
+    local reader = BinaryReader.new(ctx.body)
+    local aid = reader:readUInt32BE()
+    local atype = reader:readUInt32BE()
+    
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeUInt32BE(aid)
+    writer:writeUInt32BE(atype)
+    
+    ctx.sendResponse(buildResponse(2103, ctx.userId, 0, writer:toString()))
+    return true
+end
+
+-- CMD 2104: AIMAT (交互/瞄准)
+local function handleAimat(ctx)
+    local reader = BinaryReader.new(ctx.body)
+    local tType = reader:readUInt32BE()
+    local tId = reader:readUInt32BE()
+    local x = reader:readUInt32BE()
+    local y = reader:readUInt32BE()
+    
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeUInt32BE(tType)
+    writer:writeUInt32BE(tId)
+    writer:writeUInt32BE(x)
+    writer:writeUInt32BE(y)
+    
+    ctx.sendResponse(buildResponse(2104, ctx.userId, 0, writer:toString()))
+    return true
+end
+
 function MapHandlers.register(Handlers)
     Handlers.register(2001, handleEnterMap)
     Handlers.register(2002, handleLeaveMap)
@@ -691,7 +530,7 @@ function MapHandlers.register(Handlers)
     Handlers.register(2104, handleAimat)
     Handlers.register(2111, handlePeopleTransform)
     Handlers.register(2112, handleOnOrOffFlying)
-    print("\27[36m[Handlers] 地图命令处理器已注册\27[0m")
+    print("\27[36m[Handlers] Map Handlers Registered (v2.0 fixed)\27[0m")
 end
 
 return MapHandlers

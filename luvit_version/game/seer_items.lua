@@ -1,5 +1,4 @@
-local fs = require("fs")
-local xml_parser = require("./gameserver/xml_parser")
+local XmlLoader = require("../core/xml_loader")
 
 local SeerItems = {}
 local itemsMap = {}
@@ -10,17 +9,15 @@ function SeerItems.load()
     if SeerItems.loaded then return end
     
     print("Loading items from data/items.xml...")
-    local data = fs.readFileSync("data/items.xml")
-    if not data then 
-        print("Error: data/items.xml not found")
+    local tree, err = XmlLoader.load("data/items.xml")
+    
+    if not tree then 
+        print("Error loading items: " .. (err or "unknown error"))
         return 
     end
     
-    local parser = xml_parser:new()
-    local tree = parser:parse(data)
-    
-    if not tree or tree.name ~= "Items" then
-        print("Error: Invalid items.xml format")
+    if tree.name ~= "Items" then
+        print("Error: Invalid items.xml format (root is " .. tostring(tree.name) .. ")")
         return
     end
     

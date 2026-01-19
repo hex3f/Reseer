@@ -62,7 +62,7 @@ end
 
 -- 注册所有处理器
 function ExchangeHandlers.register(Handlers)
-    Handlers.register(2901, handleExchangeClothComplete)
+    -- Handlers.register(2901, handleExchangeClothComplete) -- Handled in item_handlers.lua
     Handlers.register(2902, handleExchangePetComplete)
     Handlers.register(2251, handleExchangeOre)
     Handlers.register(2065, handleExchangeNewYear)

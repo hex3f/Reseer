@@ -4,12 +4,12 @@ local lpp = {}
 lpp.handler = {}
 local buffer = require "buffer"
 local srv = require "./server"
-local UserDB = require "../userdb"
-local md5 = require "../md5"
+local UserDB = require "../../core/userdb"
+local md5 = require "../../utils/md5"
 local offset = 17
 
 -- 从 Logger 模块获取 tprint
-local Logger = require('../logger')
+local Logger = require('../../core/logger')
 local tprint = Logger.tprint
 
 -- 用户数据库实例

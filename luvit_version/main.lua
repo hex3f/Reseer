@@ -2,7 +2,7 @@
 -- 改自 RecMole (摩尔庄园私服)
 
 -- 初始化日志系统
-local Logger = require("./logger")
+local Logger = require("./core/logger")
 Logger.init()
 
 print("\27[36m╔════════════════════════════════════════════════════════════╗\27[0m")
@@ -125,11 +125,11 @@ end
 
 generateFrontendConfig()
 
-require "./buffer_extension"
-require "./ressrv"
-require "./loginip"
-require "./oauthserver"
-require "./apiserver"  -- API 服务器（提供配置管理和模式切换）
+require "./utils/buffer_extension"
+require "./servers/ressrv"
+require "./servers/loginip"
+require "./servers/oauthserver"
+require "./servers/apiserver"  -- API 服务器（提供配置管理和模式切换）
 
 -- ============================================================
 -- 数据预加载（在服务器启动前加载所有数据文件）
@@ -140,7 +140,7 @@ local dataLoadSuccess = true
 
 -- 1. 加载精灵数据
 print("\27[36m[数据加载] 正在加载精灵数据...\27[0m")
-local Pets = require("./seer_pets")
+local Pets = require("./game/seer_pets")
 Pets.load()
 
 -- 统计加载的精灵数量
@@ -160,7 +160,7 @@ end
 
 -- 2. 加载物品数据
 print("\27[36m[数据加载] 正在加载物品数据...\27[0m")
-local Items = require("./seer_items")
+local Items = require("./game/seer_items")
 Items.load()
 if not Items.loaded then
     print("\27[31m[错误] 物品数据加载失败！\27[0m")
@@ -172,7 +172,7 @@ end
 
 -- 3. 加载技能数据
 print("\27[36m[数据加载] 正在加载技能数据...\27[0m")
-local Skills = require("./seer_skills")
+local Skills = require("./game/seer_skills")
 Skills.load()
 if not Skills.loaded then
     print("\27[31m[错误] 技能数据加载失败！\27[0m")
@@ -188,7 +188,7 @@ end
 
 -- 4. 加载技能效果数据
 print("\27[36m[数据加载] 正在加载技能效果数据...\27[0m")
-local SkillEffects = require("./seer_skill_effects")
+local SkillEffects = require("./game/seer_skill_effects")
 SkillEffects.load()
 if not SkillEffects.loaded then
     print("\27[31m[错误] 技能效果数据加载失败！\27[0m")
@@ -219,15 +219,15 @@ if conf.local_server_mode then
     
     -- 创建会话管理器（统一状态管理）
     print("\27[36m[初始化] 创建会话管理器...\27[0m")
-    local SessionManager = require "./session_manager"
+    local SessionManager = require "./core/session_manager"
     local sessionManager = SessionManager:new()
     
     -- 启动游戏服务器（已包含家园系统）
-    local lgs = require "./gameserver/localgameserver"
+    local lgs = require "./servers/gameserver/localgameserver"
     local gameServer = lgs.LocalGameServer:new(nil, sessionManager)
     
     -- 启动登录服务器
-    require "./loginserver/login"
+    require "./servers/loginserver/login"
     
     -- 添加定时清理任务
     local timer = require('timer')
@@ -263,13 +263,13 @@ else
     print("")
     
     -- 启动游戏服务器代理
-    local gs = conf.trafficlogger and require "./gameserver/trafficlogger" or require "./gameserver/gameserver"
+    local gs = conf.trafficlogger and require "./servers/gameserver/trafficlogger" or require "./servers/gameserver/gameserver"
     gs.GameServer:new()
     
     -- 启动房间代理服务器（用于官服房间转发）
     print("\27[36m[官服代理] 启动房间代理服务器 (端口 5100)...\27[0m")
     local ok, result = pcall(function()
-        local RoomProxy = require "./room_proxy"
+        local RoomProxy = require "./servers/room_proxy"
         return RoomProxy:new(5100)
     end)
     if ok then
@@ -280,7 +280,7 @@ else
     end
     
     -- 启动登录服务器代理
-    local _ = conf.trafficlogger and require "./loginserver/trafficloggerlogin" or require "./loginserver/login"
+    local _ = conf.trafficlogger and require "./servers/loginserver/trafficloggerlogin" or require "./servers/loginserver/login"
 end
 
 -- 定时器保持进程活跃
@@ -312,7 +312,7 @@ local function saveAllData()
     end
     
     print("\27[33m[SHUTDOWN] 正在保存所有用户数据...\27[0m")
-    local success, UserDB = pcall(require, "./userdb")
+    local success, UserDB = pcall(require, "./core/userdb")
     if success then
         local db = UserDB:new(conf)
         db:save()

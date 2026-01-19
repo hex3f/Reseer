@@ -2,7 +2,7 @@
 -- 监听 5100 端口，转发所有数据到官服房间服务器
 
 local net = require('net')
-local Logger = require('./logger')
+local Logger = require('../core/logger')
 local tprint = Logger.tprint
 
 local RoomProxy = {}

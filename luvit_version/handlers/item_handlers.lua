@@ -18,7 +18,7 @@ local ITEM_TYPE = {
     NONO_ITEM_END = 299999,    -- NONO道具结束
 }
 
-local GameConfig = require('../game_config')
+local GameConfig = require('../config/game_config')
 local fs = require('fs')
 
 -- 缓存物品价格表

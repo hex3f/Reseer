@@ -2,8 +2,7 @@
 -- 赛尔号技能效果数据
 -- 从 data/skill_effects.xml 加载完整效果信息
 
-local fs = require("fs")
-local xml_parser = require("./gameserver/xml_parser")
+local XmlLoader = require("../core/xml_loader")
 
 local SeerSkillEffects = {}
 local effectsMap = {}
@@ -14,14 +13,12 @@ function SeerSkillEffects.load()
     if SeerSkillEffects.loaded then return end
     
     print("Loading skill effects from data/skill_effects.xml...")
-    local data = fs.readFileSync("data/skill_effects.xml")
-    if not data then 
-        print("Error: data/skill_effects.xml not found")
+    local tree, err = XmlLoader.load("data/skill_effects.xml")
+    
+    if not tree then 
+        print("Error loading skill effects: " .. (err or "unknown error"))
         return 
     end
-    
-    local parser = xml_parser:new()
-    local tree = parser:parse(data)
     
     local count = 0
     

@@ -2,8 +2,7 @@
 -- 赛尔号技能数据
 -- 从 data/skills.xml 加载完整技能信息
 
-local fs = require("fs")
-local xml_parser = require("./gameserver/xml_parser")
+local XmlLoader = require("../core/xml_loader")
 
 local SeerSkills = {}
 SeerSkills.skills = {}
@@ -14,15 +13,12 @@ function SeerSkills.load()
     if SeerSkills.loaded then return end
     
     print("Loading skills from data/skills.xml...")
-    local content = fs.readFileSync("data/skills.xml")
+    local tree, err = XmlLoader.load("data/skills.xml")
     
-    if not content then
-        print("\27[31m[SeerSkills] 无法读取技能数据文件\27[0m")
+    if not tree then
+        print(string.format("\27[31m[SeerSkills] 无法读取技能数据文件: %s\27[0m", err or "unknown"))
         return
     end
-    
-    local parser = xml_parser:new()
-    local tree = parser:parse(content)
     
     if not tree or (tree.name ~= "MovesTbl" and tree.name ~= "Moves") then
         -- Handle case where root is MovesTbl or just Moves

@@ -29,7 +29,7 @@ function UserDB:new(config)
     end
     
     local obj = {
-        dbPath = scriptDir .. "users.json",
+        dbPath = scriptDir .. "../users.json",
         users = {},
         gameData = {},
         isLocalMode = (config and config.local_server_mode) or true  -- 默认本地模式
@@ -231,7 +231,7 @@ function UserDB:getOrCreateGameData(userId)
     local key = tostring(userId)
     if not self.gameData[key] then
         -- 加载游戏配置
-        local GameConfig = require("./game_config")
+        local GameConfig = require("../config/game_config")
         
         -- 从账号数据获取昵称和颜色
         local loginUser = self:findByUserId(userId)
@@ -417,10 +417,10 @@ function UserDB:addItem(userId, itemId, count)
     
     -- 检查是否有任务需要此物品（获得物品类型任务）
     -- 使用 pcall 避免 require 失败导致整个函数崩溃
-    local success, SeerTaskConfig = pcall(require, "data/seer_task_config")
+    local success, SeerTaskConfig = pcall(require, "../data/seer_task_config")
     if not success then
         -- 如果加载失败，尝试相对路径
-        success, SeerTaskConfig = pcall(require, "./data/seer_task_config")
+        success, SeerTaskConfig = pcall(require, "data/seer_task_config")
     end
     
     if success and data.tasks then

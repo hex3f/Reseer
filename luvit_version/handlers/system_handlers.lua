@@ -1,11 +1,10 @@
 -- 系统相关命令处理器
 -- 包括: 登录、时间、服务器列表等
+-- Protocol Version: 2026-01-20 (Refactored using BinaryWriter)
 
 local Utils = require('./utils')
-local writeUInt32BE = Utils.writeUInt32BE
-local writeUInt16BE = Utils.writeUInt16BE
-local readUInt32BE = Utils.readUInt32BE
-local writeFixedString = Utils.writeFixedString
+local BinaryWriter = require('../utils/binary_writer')
+local BinaryReader = require('../utils/binary_reader')
 local buildResponse = Utils.buildResponse
 local OnlineTracker = require('./online_tracker')
 
@@ -22,30 +21,26 @@ local function handleCommendOnline(ctx)
             id = i,
             userCnt = math.random(10, 60),
             ip = "127.0.0.1",
-            port = 5000,  -- 统一游戏服务器端口
+            port = 5000,
             friends = 0
         })
     end
     
-    local maxOnlineID = #serverList
-    local isVIP = 0
-    local onlineCnt = #serverList
-    
-    local body = writeUInt32BE(maxOnlineID) ..
-                 writeUInt32BE(isVIP) ..
-                 writeUInt32BE(onlineCnt)
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(#serverList)            -- maxOnlineID
+    writer:writeUInt32BE(0)                      -- isVIP
+    writer:writeUInt32BE(#serverList)            -- onlineCnt
     
     for _, server in ipairs(serverList) do
-        body = body ..
-            writeUInt32BE(server.id) ..
-            writeUInt32BE(server.userCnt) ..
-            writeFixedString(server.ip, 16) ..
-            writeUInt16BE(server.port) ..
-            writeUInt32BE(server.friends)
+        writer:writeUInt32BE(server.id)
+        writer:writeUInt32BE(server.userCnt)
+        writer:writeStringFixed(server.ip, 16)
+        writer:writeUInt16BE(server.port)
+        writer:writeUInt32BE(server.friends)
     end
     
-    ctx.sendResponse(buildResponse(105, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → COMMEND_ONLINE response (%d servers)\27[0m", onlineCnt))
+    ctx.sendResponse(buildResponse(105, ctx.userId, 0, writer:toString()))
+    print(string.format("\27[32m[Handler] → COMMEND_ONLINE response (%d servers)\27[0m", #serverList))
     return true
 end
 
@@ -56,9 +51,10 @@ local function handleRangeOnline(ctx)
     local startId = 1
     local endId = 29
     
-    if #ctx.body >= 8 then
-        startId = readUInt32BE(ctx.body, 1)
-        endId = readUInt32BE(ctx.body, 5)
+    local reader = BinaryReader.new(ctx.body)
+    if reader:getRemaining() ~= "" then
+        startId = reader:readUInt32BE()
+        endId = reader:readUInt32BE()
     end
     
     local servers = {}
@@ -72,34 +68,30 @@ local function handleRangeOnline(ctx)
         })
     end
     
-    local body = writeUInt32BE(#servers)
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(#servers)
     
     for _, server in ipairs(servers) do
-        body = body ..
-            writeUInt32BE(server.id) ..
-            writeUInt32BE(server.userCnt) ..
-            writeFixedString(server.ip, 16) ..
-            writeUInt16BE(server.port) ..
-            writeUInt32BE(server.friends)
+        writer:writeUInt32BE(server.id)
+        writer:writeUInt32BE(server.userCnt)
+        writer:writeStringFixed(server.ip, 16)
+        writer:writeUInt16BE(server.port)
+        writer:writeUInt32BE(server.friends)
     end
     
-    ctx.sendResponse(buildResponse(106, ctx.userId, 0, body))
+    ctx.sendResponse(buildResponse(106, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → RANGE_ONLINE response (%d-%d, %d servers)\27[0m", 
         startId, endId, #servers))
     return true
 end
 
 -- CMD 1001: LOGIN_IN (登录游戏服务器)
--- 这是最核心的命令，需要返回完整的用户信息
--- 响应由 SeerLoginResponse 模块生成
 local function handleLoginIn(ctx)
-    -- 从 body 中提取 session (如果有)
     local session = ""
-    if #ctx.body >= 16 then
+    if ctx.body and #ctx.body >= 16 then
         session = ctx.body:sub(1, 16)
     end
     
-    -- 获取完整用户数据
     local user = {}
     if ctx.gameServer and ctx.gameServer.userdb then
         local db = ctx.gameServer.userdb:new()
@@ -116,22 +108,20 @@ local function handleLoginIn(ctx)
             for k, v in pairs(gameData) do user[k] = v end
         end
     else
-        -- 如果没有数据库，使用 getOrCreateUser
         user = ctx.getOrCreateUser(ctx.userId)
     end
     
-    -- 确保基本字段存在
+    -- 确保基本字段
     user.userid = ctx.userId
     user.nick = user.nick or user.nickname or ("Seer" .. ctx.userId)
-    user.coins = user.coins or 99999
+    user.coins = user.coins or 2000
     user.mapID = user.mapID or 1
-    user.energy = user.energy or 100000
     
     -- 生成登录响应
-    local SeerLoginResponse = require('../gameserver/seer_login_response')
+    local SeerLoginResponse = require('../servers/gameserver/seer_login_response')
     local responseBody, keySeed = SeerLoginResponse.makeLoginResponse(user)
     
-    -- 更新密钥（如果支持）
+    -- Update Crypto Key
     if ctx.gameServer and ctx.gameServer.cryptoMap and ctx.clientData then
         local crypto = ctx.gameServer.cryptoMap[ctx.clientData]
         if crypto then
@@ -143,24 +133,21 @@ local function handleLoginIn(ctx)
     ctx.sendResponse(buildResponse(1001, ctx.userId, 0, responseBody))
     print(string.format("\27[32m[Handler] → LOGIN_IN response (user=%d)\27[0m", ctx.userId))
     
-    -- 如果用户已经是超能NONO，发送 VIP_CO (8006) 强制更新客户端状态
-    -- 这是必须的，因为客户端依赖 VIP_CO 来刷新 MainManager.actorInfo.superNono
+    -- VIP_CO Check
     local nono = user.nono or {}
     if nono.superNono and nono.superNono > 0 then
-        local vipBody = ""
-        vipBody = vipBody .. writeUInt32BE(ctx.userId)                -- userId
-        vipBody = vipBody .. writeUInt32BE(2)                         -- vipFlag=2 (超能NONO)
-        vipBody = vipBody .. writeUInt32BE(nono.autoCharge or 0)      -- autoCharge
-        local endTime = nono.vipEndTime
-        if not endTime or endTime == 0 then
-            endTime = 0x7FFFFFFF
-        end
-        vipBody = vipBody .. writeUInt32BE(endTime)      -- vipEndTime
-        ctx.sendResponse(buildResponse(8006, ctx.userId, 0, vipBody))
+        local writer = BinaryWriter.new()
+        writer:writeUInt32BE(ctx.userId)
+        writer:writeUInt32BE(2) -- flag
+        writer:writeUInt32BE(nono.autoCharge or 0)
+        local endTime = nono.vipEndTime or 0
+        if endTime == 0 then endTime = 0x7FFFFFFF end
+        writer:writeUInt32BE(endTime)
+        ctx.sendResponse(buildResponse(8006, ctx.userId, 0, writer:toString()))
         print(string.format("\27[35m[Handler] → VIP_CO 发送超能NONO状态 (endTime=%d)\27[0m", endTime))
     end
     
-    -- 标记已登录并启动心跳（如果支持）
+    -- Start Heartbeat
     if ctx.clientData then
         ctx.clientData.loggedIn = true
         if ctx.gameServer and ctx.gameServer.startHeartbeat then
@@ -172,97 +159,87 @@ local function handleLoginIn(ctx)
 end
 
 -- CMD 1002: SYSTEM_TIME (系统时间)
--- SystemTimeInfo: timestamp(4) + num(4)
 local function handleSystemTime(ctx)
     local timestamp = os.time()
-    local body = writeUInt32BE(timestamp) .. writeUInt32BE(0)
-    ctx.sendResponse(buildResponse(1002, ctx.userId, 0, body))
-    -- 不打印日志，因为这个命令太频繁
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(timestamp)
+    writer:writeUInt32BE(0) -- num
+    ctx.sendResponse(buildResponse(1002, ctx.userId, 0, writer:toString()))
     return true
 end
 
--- CMD 1004: MAP_HOT (地图热度/热门地图列表)
--- MapHotInfo: count(4) + [mapId(4) + hotValue(4)]...
--- 地图列表与官服一致 (29个地图，固定顺序)
--- 在线人数从 OnlineTracker 实时获取
+-- CMD 1004: MAP_HOT (地图热度)
 local function handleMapHot(ctx)
-    -- 官服地图列表 (29个地图，固定顺序)
     local officialMaps = {
         1, 4, 5, 325, 6, 7, 8, 328, 9, 10,
         333, 15, 17, 338, 19, 20, 25, 30,
         101, 102, 103, 40, 107, 47, 51, 54, 57, 314, 60
     }
     
-    -- 获取各地图的实时在线人数
     local mapOnlineCounts = {}
     local mapCounts = OnlineTracker.getAllMapCounts()
     for _, data in ipairs(mapCounts) do
         mapOnlineCounts[data.mapId] = data.count
     end
     
-    -- 构建响应 (按官服顺序)
-    local body = writeUInt32BE(#officialMaps)  -- count = 29
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(#officialMaps)
     for _, mapId in ipairs(officialMaps) do
-        local onlineCount = mapOnlineCounts[mapId] or 0  -- 实时在线人数，默认0
-        body = body .. writeUInt32BE(mapId)
-        body = body .. writeUInt32BE(onlineCount)
+        local onlineCount = mapOnlineCounts[mapId] or 0
+        writer:writeUInt32BE(mapId)
+        writer:writeUInt32BE(onlineCount)
     end
     
-    ctx.sendResponse(buildResponse(1004, ctx.userId, 0, body))
+    ctx.sendResponse(buildResponse(1004, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → MAP_HOT response (%d maps, %d online)\27[0m", 
         #officialMaps, OnlineTracker.getOnlineCount()))
     return true
 end
 
--- CMD 1005: GET_IMAGE_ADDRESS (获取图片地址)
--- GetImgAddrInfo: ip(16) + port(2) + session(16)
+-- CMD 1005: GET_IMAGE_ADDRESS
 local function handleGetImageAddress(ctx)
-    local ip = "127.0.0.1"
-    local ipBytes = writeFixedString(ip, 16)
-    local body = ipBytes ..
-        string.char(0, 80) ..  -- port = 80 (big-endian)
-        string.rep("\0", 16)   -- session (16字节)
-    ctx.sendResponse(buildResponse(1005, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeStringFixed("127.0.0.1", 16)
+    writer:writeUInt16BE(80)           -- port
+    writer:writeStringFixed("", 16)    -- session
+    ctx.sendResponse(buildResponse(1005, ctx.userId, 0, writer:toString()))
     print("\27[32m[Handler] → GET_IMAGE_ADDRESS response\27[0m")
     return true
 end
 
--- CMD 1102: MONEY_BUY_PRODUCT (金币购买商品)
--- MoneyBuyProductInfo: unknown(4) + payMoney(4) + money(4)
+-- CMD 1102: MONEY_BUY_PRODUCT
 local function handleMoneyBuyProduct(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
-    local money = (user.money or 10000) * 100  -- 转换为分
-    local body = writeUInt32BE(0) ..       -- unknown
-                writeUInt32BE(0) ..        -- payMoney (花费0)
-                writeUInt32BE(money)       -- 剩余金币
-    ctx.sendResponse(buildResponse(1102, ctx.userId, 0, body))
-    print("\27[32m[Handler] → MONEY_BUY_PRODUCT response\27[0m")
+    local money = (user.money or 10000) * 100
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(0)      -- unknown
+    writer:writeUInt32BE(0)      -- payMoney
+    writer:writeUInt32BE(money)  -- remain
+    ctx.sendResponse(buildResponse(1102, ctx.userId, 0, writer:toString()))
     return true
 end
 
--- CMD 1104: GOLD_BUY_PRODUCT (钻石购买商品)
--- GoldBuyProductInfo: unknown(4) + payGold(4) + gold(4)
+-- CMD 1104: GOLD_BUY_PRODUCT
 local function handleGoldBuyProduct(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
-    local gold = (user.gold or 0) * 100  -- 转换为分
-    local body = writeUInt32BE(0) ..       -- unknown
-                writeUInt32BE(0) ..        -- payGold (花费0)
-                writeUInt32BE(gold)        -- 剩余钻石
-    ctx.sendResponse(buildResponse(1104, ctx.userId, 0, body))
-    print("\27[32m[Handler] → GOLD_BUY_PRODUCT response\27[0m")
+    local gold = (user.gold or 0) * 100
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(0)      -- unknown
+    writer:writeUInt32BE(0)      -- payGold
+    writer:writeUInt32BE(gold)   -- remain
+    ctx.sendResponse(buildResponse(1104, ctx.userId, 0, writer:toString()))
     return true
 end
 
--- CMD 1106: GOLD_ONLINE_CHECK_REMAIN (检查金币余额)
+-- CMD 1106: GOLD_ONLINE_CHECK_REMAIN
 local function handleGoldOnlineCheckRemain(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
-    local body = writeUInt32BE(user.gold or 0)
-    ctx.sendResponse(buildResponse(1106, ctx.userId, 0, body))
-    print("\27[32m[Handler] → GOLD_ONLINE_CHECK_REMAIN response\27[0m")
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(user.gold or 0)
+    ctx.sendResponse(buildResponse(1106, ctx.userId, 0, writer:toString()))
     return true
 end
 
--- 注册所有处理器
 function SystemHandlers.register(Handlers)
     Handlers.register(105, handleCommendOnline)
     Handlers.register(106, handleRangeOnline)
@@ -273,7 +250,7 @@ function SystemHandlers.register(Handlers)
     Handlers.register(1102, handleMoneyBuyProduct)
     Handlers.register(1104, handleGoldBuyProduct)
     Handlers.register(1106, handleGoldOnlineCheckRemain)
-    print("\27[36m[Handlers] 系统命令处理器已注册\27[0m")
+    print("\27[36m[Handlers] System Handlers Registered (v2.0 fixed)\27[0m")
 end
 
 return SystemHandlers

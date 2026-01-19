@@ -4,11 +4,14 @@
 local fs = require('fs')
 local JSON = require('json')
 
+local PacketUtils = require('../core/packet_utils')
+
 local ServerList = {}
 ServerList.__index = ServerList
 
 -- 服务器列表配置文件
 local CONFIG_FILE = "serverlist.json"
+
 
 -- 默认服务器列表 (模拟官服29个服务器)
 local DEFAULT_SERVERS = {}
@@ -157,24 +160,6 @@ function ServerList.buildCommendOnlineBody(isVIP)
     local servers = ServerList.getAll()
     local body = ""
     
-    -- 辅助函数：写入4字节大端整数
-    local function writeUInt32BE(value)
-        return string.char(
-            math.floor(value / 16777216) % 256,
-            math.floor(value / 65536) % 256,
-            math.floor(value / 256) % 256,
-            value % 256
-        )
-    end
-    
-    -- 辅助函数：写入2字节大端整数
-    local function writeUInt16BE(value)
-        return string.char(
-            math.floor(value / 256) % 256,
-            value % 256
-        )
-    end
-    
     -- CommendSvrInfo.as 解析顺序:
     -- 1. maxOnlineID (4字节) - 最大服务器ID，用于分页
     -- 2. isVIP (4字节) - 是否VIP (超能NONO)
@@ -182,9 +167,9 @@ function ServerList.buildCommendOnlineBody(isVIP)
     -- 4. 服务器列表 (每个30字节)
     -- 5. friendData (剩余数据)
     
-    body = body .. writeUInt32BE(ServerList.getMaxId())  -- maxOnlineID
-    body = body .. writeUInt32BE(isVIP)                   -- isVIP
-    body = body .. writeUInt32BE(#servers)                -- onlineCnt
+    body = body .. PacketUtils.writeUInt32BE(ServerList.getMaxId())  -- maxOnlineID
+    body = body .. PacketUtils.writeUInt32BE(isVIP)                   -- isVIP
+    body = body .. PacketUtils.writeUInt32BE(#servers)                -- onlineCnt
     
     -- ServerInfo.as 解析顺序 (每个服务器30字节):
     -- 1. onlineID (4字节)
@@ -195,35 +180,29 @@ function ServerList.buildCommendOnlineBody(isVIP)
     
     for _, srv in ipairs(servers) do
         -- onlineID
-        body = body .. writeUInt32BE(srv.id)
+        body = body .. PacketUtils.writeUInt32BE(srv.id)
         
         -- userCnt (在线人数)
         local userCnt = ServerList.getOnlineCount(srv.id)
-        body = body .. writeUInt32BE(userCnt)
+        body = body .. PacketUtils.writeUInt32BE(userCnt)
         
         -- IP地址 (16字节，不足补0)
         local ip = srv.ip or "127.0.0.1"
-        for i = 1, 16 do
-            if i <= #ip then
-                body = body .. ip:sub(i, i)
-            else
-                body = body .. "\0"
-            end
-        end
+        body = body .. PacketUtils.writeFixedString(ip, 16)
         
         -- port (2字节)
-        body = body .. writeUInt16BE(srv.port or 5000)
+        body = body .. PacketUtils.writeUInt16BE(srv.port or 5000)
         
         -- friends (好友在此服务器数量)
-        body = body .. writeUInt32BE(0)
+        body = body .. PacketUtils.writeUInt32BE(0)
     end
     
     -- friendData 部分
     -- CommendSvrInfo 会保存剩余数据作为 friendData
     -- 这部分数据会传递给 Login.dispatch() 和后续的 RelationManager
     -- 简化处理：只写入空的好友列表和黑名单
-    body = body .. writeUInt32BE(0)  -- friends count
-    body = body .. writeUInt32BE(0)  -- blacklist count
+    body = body .. PacketUtils.writeUInt32BE(0)  -- friends count
+    body = body .. PacketUtils.writeUInt32BE(0)  -- blacklist count
     
     return body
 end

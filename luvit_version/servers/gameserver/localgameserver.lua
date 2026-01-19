@@ -2,47 +2,50 @@
 -- 基于官服协议分析实现
 
 local net = require('net')
-local bit = require('../bitop_compat')
+local bit = require('../../utils/bitop_compat')
 local json = require('json')
 local fs = require('fs')
 
 -- 从 Logger 模块获取 tprint
-local Logger = require('../logger')
+local Logger = require('../../core/logger')
 local tprint = Logger.tprint
+
+local ProtocolValidator = require('../../core/protocol_validator')
+local PacketUtils = require('../../core/packet_utils')
 
 local LocalGameServer = {}
 LocalGameServer.__index = LocalGameServer
 
 -- 加载命令映射
-local SeerCommands = require('../seer_commands')
+local SeerCommands = require('../../game/seer_commands')
 
 -- 加载精灵数据 (Pets via SeerPets)
 -- SeerMonsters logic moved to SeerPets/SeerSkills
 -- local SeerMonsters = require('../seer_monsters')
 -- if SeerMonsters.load then SeerMonsters.load() end
 
-local SeerPets = require('../seer_pets')
+local SeerPets = require('../../game/seer_pets')
 if SeerPets.load then SeerPets.load() end
 
 -- 加载技能数据
-local SeerSkills = require('../seer_skills')
+local SeerSkills = require('../../game/seer_skills')
 
 -- 加载物品数据
-local SeerItems = require('../seer_items')
+local SeerItems = require('../../game/seer_items')
 if SeerItems.load then SeerItems.load() end
 
 -- 加载技能效果数据
-local SeerSkillEffects = require('../seer_skill_effects')
+local SeerSkillEffects = require('../../game/seer_skill_effects')
 if SeerSkillEffects.load then SeerSkillEffects.load() end
 
 -- 加载战斗系统
-local SeerBattle = require('../seer_battle')
+local SeerBattle = require('../../game/seer_battle')
 
 -- 加载协议验证器
-local ProtocolValidator = require('../protocol_validator')
+local ProtocolValidator = require('../../core/protocol_validator')
 
 -- 加载在线追踪模块
-local OnlineTracker = require('../handlers/online_tracker')
+local OnlineTracker = require('../../handlers/online_tracker')
 
 -- ==================== 全局处理器注册系统 ====================
 -- 处理器模块可以注册到这里,由 handleCommand 统一调用
@@ -56,25 +59,25 @@ local GlobalHandlerRegistry = {
 
 -- 加载所有处理器模块
 local handlerModules = {
-    '../handlers/nono_handlers',
-    '../handlers/pet_handlers',
-    '../handlers/pet_advanced_handlers',
-    '../handlers/task_handlers',
-    '../handlers/fight_handlers',
-    '../handlers/item_handlers',
-    '../handlers/friend_handlers',
-    '../handlers/mail_handlers',
-    '../handlers/map_handlers',
-    '../handlers/room_handlers',
-    '../handlers/team_handlers',
-    '../handlers/teampk_handlers',
-    '../handlers/arena_handlers',
-    '../handlers/exchange_handlers',
-    '../handlers/game_handlers',
-    '../handlers/misc_handlers',
-    '../handlers/special_handlers',
-    '../handlers/system_handlers',
-    '../handlers/teacher_handlers',
+    '../../handlers/nono_handlers',
+    '../../handlers/pet_handlers',
+    '../../handlers/pet_advanced_handlers',
+    '../../handlers/task_handlers',
+    '../../handlers/fight_handlers',
+    '../../handlers/item_handlers',
+    '../../handlers/friend_handlers',
+    '../../handlers/mail_handlers',
+    '../../handlers/map_handlers',
+    '../../handlers/room_handlers',
+    '../../handlers/team_handlers',
+    '../../handlers/teampk_handlers',
+    '../../handlers/arena_handlers',
+    '../../handlers/exchange_handlers',
+    '../../handlers/game_handlers',
+    '../../handlers/misc_handlers',
+    '../../handlers/special_handlers',
+    '../../handlers/system_handlers',
+    '../../handlers/teacher_handlers',
 }
 
 for _, modulePath in ipairs(handlerModules) do
@@ -90,9 +93,9 @@ end
 tprint(string.format("\27[32m[LocalGame] 共注册 %d 个全局命令处理器\27[0m", (function() local n=0 for _ in pairs(GlobalHandlers) do n=n+1 end return n end)()))
 
 -- 加载配置
-local GameConfig = require('../game_config')
+local GameConfig = require('../../config/game_config')
 local SeerLoginResponse = require('./seer_login_response')
-local SeerTaskConfig = require('../data/seer_task_config')
+local SeerTaskConfig = require('../../data/seer_task_config')
 
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
@@ -132,7 +135,7 @@ end
 
 function LocalGameServer:loadUserData()
     -- 从 userdb 加载用户数据
-    local userdb = require('../userdb')
+    local userdb = require('../../core/userdb')
     self.userdb = userdb
     tprint("\27[36m[LocalGame] 用户数据库已加载\27[0m")
 end
@@ -229,10 +232,8 @@ function LocalGameServer:handleData(clientData, data)
     -- 尝试解析完整的数据包
     while #clientData.buffer >= 17 do
         -- 读取长度
-        local length = clientData.buffer:byte(1) * 16777216 + 
-                      clientData.buffer:byte(2) * 65536 + 
-                      clientData.buffer:byte(3) * 256 + 
-                      clientData.buffer:byte(4)
+        -- Reading length using PacketUtils
+        local length = PacketUtils.readUInt32BE(clientData.buffer, 1)
         
         if #clientData.buffer < length then
             break  -- 等待更多数据
@@ -250,15 +251,11 @@ end
 function LocalGameServer:processPacket(clientData, packet)
     if #packet < 17 then return end
     
-    local length = packet:byte(1) * 16777216 + packet:byte(2) * 65536 + 
-                   packet:byte(3) * 256 + packet:byte(4)
+    local length = PacketUtils.readUInt32BE(packet, 1)
     local version = packet:byte(5)
-    local cmdId = packet:byte(6) * 16777216 + packet:byte(7) * 65536 + 
-                  packet:byte(8) * 256 + packet:byte(9)
-    local userId = packet:byte(10) * 16777216 + packet:byte(11) * 65536 + 
-                   packet:byte(12) * 256 + packet:byte(13)
-    local seqId = packet:byte(14) * 16777216 + packet:byte(15) * 65536 + 
-                  packet:byte(16) * 256 + packet:byte(17)
+    local cmdId = PacketUtils.readUInt32BE(packet, 6)
+    local userId = PacketUtils.readUInt32BE(packet, 10)
+    local seqId = PacketUtils.readUInt32BE(packet, 14)
     
     local body = #packet > 17 and packet:sub(18) or ""
     
@@ -491,29 +488,7 @@ function LocalGameServer:sendResponse(clientData, cmdId, userId, result, body)
         tprint(string.format("\27[32m%s\27[0m", message))
     end
     
-    local length = 17 + #body
-    
-    local header = string.char(
-        math.floor(length / 16777216) % 256,
-        math.floor(length / 65536) % 256,
-        math.floor(length / 256) % 256,
-        length % 256,
-        0x37,  -- version
-        math.floor(cmdId / 16777216) % 256,
-        math.floor(cmdId / 65536) % 256,
-        math.floor(cmdId / 256) % 256,
-        cmdId % 256,
-        math.floor(userId / 16777216) % 256,
-        math.floor(userId / 65536) % 256,
-        math.floor(userId / 256) % 256,
-        userId % 256,
-        math.floor(result / 16777216) % 256,
-        math.floor(result / 65536) % 256,
-        math.floor(result / 256) % 256,
-        result % 256
-    )
-    
-    local packet = header .. body
+    local packet = PacketUtils.buildResponse(cmdId, userId, result, body)
     
     pcall(function()
         clientData.socket:write(packet)
@@ -523,74 +498,21 @@ function LocalGameServer:sendResponse(clientData, cmdId, userId, result, body)
         tprint(string.format("\27[32m[LocalGame] 发送 CMD=%d (%s) RESULT=%d LEN=%d\27[0m", 
             cmdId, getCmdName(cmdId), result, length))
         
-        -- 详细包体输出 (完整十六进制) - 始终显示
-        if #body > 0 then
-            tprint(string.format("\27[36m[PACKET] CMD=%d 包体详情 (%d bytes):\27[0m", cmdId, #body))
-            
-            -- 十六进制格式输出 (每行16字节)
-            local hexLines = {}
-            for i = 1, #body, 16 do
-                local hexPart = ""
-                local asciiPart = ""
-                for j = i, math.min(i + 15, #body) do
-                    local byte = body:byte(j)
-                    hexPart = hexPart .. string.format("%02X ", byte)
-                    if byte >= 32 and byte < 127 then
-                        asciiPart = asciiPart .. string.char(byte)
-                    else
-                        asciiPart = asciiPart .. "."
-                    end
-                end
-                -- 补齐不足16字节的行
-                local padding = 16 - ((#body - i + 1) < 16 and (#body - i + 1) or 16)
-                hexPart = hexPart .. string.rep("   ", padding)
-                
-                table.insert(hexLines, string.format("  %04X: %s |%s|", i - 1, hexPart, asciiPart))
-            end
-            
-            for _, line in ipairs(hexLines) do
-                tprint(string.format("\27[90m%s\27[0m", line))
-            end
-            tprint(string.format("\27[36m[PACKET] --- 包体结束 ---\27[0m"))
+        -- 调试增强: 关键协议强制 Hex Dump
+        -- 1001: 登录 (检查 nonoNick/nonoState)
+        -- 9003: NONO_INFO (检查 body 长度和偏移)
+        -- 9013: NONO_PLAY (检查 6 字段)
+        -- 9019: FOLLOW/HOOM (检查跟随状态)
+        local debugCmds = {[1001]=true, [9003]=true, [9013]=true, [9019]=true}
+        
+        -- 详细包体输出
+        if #body > 0 and (debugCmds[cmdId] or conf.debug_packets) then
+            tprint(PacketUtils.hexDump(body, string.format("PACKET CMD=%d", cmdId)))
         end
     end
 end
 
--- 辅助函数：写入 4 字节大端整数
-local function writeUInt32BE(value)
-    return string.char(
-        math.floor(value / 16777216) % 256,
-        math.floor(value / 65536) % 256,
-        math.floor(value / 256) % 256,
-        value % 256
-    )
-end
-
--- 辅助函数：写入 2 字节大端整数
-local function writeUInt16BE(value)
-    return string.char(
-        math.floor(value / 256) % 256,
-        value % 256
-    )
-end
-
--- 辅助函数：写入固定长度字符串
-local function writeFixedString(str, length)
-    local result = str:sub(1, length)
-    while #result < length do
-        result = result .. "\0"
-    end
-    return result
-end
-
--- 辅助函数：读取 4 字节大端整数
-local function readUInt32BE(data, offset)
-    offset = offset or 1
-    return data:byte(offset) * 16777216 + 
-           data:byte(offset + 1) * 65536 + 
-           data:byte(offset + 2) * 256 + 
-           data:byte(offset + 3)
-end
+-- Helper functions removed (converted to core/packet_utils)
 
 -- ==================== 用户数据管理 ====================
 
@@ -732,33 +654,7 @@ function LocalGameServer:saveUserData(userId)
     end
 end
 
--- 辅助函数：构建数据包
-function LocalGameServer:buildPacket(cmdId, userId, result, body)
-    body = body or ""
-    local length = 17 + #body
-    
-    local header = string.char(
-        math.floor(length / 16777216) % 256,
-        math.floor(length / 65536) % 256,
-        math.floor(length / 256) % 256,
-        length % 256,
-        0x37,  -- version
-        math.floor(cmdId / 16777216) % 256,
-        math.floor(cmdId / 65536) % 256,
-        math.floor(cmdId / 256) % 256,
-        cmdId % 256,
-        math.floor(userId / 16777216) % 256,
-        math.floor(userId / 65536) % 256,
-        math.floor(userId / 256) % 256,
-        userId % 256,
-        math.floor(result / 16777216) % 256,
-        math.floor(result / 65536) % 256,
-        math.floor(result / 256) % 256,
-        result % 256
-    )
-    
-    return header .. body
-end
+
 
 -- CMD 80008: 心跳包 (NIEO_HEART)
 -- 官服主动发送心跳，客户端收到后回复相同命令
@@ -793,28 +689,11 @@ end
 
 -- 发送心跳包
 function LocalGameServer:sendHeartbeat(clientData, userId)
-    local cmdId = 80008  -- NIEO_HEART
-    local length = 17    -- 只有包头，没有数据体
-    
-    local header = string.char(
-        math.floor(length / 16777216) % 256,
-        math.floor(length / 65536) % 256,
-        math.floor(length / 256) % 256,
-        length % 256,
-        0x37,  -- version
-        math.floor(cmdId / 16777216) % 256,
-        math.floor(cmdId / 65536) % 256,
-        math.floor(cmdId / 256) % 256,
-        cmdId % 256,
-        math.floor(userId / 16777216) % 256,
-        math.floor(userId / 65536) % 256,
-        math.floor(userId / 256) % 256,
-        userId % 256,
-        0, 0, 0, 0  -- result = 0
-    )
+    -- CMD 80008: NIEO_HEART (Heartbeat)
+    local packet = PacketUtils.buildResponse(80008, userId, 0, "")
     
     pcall(function()
-        clientData.socket:write(header)
+        clientData.socket:write(packet)
     end)
 end
 

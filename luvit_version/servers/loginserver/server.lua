@@ -1,6 +1,6 @@
 -- servers
 local srv = {}
-local UserDB = require "../userdb"
+local UserDB = require "../../core/userdb"
 
 -- 获取在线用户数量
 function srv.getOnlineCount()

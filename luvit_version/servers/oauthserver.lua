@@ -6,7 +6,7 @@ local http = require('http')
 local JSON = require('json')
 
 -- 获取日志模块
-local Logger = require('./logger')
+local Logger = require('../core/logger')
 
 -- 生成随机hex token
 local function generateToken()
