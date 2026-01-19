@@ -378,8 +378,13 @@ function LocalGameServer:buildHandlerContext(clientData, cmdId, userId, seqId, b
         saveUserDB = function()
             if self_ref.userdb then
                 local db = self_ref.userdb:new()
-                local user = self_ref:getOrCreateUser(userId)
-                db:saveGameData(userId, user)
+                -- 获取最新用户数据并保存
+                local user = self_ref.users[userId]
+                if user then
+                    db:saveGameData(userId, user)
+                    -- 强制写入磁盘 (解决重启回档问题)
+                    db:save()
+                end
             end
         end,
         

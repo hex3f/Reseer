@@ -3,27 +3,22 @@
 
 local buffer = require "buffer"
 require "../easybytewrite"
+local Config = require("../game_config")
 
 local SeerLoginResponse = {}
 
 -- 可选的初始场景列表（非新手玩家随机进入）
-local INITIAL_MAPS = {
-    1,    -- 赫尔卡星
-    4,    -- 克洛斯星
-    5,    -- 塞西利亚星
-    7,    -- 云霄星
-    10,   -- 火山星
-    107,  -- 赛尔号飞船
-}
+
 
 -- 检查玩家是否完成新手任务（任务85-88）
 local function hasCompletedTutorial(user)
-    if not user.tasks then return false end
+    if not user.taskList then return false end
     
     -- 检查新手任务 85-88 是否都已完成
     for taskId = 85, 88 do
-        local task = user.tasks[tostring(taskId)]
-        if not task or task.status ~= "completed" then
+        local status = user.taskList[tostring(taskId)]
+        -- status: 3 = COMPLETE
+        if not status or status ~= 3 then
             return false
         end
     end
@@ -34,17 +29,21 @@ end
 -- 生成登录响应 (CMD 1001)
 function SeerLoginResponse.makeLoginResponse(user)
     local parts = {}
-    
-    -- 检查是否完成新手任务，如果完成则随机选择场景
+    -- 检查是否完成新手任务
+    -- 这里的逻辑是：如果完成了新手任务，登录时强制进入配置的 PostTutorialMap (如飞船/大厅)
+    -- 如果未完成新手任务，且没有存档位置，则进入 DefaultMap
+    -- 如果未完成且有存档位置，保持存档位置 (继续做新手任务)
     local completedTutorial = hasCompletedTutorial(user)
-    if completedTutorial and not user.mapID then
-        -- 随机选择一个场景
-        local randomIndex = math.random(1, #INITIAL_MAPS)
-        user.mapID = INITIAL_MAPS[randomIndex]
-        print(string.format("\27[32m[LOGIN] 玩家已完成新手任务，随机进入场景: %d\27[0m", user.mapID))
+    local spawnConfig = Config.InitialPlayer.Spawn or { DefaultMap = 1, PostTutorialMap = 1 }
+    
+    if completedTutorial then
+        -- 完成新手任务，强制进入配置的地图 (忽略存档位置)
+        -- 用户反馈：存档要保留，但是不是进入存档的位置
+        user.mapID = spawnConfig.PostTutorialMap
+        print(string.format("\27[32m[LOGIN] 玩家已完成新手任务，强制进入配置场景: %d\27[0m", user.mapID))
     elseif not user.mapID then
-        -- 新手玩家进入默认场景（新手教程场景）
-        user.mapID = 1
+        -- 新手玩家且无位置存档，进入默认场景
+        user.mapID = spawnConfig.DefaultMap
         print(string.format("\27[33m[LOGIN] 新手玩家进入默认场景: %d\27[0m", user.mapID))
     end
     
@@ -340,19 +339,24 @@ function SeerLoginResponse.makeLoginResponse(user)
     end
     
     -- 从数据库填充任务状态
-    if user.tasks then
+    if user.taskList then
         local taskCount = 0
-        for taskIdStr, taskData in pairs(user.tasks) do
+        for taskIdStr, statusVal in pairs(user.taskList) do
             local tid = tonumber(taskIdStr)
             if tid and tid >= 1 and tid <= 500 then
-                local status = 0
-                if taskData.status == "accepted" then
-                    status = 1 -- ALR_ACCEPT
-                elseif taskData.status == "completed" then
-                    status = 3 -- COMPLETE
-                end
-                taskBuf:wbyte(tid, status)
-                taskCount = taskCount + 1
+                 -- statusVal 已经是数值 (1=accepted, 3=completed)
+                 -- 或者是旧数据的字符串形式，做一下兼容
+                 local status = 0
+                 if type(statusVal) == "number" then
+                     status = statusVal
+                 elseif statusVal == "accepted" then
+                     status = 1
+                 elseif statusVal == "completed" then
+                     status = 3
+                 end
+                 
+                 taskBuf:wbyte(tid, status)
+                 taskCount = taskCount + 1
             end
         end
         if taskCount > 0 then

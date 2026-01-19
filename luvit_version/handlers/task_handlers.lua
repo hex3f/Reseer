@@ -11,6 +11,9 @@ local TaskHandlers = {}
 -- ==================== 新手任务处理 ====================
 
 -- 新手任务ID定义
+local SeerTaskConfig = require('../data/seer_task_config')
+
+-- 新手任务ID定义
 local NOVICE_TASK = {
     GET_CLOTH = 85,      -- 0x55 - 领取服装
     SELECT_PET = 86,     -- 0x56 - 选择精灵
@@ -30,108 +33,88 @@ local NOVICE_PET_MAP = {
     [3] = 4,   -- 选择3 -> 伊优
 }
 
--- 新手任务奖励配置 (与官服数据一致)
-local NOVICE_REWARDS = {
-    -- 任务85: 领取服装 - 官服抓包数据
-    [85] = {
-        petId = 0,
-        items = {
-            {id = 0x0186BB, count = 1},  -- 100027 服装
-            {id = 0x0186BC, count = 1},  -- 100028 服装
-            {id = 0x07A121, count = 1},  -- 500001 道具
-            {id = 0x04966A, count = 3},  -- 300650 精灵道具
-            {id = 0x0493F9, count = 3},  -- 300025 精灵道具
-            {id = 0x049403, count = 3},  -- 300035 精灵道具
-            {id = 0x07A316, count = 1},  -- 500502 道具
-            {id = 0x07A317, count = 1},  -- 500503 道具
-        }
-    },
-    -- 任务86: 选择精灵 - 获得选择的精灵 (使用NOVICE_PET_MAP映射)
-    [86] = {
-        petId = "param_mapped",  -- 使用映射后的精灵ID
-        items = {}
-    },
-    -- 任务87: 战斗胜利 - 官服抓包数据
-    [87] = {
-        petId = 0,
-        items = {
-            {id = 0x0493E1, count = 5},  -- 300001 精灵道具
-            {id = 0x0493EB, count = 3},  -- 300011 精灵道具
-        }
-    },
-    -- 任务88: 使用道具 - 官服抓包数据
-    [88] = {
-        petId = 0,
-        items = {
-            {id = 1, count = 50000},     -- 金币 (0x00C350)
-            {id = 3, count = 250000},    -- 经验? (0x03D090)
-            {id = 5, count = 20},        -- 其他 (0x000014)
-        }
-    },
-}
-
+-- 构建任务完成响应
+-- NoviceFinishInfo: taskID(4) + petID(4) + captureTm(4) + itemCount(4) + [itemID(4) + itemCnt(4)]...
 -- 构建任务完成响应
 -- NoviceFinishInfo: taskID(4) + petID(4) + captureTm(4) + itemCount(4) + [itemID(4) + itemCnt(4)]...
 local function buildTaskCompleteResponse(taskId, param, user)
-    local reward = NOVICE_REWARDS[taskId]
+    local taskConfig = SeerTaskConfig.get(taskId)
+    -- 如果没有配置，使用默认空响应
+    if not taskConfig then
+        return writeUInt32BE(taskId) ..
+               writeUInt32BE(0) ..
+               writeUInt32BE(0) ..
+               writeUInt32BE(0), 0
+    end
+
+    local rewards = taskConfig.rewards or {}
     local petId = 0
     local captureTm = 0
     local body = ""
+    local responseItems = {} -- 收集所有奖励物品用于构建包
     
-    if reward then
-        -- 处理精灵奖励
-        if reward.petId == "param_mapped" then
-            -- 新手三选一精灵：使用映射表
-            petId = NOVICE_PET_MAP[param] or param
-            if petId == 0 then petId = 1 end  -- 默认布布种子
-            captureTm = 0x69686700 + petId
-            user.currentPetId = petId
-            user.catchId = captureTm  -- 保存 catchId 供 PET_RELEASE 使用
-            print(string.format("\27[36m[Handler] COMPLETE_TASK 86: param=%d -> petId=%d, catchId=0x%X\27[0m", param, petId, captureTm))
-        elseif reward.petId == "param" then
-            -- 直接使用参数作为精灵ID
-            petId = param > 0 and param or 7
-            captureTm = 0x69686700 + petId
-            user.currentPetId = petId
-            user.catchId = captureTm
+    -- 1. 处理精灵奖励逻辑
+    if taskConfig.type == "select_pet" then
+        if taskConfig.paramMap then
+             petId = taskConfig.paramMap[param] or 1
         else
-            petId = reward.petId
+             petId = (param > 0) and param or 1
         end
-        
-        -- 构建响应
-        body = writeUInt32BE(taskId) ..
-               writeUInt32BE(petId) ..
-               writeUInt32BE(captureTm) ..
-               writeUInt32BE(#reward.items)
-        
-        -- 添加物品到用户背包并构建响应
-        user.items = user.items or {}
-        for _, item in ipairs(reward.items) do
-            body = body .. writeUInt32BE(item.id) .. writeUInt32BE(item.count)
+        captureTm = 0x69686700 + petId
+        user.currentPetId = petId
+        user.catchId = captureTm
+        print(string.format("\27[36m[Handler] COMPLETE_TASK %d: Choice=%d -> petId=%d\27[0m", taskId, param, petId))
+    elseif rewards.petId and rewards.petId > 0 then
+        petId = rewards.petId
+    end
+    
+    -- 2. 收集普通物品奖励
+    if rewards.items then
+        for _, item in ipairs(rewards.items) do
+            table.insert(responseItems, {id = item.id, count = item.count})
             
-            -- 真正添加物品到用户数据 (id=1 是金币，特殊处理)
-            if item.id == 1 then
-                user.coins = (user.coins or 0) + item.count
-                print(string.format("\27[32m[Handler] 任务奖励: +%d 金币 (总计: %d)\27[0m", item.count, user.coins))
+            -- 给用户加物品
+            local itemKey = tostring(item.id)
+            user.items = user.items or {}
+            if user.items[itemKey] then
+                user.items[itemKey].count = (user.items[itemKey].count or 1) + item.count
             else
-                local itemKey = tostring(item.id)
-                if user.items[itemKey] then
-                    user.items[itemKey].count = (user.items[itemKey].count or 1) + item.count
-                else
-                    user.items[itemKey] = {
-                        count = item.count,
-                        expireTime = 0x057E40  -- 永久
-                    }
-                end
-                print(string.format("\27[32m[Handler] 任务奖励: 物品 %d x%d\27[0m", item.id, item.count))
+                user.items[itemKey] = {
+                    count = item.count,
+                    expireTime = 0x057E40
+                }
+            end
+            print(string.format("\27[32m[Handler] 任务奖励: 物品 %d x%d\27[0m", item.id, item.count))
+        end
+    end
+    
+    -- 3. 收集特殊奖励 (如金币)
+    -- 官服协议将金币等特殊奖励也放在 item 列表里返回，ID为 1, 3, 5 等
+    if rewards.special then
+        for _, spec in ipairs(rewards.special) do
+            table.insert(responseItems, {id = spec.type, count = spec.value})
+            
+            if spec.type == 1 then -- 金币
+                 user.coins = (user.coins or 0) + spec.value
+                 print(string.format("\27[32m[Handler] 任务奖励: +%d 金币\27[0m", spec.value))
             end
         end
-    else
-        -- 默认响应: 无奖励
-        body = writeUInt32BE(taskId) ..
-               writeUInt32BE(0) ..
-               writeUInt32BE(0) ..
-               writeUInt32BE(0)
+    end
+    
+    -- 4. 收集直接金币/经验配置
+    if rewards.coins then
+        table.insert(responseItems, {id = 1, count = rewards.coins})
+        user.coins = (user.coins or 0) + rewards.coins
+    end
+    
+    -- 构建响应包
+    body = writeUInt32BE(taskId) ..
+           writeUInt32BE(petId) ..
+           writeUInt32BE(captureTm) ..
+           writeUInt32BE(#responseItems)
+           
+    for _, item in ipairs(responseItems) do
+        body = body .. writeUInt32BE(item.id) .. writeUInt32BE(item.count)
     end
     
     return body, petId
@@ -151,7 +134,7 @@ local function handleAcceptTask(ctx)
     if not user.taskList then
         user.taskList = {}
     end
-    user.taskList[taskId] = 1  -- 1 = ALR_ACCEPT
+    user.taskList[tostring(taskId)] = 1  -- 1 = ALR_ACCEPT
     ctx.saveUserDB()
     
     ctx.sendResponse(buildResponse(2201, ctx.userId, 0, writeUInt32BE(taskId)))
@@ -188,7 +171,7 @@ local function handleCompleteTask(ctx)
     if not user.taskList then
         user.taskList = {}
     end
-    user.taskList[taskId] = 3  -- 3 = COMPLETE
+    user.taskList[tostring(taskId)] = 3  -- 3 = COMPLETE
     
     if petId > 0 then
         ctx.saveUserDB()
