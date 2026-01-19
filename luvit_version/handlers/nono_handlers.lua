@@ -63,19 +63,19 @@ local function saveNonoData(ctx, nonoData)
     ctx.saveUser(ctx.userId, user)
 end
 
--- 构建完整NONO信息响应�?(用于9003 NONO_INFO)
+-- 构建完整NONO信息响应??(用于9003 NONO_INFO)
 -- NonoInfo: userID(4) + flag(4) + state(4) + nick(16) + superNono(4) + color(4) + 
 --           power(4) + mate(4) + iq(4) + ai(2) + birth(4) + chargeTime(4) + 
 --           func(20 bytes) + superEnergy(4) + superLevel(4) + superStage(4)
--- 总长�? 4+4+4+16+4+4+4+4+4+2+4+4+20+4+4+4 = 90 bytes
--- 注意: state 参数用于指定返回的状态（房间服务器始终返�?state=3�?
+-- 总长?? 4+4+4+16+4+4+4+4+4+2+4+4+20+4+4+4 = 90 bytes
+-- 注意: state 参数用于指定返回的状态（房间服务器始终返??state=3??
 local function buildNonoInfoBody(userId, nonoData, forceState)
     local body = ""
     body = body .. writeUInt32BE(userId)                    -- userID
     body = body .. writeUInt32BE(nonoData.flag or 1)        -- flag (32 bits)
-    -- 使用 forceState 或默认�?3（NoNo 在房间）
+    -- 使用 forceState 或默认??3（NoNo 在房间）
     body = body .. writeUInt32BE(forceState or 3)           -- state (32 bits)
-    body = body .. writeFixedString(nonoData.nick or "NONO", 16)  -- nick (官服用大�?
+    body = body .. writeFixedString(nonoData.nick or "NONO", 16)  -- nick (官服用大??
     body = body .. writeUInt32BE(nonoData.superNono or 0)   -- superNono (0=普通, 1=超能)
     body = body .. writeUInt32BE(nonoData.color or 0xFFFFFF)  -- color (官服默认白色)
     body = body .. writeUInt32BE(nonoData.power or 10000)   -- power (官服默认10000)
@@ -84,7 +84,7 @@ local function buildNonoInfoBody(userId, nonoData, forceState)
     body = body .. writeUInt16BE(nonoData.ai or 0)          -- ai (官服默认0)
     body = body .. writeUInt32BE(nonoData.birth or os.time())  -- birth
     body = body .. writeUInt32BE(nonoData.chargeTime or 500)   -- chargeTime (官服默认500)
-    -- func: 20 bytes (160 bits of function flags) - 所有功能开�?
+    -- func: 20 bytes (160 bits of function flags) - 所有功能开??
     body = body .. string.rep("\xFF", 20)
     body = body .. writeUInt32BE(nonoData.superEnergy or 0)     -- superEnergy (官服默认0)
     body = body .. writeUInt32BE(nonoData.superLevel or 0)      -- superLevel (官服默认0)
@@ -116,10 +116,10 @@ end
 
 -- CMD 9002: NONO_CHANGE_NAME (修改NONO名字)
 local function handleNonoChangeName(ctx)
-    -- 解析新名�?(16 bytes)
+    -- 解析新名??(16 bytes)
     local newNick = "NoNo"
     if #ctx.body >= 16 then
-        newNick = ctx.body:sub(1, 16):gsub("%z+$", "")  -- 去除尾部空字�?
+        newNick = ctx.body:sub(1, 16):gsub("%z+$", "")  -- 去除尾部空字??
     end
     
     local nonoData = getNonoData(ctx)
@@ -127,7 +127,7 @@ local function handleNonoChangeName(ctx)
     saveNonoData(ctx, nonoData)
     
     ctx.sendResponse(buildResponse(9002, ctx.userId, 0, ""))
-    tprint(string.format("\27[32m[Handler] �?NONO_CHANGE_NAME '%s' response\27[0m", newNick))
+    tprint(string.format("\27[32m[Handler] ??NONO_CHANGE_NAME '%s' response\27[0m", newNick))
     return true
 end
 
@@ -183,26 +183,26 @@ end
 -- CMD 9004: NONO_CHIP_MIXTURE (芯片合成)
 local function handleNonoChipMixture(ctx)
     ctx.sendResponse(buildResponse(9004, ctx.userId, 0, writeUInt32BE(0)))
-    tprint("\27[32m[Handler] �?NONO_CHIP_MIXTURE response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_CHIP_MIXTURE response\27[0m")
     return true
 end
 
 -- CMD 9007: NONO_CURE (治疗NONO)
 local function handleNonoCure(ctx)
     local nonoData = getNonoData(ctx)
-    nonoData.power = 100000  -- 恢复满体�?
-    nonoData.mate = 100000   -- 恢复满心�?
+    nonoData.power = 100000  -- 恢复满体??
+    nonoData.mate = 100000   -- 恢复满心??
     saveNonoData(ctx, nonoData)
     
     ctx.sendResponse(buildResponse(9007, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_CURE response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_CURE response\27[0m")
     return true
 end
 
 -- CMD 9008: NONO_EXPADM (NONO经验管理)
 local function handleNonoExpadm(ctx)
     ctx.sendResponse(buildResponse(9008, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_EXPADM response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_EXPADM response\27[0m")
     return true
 end
 
@@ -218,7 +218,7 @@ local function handleNonoImplementTool(ctx)
     body = body .. writeUInt32BE(nonoData.mate)         -- mate (*1000)
     body = body .. writeUInt32BE(nonoData.iq)           -- iq
     ctx.sendResponse(buildResponse(9010, ctx.userId, 0, body))
-    tprint("\27[32m[Handler] �?NONO_IMPLEMENT_TOOL response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_IMPLEMENT_TOOL response\27[0m")
     return true
 end
 
@@ -234,23 +234,23 @@ local function handleNonoChangeColor(ctx)
     saveNonoData(ctx, nonoData)
     
     ctx.sendResponse(buildResponse(9012, ctx.userId, 0, ""))
-    tprint(string.format("\27[32m[Handler] �?NONO_CHANGE_COLOR 0x%X response\27[0m", newColor))
+    tprint(string.format("\27[32m[Handler] ??NONO_CHANGE_COLOR 0x%X response\27[0m", newColor))
     return true
 end
 
--- CMD 9013: NONO_PLAY (NONO玩�?
+-- CMD 9013: NONO_PLAY (NONO玩??
 local function handleNonoPlay(ctx)
     local nonoData = getNonoData(ctx)
-    -- 玩耍增加心�?
+    -- 玩耍增加心??
     nonoData.mate = math.min(100000, nonoData.mate + 5000)
     saveNonoData(ctx, nonoData)
     
     ctx.sendResponse(buildResponse(9013, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_PLAY response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_PLAY response\27[0m")
     return true
 end
 
--- CMD 9014: NONO_CLOSE_OPEN (NONO开�?
+-- CMD 9014: NONO_CLOSE_OPEN (NONO开??
 -- 官服响应: 17 bytes (只有头部，body为空)
 local function handleNonoCloseOpen(ctx)
     local action = 0
@@ -259,12 +259,12 @@ local function handleNonoCloseOpen(ctx)
     end
     
     local nonoData = getNonoData(ctx)
-    nonoData.state = action  -- 0=关闭, 1=开�?
+    nonoData.state = action  -- 0=关闭, 1=开??
     saveNonoData(ctx, nonoData)
     
-    -- 官服返回�?body
+    -- 官服返回??body
     ctx.sendResponse(buildResponse(9014, ctx.userId, 0, ""))
-    tprint(string.format("\27[32m[Handler] �?NONO_CLOSE_OPEN action=%d response\27[0m", action))
+    tprint(string.format("\27[32m[Handler] ??NONO_CLOSE_OPEN action=%d response\27[0m", action))
     return true
 end
 
@@ -272,7 +272,7 @@ end
 local function handleNonoExeList(ctx)
     local body = writeUInt32BE(0)  -- count = 0
     ctx.sendResponse(buildResponse(9015, ctx.userId, 0, body))
-    tprint("\27[32m[Handler] �?NONO_EXE_LIST response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_EXE_LIST response\27[0m")
     return true
 end
 
@@ -283,25 +283,25 @@ local function handleNonoCharge(ctx)
     saveNonoData(ctx, nonoData)
     
     ctx.sendResponse(buildResponse(9016, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_CHARGE response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_CHARGE response\27[0m")
     return true
 end
 
--- CMD 9017: NONO_START_EXE (开始执�?
+-- CMD 9017: NONO_START_EXE (开始执??
 local function handleNonoStartExe(ctx)
     ctx.sendResponse(buildResponse(9017, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_START_EXE response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_START_EXE response\27[0m")
     return true
 end
 
 -- CMD 9018: NONO_END_EXE (结束执行)
 local function handleNonoEndExe(ctx)
     ctx.sendResponse(buildResponse(9018, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_END_EXE response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_END_EXE response\27[0m")
     return true
 end
 
--- CMD 9019: NONO_FOLLOW_OR_HOOM (跟随或回�?
+-- CMD 9019: NONO_FOLLOW_OR_HOOM (跟随或回??
 -- 官服响应根据 action 不同返回不同长度:
 --   action=1 (跟随): 36 bytes = userID(4) + flag(4) + state(4) + nick(16) + color(4) + chargeTime(4)
 --   action=0 (回家): 12 bytes = userID(4) + flag(4) + state(4)
@@ -319,31 +319,31 @@ local function handleNonoFollowOrHoom(ctx)
         ctx.clientData.nonoFollowing = (action == 1)
     end
     
-    -- 使用会话管理器设�?NoNo 跟随状�?
+    -- 使用会话管理器设??NoNo 跟随状??
     if ctx.sessionManager then
         ctx.sessionManager:setNonoFollowing(ctx.userId, action == 1)
     end
     
-    -- 注意: 不保存跟随状态到数据�?
+    -- 注意: 不保存跟随状态到数据??
     -- 跟随状态是会话级别的，重新登录后会重置
-    -- 这样可以确保每次登录�?NoNo 都在房间
+    -- 这样可以确保每次登录??NoNo 都在房间
     
     local body = ""
     if action == 1 then
         -- 跟随: 返回完整 NONO 信息 (36 bytes)
         -- 官服格式: flag=0, state=1
         body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
-        body = body .. writeUInt32BE(0)                             -- flag=0 (官服始终�?) (4)
-        body = body .. writeUInt32BE(1)                             -- state=1 跟随�?(4)
+        body = body .. writeUInt32BE(0)                             -- flag=0 (官服始终??) (4)
+        body = body .. writeUInt32BE(1)                             -- state=1 跟随??(4)
         body = body .. writeFixedString(nonoData.nick or "NONO", 16) -- nick (16)
         body = body .. writeUInt32BE(nonoData.color or 0xFFFFFF)    -- color (4)
         body = body .. writeUInt32BE(nonoData.power or 10000)       -- power (4) (官服值为10000，此前误写为chargeTime)
     else
-        -- 回家: 只返�?12 bytes (官服协议)
+        -- 回家: 只返??12 bytes (官服协议)
         -- 官服格式: flag=0, state=0
         body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
-        body = body .. writeUInt32BE(0)                             -- flag=0 (官服始终�?) (4)
-        body = body .. writeUInt32BE(0)                             -- state=0 已回�?(4)
+        body = body .. writeUInt32BE(0)                             -- flag=0 (官服始终??) (4)
+        body = body .. writeUInt32BE(0)                             -- state=0 已回??(4)
     end
     
     ctx.sendResponse(buildResponse(9019, ctx.userId, 0, body))
@@ -353,7 +353,7 @@ local function handleNonoFollowOrHoom(ctx)
         ctx.broadcastToMap(buildResponse(9019, ctx.userId, 0, body), ctx.userId)
     end
     
-    tprint(string.format("\27[32m[Handler] �?NONO_FOLLOW_OR_HOOM %s response (%d bytes)\27[0m", 
+    tprint(string.format("\27[32m[Handler] ??NONO_FOLLOW_OR_HOOM %s response (%d bytes)\27[0m", 
         action == 1 and "跟随" or "回家", #body))
     return true
 end
@@ -367,29 +367,58 @@ local function handleNonoOpenSuper(ctx)
     saveNonoData(ctx, nonoData)
     
     ctx.sendResponse(buildResponse(9020, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_OPEN_SUPER response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_OPEN_SUPER response\27[0m")
     return true
 end
 
 -- CMD 9021: NONO_HELP_EXP (NONO帮助经验)
 local function handleNonoHelpExp(ctx)
     ctx.sendResponse(buildResponse(9021, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_HELP_EXP response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_HELP_EXP response\27[0m")
     return true
 end
 
 -- CMD 9022: NONO_MATE_CHANGE (NONO心情变化)
 local function handleNonoMateChange(ctx)
     ctx.sendResponse(buildResponse(9022, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_MATE_CHANGE response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_MATE_CHANGE response\27[0m")
     return true
 end
 
 -- CMD 9023: NONO_GET_CHIP (获取芯片)
+-- 请求: chipType(4)
+-- 响应: 0(4) + 0(4) + 0(4) + count(4) + [id(4) + count(4)]...
 local function handleNonoGetChip(ctx)
-    local body = writeUInt32BE(0)  -- count = 0
+    local chipType = 0
+    if #ctx.body >= 4 then
+        chipType = readUInt32BE(ctx.body, 1)
+    end
+    
+    -- 给用户添加芯片物品
+    local user = ctx.getOrCreateUser(ctx.userId)
+    if not user.nonoChips then user.nonoChips = {} end
+    
+    local chipId = chipType
+    local chipCount = 1
+    
+    -- 保存芯片到用户数据
+    local chipKey = tostring(chipId)
+    if not user.nonoChips[chipKey] then
+        user.nonoChips[chipKey] = { count = 0 }
+    end
+    user.nonoChips[chipKey].count = user.nonoChips[chipKey].count + chipCount
+    ctx.saveUser(ctx.userId, user)
+    
+    -- 构建响应: 3个padding(0) + count + [id + count]
+    local body = writeUInt32BE(0) ..
+                 writeUInt32BE(0) ..
+                 writeUInt32BE(0) ..
+                 writeUInt32BE(1) ..
+                 writeUInt32BE(chipId) ..
+                 writeUInt32BE(chipCount)
+    
     ctx.sendResponse(buildResponse(9023, ctx.userId, 0, body))
-    tprint("\27[32m[Handler] �?NONO_GET_CHIP response\27[0m")
+    tprint(string.format("\27[32m[Handler] -> NONO_GET_CHIP chipId=%d\27[0m", chipId))
     return true
 end
 
@@ -401,7 +430,7 @@ local function handleNonoAddEnergyMate(ctx)
     saveNonoData(ctx, nonoData)
     
     ctx.sendResponse(buildResponse(9024, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_ADD_ENERGY_MATE response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_ADD_ENERGY_MATE response\27[0m")
     return true
 end
 
@@ -409,34 +438,34 @@ end
 local function handleGetDiamond(ctx)
     local body = writeUInt32BE(9999)  -- 钻石数量
     ctx.sendResponse(buildResponse(9025, ctx.userId, 0, body))
-    tprint("\27[32m[Handler] �?GET_DIAMOND response\27[0m")
+    tprint("\27[32m[Handler] ??GET_DIAMOND response\27[0m")
     return true
 end
 
 -- CMD 9026: NONO_ADD_EXP (增加NONO经验)
 local function handleNonoAddExp(ctx)
     ctx.sendResponse(buildResponse(9026, ctx.userId, 0, ""))
-    tprint("\27[32m[Handler] �?NONO_ADD_EXP response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_ADD_EXP response\27[0m")
     return true
 end
 
--- CMD 9027: NONO_IS_INFO (NONO是否有信�?
+-- CMD 9027: NONO_IS_INFO (NONO是否有信??
 local function handleNonoIsInfo(ctx)
     local body = writeUInt32BE(1)  -- 有NONO
     ctx.sendResponse(buildResponse(9027, ctx.userId, 0, body))
-    tprint("\27[32m[Handler] �?NONO_IS_INFO response\27[0m")
+    tprint("\27[32m[Handler] ??NONO_IS_INFO response\27[0m")
     return true
 end
 
--- CMD 80001: NIEO_LOGIN (超能NONO登录/状态检�?
--- 请求: 无参�?
--- 响应: status(4) - 0=正常/已激�?
--- 如果新激活，会先发�?80002 通知消息
+-- CMD 80001: NIEO_LOGIN (超能NONO登录/状态检??
+-- 请求: 无参??
+-- 响应: status(4) - 0=正常/已激??
+-- 如果新激活，会先发??80002 通知消息
 local function handleNieoLogin(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
     local nonoData = user.nono or {}
     
-    -- 从配置读取默认开通天�?
+    -- 从配置读取默认开通天??
     local GameConfig = require('../game_config')
     local nonoConfig = GameConfig.InitialPlayer.nono or {}
     local durationDays = nonoConfig.superNonoDurationDays or 30
@@ -444,11 +473,11 @@ local function handleNieoLogin(ctx)
     local currentTime = os.time()
     local needActivate = false
     
-    -- 检查是否需要激�?续费
+    -- 检查是否需要激??续费
     if not nonoData.superNono or nonoData.superNono == 0 then
         needActivate = true
     elseif nonoData.vipEndTime and nonoData.vipEndTime > 0 and nonoData.vipEndTime < currentTime then
-        needActivate = true  -- 已过期，需要续�?
+        needActivate = true  -- 已过期，需要续??
     end
     
     if needActivate then

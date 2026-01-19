@@ -235,11 +235,65 @@ local function handleCompleteTask(ctx)
 end
 
 -- CMD 2203: GET_TASK_BUF (获取任务缓存)
--- TaskBufInfo: taskId(4) + flag(4) + buf(剩余字节)
+-- 请求: taskId(4)
+-- 响应: taskId(4) + flag(4) + buf (20 字节)
+-- 官服格式: taskId(4) + flag(4) + buf[0..4] (每个4字节)
 local function handleGetTaskBuf(ctx)
-    local body = writeUInt32BE(0) .. writeUInt32BE(0)
+    local taskId = 0
+    if #ctx.body >= 4 then
+        taskId = readUInt32BE(ctx.body, 1)
+    end
+    
+    -- 从用户数据获取任务缓存
+    local user = ctx.getOrCreateUser(ctx.userId)
+    if not user.taskBufs then user.taskBufs = {} end
+    local taskBuf = user.taskBufs[tostring(taskId)] or {}
+    
+    -- 构建响应: taskId(4) + flag(4) + buf[0..4] (5个4字节 = 20字节缓存)
+    local body = writeUInt32BE(taskId) ..
+                 writeUInt32BE(1)  -- flag = 1 表示有缓存数据
+    
+    -- 添加5个缓存值            
+    for i = 0, 4 do
+        local val = taskBuf[i] or 0
+        body = body .. writeUInt32BE(val)
+    end
+    
     ctx.sendResponse(buildResponse(2203, ctx.userId, 0, body))
-    print("\27[32m[Handler] → GET_TASK_BUF response\27[0m")
+    print(string.format("\27[32m[Handler] → GET_TASK_BUF taskId=%d\27[0m", taskId))
+    return true
+end
+
+-- CMD 2204: ADD_TASK_BUF (添加/更新任务缓存)
+-- 请求: taskId(4) + index(1) + value (20字节缓存数据)
+-- 响应: 空
+local function handleAddTaskBuf(ctx)
+    local taskId = 0
+    local index = 0
+    local value = 0
+    
+    if #ctx.body >= 4 then
+        taskId = readUInt32BE(ctx.body, 1)
+    end
+    if #ctx.body >= 5 then
+        index = string.byte(ctx.body, 5) or 0
+    end
+    if #ctx.body >= 9 then
+        value = readUInt32BE(ctx.body, 6)
+    end
+    
+    -- 保存任务缓存
+    local user = ctx.getOrCreateUser(ctx.userId)
+    if not user.taskBufs then user.taskBufs = {} end
+    if not user.taskBufs[tostring(taskId)] then
+        user.taskBufs[tostring(taskId)] = {}
+    end
+    user.taskBufs[tostring(taskId)][index] = value
+    ctx.saveUserDB()
+    
+    -- 响应: 空
+    ctx.sendResponse(buildResponse(2204, ctx.userId, 0, ""))
+    print(string.format("\27[32m[Handler] → ADD_TASK_BUF taskId=%d index=%d value=%d\27[0m", taskId, index, value))
     return true
 end
 
@@ -252,12 +306,16 @@ local function handleGetDailyTaskBuf(ctx)
 end
 
 -- 注册所有处理器
+-- 注意: PEOPLE_WALK (2101) 在 map_handlers.lua 中注册
+-- 注意: NONO_GET_CHIP (9023) 在 nono_handlers.lua 中注册
 function TaskHandlers.register(Handlers)
     Handlers.register(2201, handleAcceptTask)
     Handlers.register(2202, handleCompleteTask)
     Handlers.register(2203, handleGetTaskBuf)
+    Handlers.register(2204, handleAddTaskBuf)
     Handlers.register(2234, handleGetDailyTaskBuf)
     print("\27[36m[Handlers] 任务命令处理器已注册\27[0m")
 end
 
 return TaskHandlers
+
