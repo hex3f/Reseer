@@ -816,7 +816,7 @@ function SeerBattle.executeAttack(attacker, defender, skill, attackerUserId, isF
             targetRemainHp = defender.hp,
             targetMaxHp = defender.maxHp,
             blocked = true,
-            atkTimes = 0,
+            atkTimes = 0,  -- 0 = MISS/Blocked display on client
             effects = {}
         }
     end
@@ -836,7 +836,7 @@ function SeerBattle.executeAttack(attacker, defender, skill, attackerUserId, isF
             targetRemainHp = defender.hp,
             targetMaxHp = defender.maxHp,
             missed = true,
-            atkTimes = 0,
+            atkTimes = 0,  -- 0 = MISS display on client
             effects = {}
         }
     end
@@ -913,8 +913,54 @@ function SeerBattle.executeAttack(attacker, defender, skill, attackerUserId, isF
             table.insert(effectResults, {type = "recoil", damage = recoilDamage})
         end
         
+        -- 能力修改效果 (SideEffect=5)
+        -- 格式: SideEffectArg="stat chance stages"
+        -- stat: 0=攻击, 1=防御, 2=特攻, 3=特防, 4=速度, 5=命中
+        -- stages: 负数=降低对手, 正数=提升自己
+        if effectId == 5 then
+            local args = SkillEffects.parseArgs(effectArg)
+            local stat = args[1] or 0
+            local chance = args[2] or 100
+            local stages = args[3] or -1
+            
+            if math.random(100) <= chance then
+                if stages < 0 then
+                    -- 降低对手能力
+                    defender.battleLv = defender.battleLv or {0, 0, 0, 0, 0, 0}
+                    local statIndex = stat + 1  -- Lua数组从1开始
+                    defender.battleLv[statIndex] = math.max(-6, (defender.battleLv[statIndex] or 0) + stages)
+                    table.insert(effectResults, {type = "stat_down", target = "defender", stat = stat, stages = -stages})
+                    print(string.format("\27[33m[SideEffect=5] 降低对手能力: stat=%d stages=%d, 新等级=%d\27[0m", stat, stages, defender.battleLv[statIndex]))
+                else
+                    -- 提升自己能力
+                    attacker.battleLv = attacker.battleLv or {0, 0, 0, 0, 0, 0}
+                    local statIndex = stat + 1
+                    attacker.battleLv[statIndex] = math.min(6, (attacker.battleLv[statIndex] or 0) + stages)
+                    table.insert(effectResults, {type = "stat_up", target = "attacker", stat = stat, stages = stages})
+                    print(string.format("\27[33m[SideEffect=5] 提升自己能力: stat=%d stages=%d, 新等级=%d\27[0m", stat, stages, attacker.battleLv[statIndex]))
+                end
+            end
+        end
+        
+        -- 能力自提升效果 (SideEffect=4)
+        -- 格式: SideEffectArg="stat chance stages"
+        if effectId == 4 then
+            local args = SkillEffects.parseArgs(effectArg)
+            local stat = args[1] or 0
+            local chance = args[2] or 100
+            local stages = args[3] or 1
+            
+            if math.random(100) <= chance then
+                attacker.battleLv = attacker.battleLv or {0, 0, 0, 0, 0, 0}
+                local statIndex = stat + 1
+                attacker.battleLv[statIndex] = math.min(6, (attacker.battleLv[statIndex] or 0) + stages)
+                table.insert(effectResults, {type = "stat_up", target = "attacker", stat = stat, stages = stages})
+                print(string.format("\27[33m[SideEffect=4] 提升自己能力: stat=%d stages=%d, 新等级=%d\27[0m", stat, stages, attacker.battleLv[statIndex]))
+            end
+        end
+        
         -- 其他效果通过 SkillEffects.processEffect 处理
-        if effectId ~= 1 and effectId ~= 6 and effectId ~= 8 and effectId ~= 31 and effectId ~= 34 and effectId ~= 35 then
+        if effectId ~= 1 and effectId ~= 4 and effectId ~= 5 and effectId ~= 6 and effectId ~= 8 and effectId ~= 31 and effectId ~= 34 and effectId ~= 35 then
             local results = SkillEffects.processEffect(effectId, attacker, defender, totalDamage, effectArg)
             for _, r in ipairs(results) do
                 table.insert(effectResults, r)

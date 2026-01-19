@@ -89,22 +89,19 @@ local function writeBattleLv(lvTable)
     return s
 end
 
--- 序列化状态 (20字节 = 5 * 4 bytes)
--- Protocol usually expects array of status IDs (UInt32)
+-- 序列化状态 (20字节 - 每个字节代表对应状态的持续回合数)
+-- Status索引: 0=麻痹, 1=中毒, 2=烧伤, 3=吸取, 4=被吸取, 5=冻伤, 6=害怕, 7=疲惫, 8=睡眠, 9=石化, etc.
 local function writeStatus(statusTable)
     local s = ""
-    local count = 0
-    if statusTable then
-        for k, v in pairs(statusTable) do
-            if v and v > 0 and count < 5 then
-                s = s .. writeUInt32BE(k)
-                count = count + 1
-            end
+    for i = 0, 19 do
+        local duration = 0
+        if statusTable and statusTable[i] then
+            duration = statusTable[i]
         end
-    end
-    -- Pad remaining with 0
-    for i = count + 1, 5 do
-        s = s .. writeUInt32BE(0)
+        -- 确保在 0-255 范围内
+        if duration < 0 then duration = 0 end
+        if duration > 255 then duration = 255 end
+        s = s .. string.char(duration)
     end
     return s
 end
@@ -145,7 +142,7 @@ end
 -- ==================== 命令处理器 ====================
 
 -- 新手教程BOSS ID (当bossId=0时使用)
-local NOVICE_BOSS_ID = 58  -- 默认新手BOSS
+local NOVICE_BOSS_ID = 13  -- 默认新手BOSS (比比鼠)
 
 -- CMD 2411: CHALLENGE_BOSS (挑战BOSS)
 local function handleChallengeBoss(ctx)
@@ -164,8 +161,32 @@ local function handleChallengeBoss(ctx)
     local nickname = user.nick or user.nickname or user.username or ("赛尔" .. ctx.userId)
     local catchTime = user.catchId or (0x69686700 + petId)
     
-    -- 保存当前BOSS ID
+    -- 获取玩家精灵实际等级和数据
+    local Config = require('../game_config')
+    local defaults = Config.PetDefaults or {}
+    local defaultLevel = defaults.level or 5
+    
+    local petIdStr = tostring(petId)
+    local userPetData = user.pets and user.pets[petIdStr]
+    local playerLevel = defaultLevel
+    local playerDV = 31
+    if userPetData then
+        playerLevel = userPetData.level or defaultLevel
+        playerDV = userPetData.iv or userPetData.dv or 31
+    elseif defaults.dv then
+        playerDV = type(defaults.dv) == "function" and defaults.dv() or defaults.dv
+    end
+    
+    -- 计算玩家精灵属性
+    local playerStats = SeerPets.getStats(petId, playerLevel, playerDV, nil)
+    
+    -- BOSS等级
+    local bossLevel = user.currentBossLevel or 1
+    local bossStats = SeerPets.getStats(bossId, bossLevel, 15, nil)
+    
+    -- 保存当前BOSS ID和等级
     user.currentBossId = bossId
+    user.currentBossLevel = bossLevel
     ctx.saveUserDB()
     
     -- 记录遭遇 (进入战斗)
@@ -173,7 +194,7 @@ local function handleChallengeBoss(ctx)
         ctx.userDB:recordEncounter(ctx.userId, bossId)
     end
     
-    print(string.format("\27[36m[Handler] CHALLENGE_BOSS: bossId=%d, petId=%d, catchTime=0x%X\27[0m", bossId, petId, catchTime))
+    print(string.format("\27[36m[Handler] CHALLENGE_BOSS: bossId=%d, petId=%d(Lv%d), catchTime=0x%X\27[0m", bossId, petId, playerLevel, catchTime))
     
     -- 发送 NOTE_READY_TO_FIGHT (2503)
     -- NoteReadyToFightInfo: userCount(4) + [FighetUserInfo + petCount(4) + PetInfo[]]...
@@ -243,22 +264,23 @@ local function handleChallengeBoss(ctx)
         return pb
     end
     
-    -- 玩家1 (自己)
+    -- 玩家1 (自己) - 使用实际等级和HP
     body = body .. writeUInt32BE(ctx.userId)
     body = body .. writeFixedString(nickname, 16)
     body = body .. writeUInt32BE(1)  -- petCount
-    body = body .. buildBattlePetInfo(petId, catchTime, 100, 100, 16)
+    body = body .. buildBattlePetInfo(petId, catchTime, playerStats.hp, playerStats.maxHp, playerLevel)
     
-    -- 玩家2 (敌人/BOSS)
+    -- 玩家2 (敌人/BOSS) - 使用实际BOSS等级
     body = body .. writeUInt32BE(0)
     body = body .. writeFixedString("", 16)
     body = body .. writeUInt32BE(1)  -- petCount
-    body = body .. buildBattlePetInfo(bossId, 0, 50, 50, 5)
+    body = body .. buildBattlePetInfo(bossId, 0, bossStats.hp, bossStats.maxHp, bossLevel)
     
     ctx.sendResponse(buildResponse(2503, ctx.userId, 0, body))
     print(string.format("\27[32m[Handler] → CHALLENGE_BOSS %d (sent NOTE_READY_TO_FIGHT, body=%d bytes)\27[0m", bossId, #body))
     return true
 end
+
 
 -- CMD 2404: READY_TO_FIGHT (准备战斗)
 local function handleReadyToFight(ctx)
@@ -606,6 +628,25 @@ local function handleUseSkill(ctx)
                 battle.enemy.hp, battle.enemy.maxHp, 0, enemyPetId, 
                 battle.enemy.status, battle.enemy.battleLv, 0)
         end
+        
+        -- Debug logging for AttackValue packets
+        if result.firstAttack then
+            local atk1 = result.firstAttack
+            print(string.format("\27[35m[DEBUG] AttackValue1: userId=%d skillId=%d atkTimes=%d damage=%d gainHp=%d remainHp=%d maxHp=%d\27[0m",
+                atk1.userId or 0, atk1.skillId or 0, atk1.atkTimes or 0, atk1.damage or 0, atk1.gainHp or 0,
+                atk1.attackerRemainHp or 0, atk1.attackerMaxHp or 0))
+        else
+            print("\27[35m[DEBUG] AttackValue1: No first attack (empty)\27[0m")
+        end
+        if result.secondAttack then
+            local atk2 = result.secondAttack
+            print(string.format("\27[35m[DEBUG] AttackValue2: userId=%d skillId=%d atkTimes=%d damage=%d gainHp=%d remainHp=%d maxHp=%d\27[0m",
+                atk2.userId or 0, atk2.skillId or 0, atk2.atkTimes or 0, atk2.damage or 0, atk2.gainHp or 0,
+                atk2.attackerRemainHp or 0, atk2.attackerMaxHp or 0))
+        else
+            print("\27[35m[DEBUG] AttackValue2: No second attack (empty)\27[0m")
+        end
+        print(string.format("\27[35m[DEBUG] CMD 2505 body size: %d bytes (expected 156)\27[0m", #body2505))
         
         ctx.sendResponse(buildResponse(2505, ctx.userId, 0, body2505))
         

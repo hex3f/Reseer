@@ -272,7 +272,7 @@ end
 
 -- 获取BOSS的AI类型
 function BattleAI.getBossAIType(bossId)
-    -- 新手教程BOSS (ID 58 = 比比鼠)
+    -- 新手教程BOSS (ID 58 = 塔奇拉顿, ID 13 = 比比鼠)
     if bossId == 58 or bossId == 13 then
         return BattleAI.TYPE.NOVICE_BOSS
     end

@@ -676,7 +676,7 @@ local resServer = http.createServer(function(req, res)
             end
             
             -- 如果开启了官方资源模式，但本地文件已存在且有效，则使用本地文件（静默模式，不打印日志）
-            if conf.use_official_resources and not err and stat.type == "file" and stat.size > 0 then
+            if conf.use_official_resources and not err and stat.type == "file" then
                 Logger.logResource("GET", dest, 200, stat.size)
                 
                 -- 如果是 SWF 文件，在控制台显示
@@ -696,7 +696,7 @@ local resServer = http.createServer(function(req, res)
             end
             
             -- 如果开启了官方资源模式且本地文件不存在或无效，从官服获取
-            if conf.use_official_resources and (err or stat.type ~= "file" or stat.size == 0) then
+            if conf.use_official_resources and (err or stat.type ~= "file") then
                 return res:notFound(req.uri.pathname, "Force fetch from official\n")
             end
             
