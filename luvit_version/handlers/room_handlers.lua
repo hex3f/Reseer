@@ -226,34 +226,103 @@ local function handleLeaveRoom(ctx)
 end
 
 -- CMD 10004: BUY_FITMENT (购买家具)
+-- 请求: itemId(4) + count(4)
+-- 响应: coins(4) + itemId(4) + count(4)
 local function handleBuyFitment(ctx)
     local itemId = 0
+    local count = 1
     if #ctx.body >= 4 then
         itemId = readUInt32BE(ctx.body, 1)
     end
-    local body = writeUInt32BE(0) ..      -- ret (0=成功)
-                writeUInt32BE(itemId)     -- itemId
+    if #ctx.body >= 8 then
+        count = readUInt32BE(ctx.body, 5)
+    end
+    if count <= 0 then count = 1 end
+    
+    local user = ctx.getOrCreateUser(ctx.userId)
+    
+    -- TODO: 从物品配置中获取价格，暂时使用固定价格
+    local price = 100 * count
+    local currentCoins = user.coins or 10000
+    
+    -- 扣除赛尔豆
+    if currentCoins >= price then
+        user.coins = currentCoins - price
+    else
+        -- 余额不足也允许购买（测试用）
+        user.coins = currentCoins
+    end
+    
+    -- 添加家具到背包 (items 表)
+    if not user.items then user.items = {} end
+    local itemKey = tostring(itemId)
+    if not user.items[itemKey] then
+        user.items[itemKey] = { count = 0 }
+    end
+    user.items[itemKey].count = (user.items[itemKey].count or 0) + count
+    
+    -- 保存到数据库
+    ctx.saveUserDB()
+    
+    -- 响应: coins(4) + itemId(4) + count(4)
+    local body = writeUInt32BE(user.coins) ..
+                 writeUInt32BE(itemId) ..
+                 writeUInt32BE(count)
     ctx.sendResponse(buildResponse(10004, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → BUY_FITMENT %d response\27[0m", itemId))
+    print(string.format("\27[32m[Handler] → BUY_FITMENT itemId=%d count=%d coins=%d\27[0m", 
+        itemId, count, user.coins))
     return true
 end
 
 -- CMD 10005: BETRAY_FITMENT (出售家具)
+-- 请求: itemId(4) + count(4)
+-- 响应: coins(4) + itemId(4) + count(4)
 local function handleBetrayFitment(ctx)
     local itemId = 0
+    local count = 1
     if #ctx.body >= 4 then
         itemId = readUInt32BE(ctx.body, 1)
     end
-    local body = writeUInt32BE(0) ..      -- ret (0=成功)
-                writeUInt32BE(itemId)     -- itemId
+    if #ctx.body >= 8 then
+        count = readUInt32BE(ctx.body, 5)
+    end
+    if count <= 0 then count = 1 end
+    
+    local user = ctx.getOrCreateUser(ctx.userId)
+    
+    -- 从背包中移除家具
+    if user.items then
+        local itemKey = tostring(itemId)
+        if user.items[itemKey] then
+            local current = user.items[itemKey].count or 0
+            local toRemove = math.min(count, current)
+            user.items[itemKey].count = current - toRemove
+            if user.items[itemKey].count <= 0 then
+                user.items[itemKey] = nil
+            end
+        end
+    end
+    
+    -- 返还赛尔豆 (出售价格 = 购买价格的一半)
+    local sellPrice = 50 * count
+    user.coins = (user.coins or 0) + sellPrice
+    
+    -- 保存到数据库
+    ctx.saveUserDB()
+    
+    -- 响应: coins(4) + itemId(4) + count(4)
+    local body = writeUInt32BE(user.coins) ..
+                 writeUInt32BE(itemId) ..
+                 writeUInt32BE(count)
     ctx.sendResponse(buildResponse(10005, ctx.userId, 0, body))
-    print(string.format("\27[32m[Handler] → BETRAY_FITMENT %d response\27[0m", itemId))
+    print(string.format("\27[32m[Handler] → BETRAY_FITMENT itemId=%d count=%d coins=%d\27[0m", 
+        itemId, count, user.coins))
     return true
 end
 
 -- CMD 10006: FITMENT_USERING (正在使用的家具)
 -- 返回正在使用的家具列表
--- 官服响应格式: userID(4) + visitorId(4) + count(4) + [FitmentInfo]...
+-- 客户端解析: userID(4) + roomID(4) + count(4) + [FitmentInfo]...
 -- FitmentInfo: id(4) + x(4) + y(4) + dir(4) + status(4)
 local function handleFitmentUsering(ctx)
     -- 从请求中读取目标用户ID (可能是访问别人的家)
@@ -265,11 +334,12 @@ local function handleFitmentUsering(ctx)
     -- 获取用户的家具数据
     local user = ctx.getOrCreateUser(targetUserId)
     local fitments = user.fitments or {}
+    local roomId = user.roomId or targetUserId  -- 房间ID，默认使用用户ID
     
-    -- 构建响应 (与官服格式一致)
+    -- 构建响应 (与客户端 FitmentManager.getUsedInfo 解析一致)
     local body = writeUInt32BE(targetUserId) ..  -- userID (房主)
-                 writeUInt32BE(ctx.userId) ..    -- visitorId (访问者，通常是自己)
-                 writeUInt32BE(#fitments)        -- count
+                 writeUInt32BE(roomId) ..         -- roomID (房间ID)
+                 writeUInt32BE(#fitments)         -- count
     
     -- 添加家具列表
     for _, fitment in ipairs(fitments) do
@@ -343,11 +413,109 @@ local function handleFitmentAll(ctx)
     return true
 end
 
--- CMD 10008: SET_FITMENT (设置家具)
--- FitmentInfo for 10008: id(4) + x(4) + y(4) + dir(4) + status(4)
+-- CMD 10008: SET_FITMENT (设置家具/保存家具布局)
+-- 请求: roomId(4) + count(4) + [id(4) + x(4) + y(4) + dir(4) + status(4)]...
+-- 响应: 空 (客户端不需要响应数据)
 local function handleSetFitment(ctx)
+    local roomId = 0
+    local count = 0
+    local offset = 1
+    
+    -- 解析 roomId
+    if #ctx.body >= 4 then
+        roomId = readUInt32BE(ctx.body, offset)
+        offset = offset + 4
+    end
+    
+    -- 解析家具数量
+    if #ctx.body >= 8 then
+        count = readUInt32BE(ctx.body, offset)
+        offset = offset + 4
+    end
+    
+    -- 解析家具列表
+    local newFitments = {}
+    for i = 1, count do
+        if #ctx.body >= offset + 19 then  -- 每个 FitmentInfo 是 20 字节
+            local fitment = {
+                id = readUInt32BE(ctx.body, offset),
+                x = readUInt32BE(ctx.body, offset + 4),
+                y = readUInt32BE(ctx.body, offset + 8),
+                dir = readUInt32BE(ctx.body, offset + 12),
+                status = readUInt32BE(ctx.body, offset + 16)
+            }
+            table.insert(newFitments, fitment)
+            offset = offset + 20
+        else
+            break
+        end
+    end
+    
+    -- 获取用户数据
+    local user = ctx.getOrCreateUser(ctx.userId)
+    local oldFitments = user.fitments or {}
+    if not user.items then user.items = {} end
+    
+    -- 统计旧的已放置家具数量 (按ID)
+    local oldPlacedCount = {}
+    for _, f in ipairs(oldFitments) do
+        local id = f.id
+        oldPlacedCount[id] = (oldPlacedCount[id] or 0) + 1
+    end
+    
+    -- 统计新的已放置家具数量 (按ID)
+    local newPlacedCount = {}
+    for _, f in ipairs(newFitments) do
+        local id = f.id
+        newPlacedCount[id] = (newPlacedCount[id] or 0) + 1
+    end
+    
+    -- 计算变化并更新背包数量
+    -- 合并所有出现过的家具ID
+    local allIds = {}
+    for id, _ in pairs(oldPlacedCount) do allIds[id] = true end
+    for id, _ in pairs(newPlacedCount) do allIds[id] = true end
+    
+    for id, _ in pairs(allIds) do
+        local oldCount = oldPlacedCount[id] or 0
+        local newCount = newPlacedCount[id] or 0
+        local delta = newCount - oldCount  -- 正数=新放置, 负数=收回背包
+        
+        if delta ~= 0 then
+            local itemKey = tostring(id)
+            if not user.items[itemKey] then
+                user.items[itemKey] = { count = 0 }
+            end
+            -- 新放置的家具从背包扣除，收回的家具加到背包
+            user.items[itemKey].count = (user.items[itemKey].count or 0) - delta
+            
+            -- 确保不会变成负数
+            if user.items[itemKey].count < 0 then
+                user.items[itemKey].count = 0
+            end
+            
+            print(string.format("  [Sync] id=%d: placed %+d, bag now=%d", 
+                id, delta, user.items[itemKey].count))
+        end
+    end
+    
+    -- 保存新的家具布局
+    user.fitments = newFitments
+    user.roomId = roomId
+    
+    -- 打印调试信息
+    print(string.format("\27[36m[Handler] SET_FITMENT: roomId=%d, count=%d\27[0m", roomId, #newFitments))
+    for i, f in ipairs(newFitments) do
+        print(string.format("  [%d] id=%d pos=(%d,%d) dir=%d status=%d", 
+            i, f.id, f.x, f.y, f.dir, f.status))
+    end
+    
+    -- 保存到数据库
+    ctx.saveUserDB()
+    
+    -- 发送响应 (空响应)
     ctx.sendResponse(buildResponse(10008, ctx.userId, 0, ""))
-    print("\27[32m[Handler] → SET_FITMENT response\27[0m")
+    print(string.format("\27[32m[Handler] → SET_FITMENT response (saved %d fitments)\27[0m", #fitments))
     return true
 end
 
