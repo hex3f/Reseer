@@ -320,6 +320,7 @@ local function saveAllData()
     else
         print("\27[31m[SHUTDOWN] 保存用户数据失败: " .. tostring(UserDB) .. "\27[0m")
     end
+end
 -- Windows 兼容的 Ctrl+C 处理
 -- 在 Windows 上，使用定时器定期保存数据 (仅本地模式)
 if package.config:sub(1,1) == '\\' and conf.local_server_mode then

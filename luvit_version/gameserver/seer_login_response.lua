@@ -4,6 +4,7 @@
 local buffer = require "buffer"
 require "../easybytewrite"
 local Config = require("../game_config")
+local RecUtils = require("../handlers/utils")
 
 local SeerLoginResponse = {}
 
@@ -63,7 +64,9 @@ function SeerLoginResponse.makeLoginResponse(user)
     pos = pos + 4
     
     -- nick (16 bytes) - line 759
-    basic:write(pos, user.nick or "赛尔", 16)
+    -- 必须确保填充到 16 字节，否则未初始化的内存会导致后面的 vipFlags 读到垃圾值
+    local paddedNick = RecUtils.writeFixedString(user.nick or "赛尔", 16)
+    basic:write(pos, paddedNick, 16)
     pos = pos + 16
     
     -- vip flags (4 bytes) - line 760-762

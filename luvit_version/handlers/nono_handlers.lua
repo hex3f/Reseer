@@ -334,7 +334,7 @@ local function handleNonoFollowOrHoom(ctx)
         body = body .. writeUInt32BE(1)                             -- state=1 跟随�?(4)
         body = body .. writeFixedString(nonoData.nick or "NONO", 16) -- nick (16)
         body = body .. writeUInt32BE(nonoData.color or 0xFFFFFF)    -- color (4)
-        body = body .. writeUInt32BE(nonoData.chargeTime or 10000)  -- chargeTime (4)
+        body = body .. writeUInt32BE(nonoData.power or 10000)       -- power (4) (官服值为10000，此前误写为chargeTime)
     else
         -- 回家: 只返�?12 bytes (官服协议)
         -- 官服格式: flag=0, state=0
