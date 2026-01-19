@@ -289,9 +289,57 @@ end
 -- CMD 10007: FITMENT_ALL (所有家具)
 -- FitmentInfo for 10007: id(4) + usedCount(4) + allCount(4)
 local function handleFitmentAll(ctx)
-    local body = writeUInt32BE(0)  -- count = 0 (没有家具)
+    local user = ctx.getOrCreateUser(ctx.userId)
+    local fitments = user.fitments or {}
+    local items = user.items or {}
+    
+    -- 统计数表: id -> {used=0, bag=0}
+    local stats = {}
+    
+    -- 1. 统计已摆放的家具 (usedCount)
+    for _, f in ipairs(fitments) do
+        local id = f.id or 0
+        if id > 0 then
+            if not stats[id] then stats[id] = {used=0, bag=0} end
+            stats[id].used = stats[id].used + 1
+        end
+    end
+    
+    -- 2. 统计背包里的家具物品 (bagCount)
+    -- 家具物品ID通常 >= 500000 (根据 task_handlers 和 game_config)
+    for itemIdStr, itemData in pairs(items) do
+        local id = tonumber(itemIdStr)
+        if id and id >= 500000 then
+            local count = itemData.count or 0
+            if count > 0 then
+                if not stats[id] then stats[id] = {used=0, bag=0} end
+                stats[id].bag = count
+            end
+        end
+    end
+    
+    -- 3. 转换为数组并构建响应
+    local uniqueFitments = {}
+    for id, data in pairs(stats) do
+        -- allCount = usedCount + bagCount
+        -- 官服逻辑: allCount 是总拥有数量，usedCount 是已摆放数量
+        -- 背包里的数量 = allCount - usedCount
+        local allCount = data.used + data.bag
+        table.insert(uniqueFitments, {id = id, usedCount = data.used, allCount = allCount})
+    end
+    
+    -- 排序 (可选，方便调试)
+    table.sort(uniqueFitments, function(a, b) return a.id < b.id end)
+    
+    local body = writeUInt32BE(#uniqueFitments)
+    for _, f in ipairs(uniqueFitments) do
+        body = body .. writeUInt32BE(f.id)
+        body = body .. writeUInt32BE(f.usedCount)   -- 已使用数量
+        body = body .. writeUInt32BE(f.allCount)    -- 总数量
+    end
+    
     ctx.sendResponse(buildResponse(10007, ctx.userId, 0, body))
-    print("\27[32m[Handler] → FITMENT_ALL response\27[0m")
+    print(string.format("\27[32m[Handler] → FITMENT_ALL response (%d types)\27[0m", #uniqueFitments))
     return true
 end
 

@@ -276,15 +276,12 @@ function UserDB:getOrCreateGameData(userId)
             posX = GameConfig.InitialPlayer.posX or 300,
             posY = GameConfig.InitialPlayer.posY or 300,
             
-            -- 家园系统 - 默认家具
-            -- fitments: 正在使用的家具 (摆放在房间里的)
-            fitments = {
+            -- 家园系统 - 默认家具 (从配置读取)
+            fitments = GameConfig.InitialPlayer.defaultFitments or {
                 {id = 500001, x = 0, y = 0, dir = 0, status = 0}  -- 默认房间风格
             },
-            -- allFitments: 所有拥有的家具 (仓库)
-            allFitments = {
-                {id = 500001, usedCount = 1, allCount = 1}  -- 默认房间风格
-            },
+            -- allFitments: 所有拥有的家具 (仓库) - 与 fitments 保持一致
+            allFitments = {},
             
             -- NoNo信息 (从配置读取所有默认值，包含VIP信息)
             nono = {
