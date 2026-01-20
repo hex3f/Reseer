@@ -2,8 +2,8 @@
 -- 赛尔号战斗AI系统
 -- 用于控制野怪/BOSS的战斗行为
 
-local SeerSkills = require('./seer_skills')
-local SeerPets = require('./seer_pets')
+local SeerSkills = require('game/seer_skills')
+local SeerPets = require('game/seer_pets')
 
 local BattleAI = {}
 

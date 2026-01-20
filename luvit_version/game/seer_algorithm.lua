@@ -1,8 +1,8 @@
 -- 赛尔号战斗算法系统
 -- 整合属性计算、伤害公式、速度判定等核心战斗逻辑
 
-local Elements = require('./seer_elements')
-local Natures = require('./seer_natures')
+local Elements = require('game/seer_elements')
+local Natures = require('game/seer_natures')
 
 local Algorithm = {}
 

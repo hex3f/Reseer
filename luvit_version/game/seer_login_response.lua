@@ -128,16 +128,17 @@ function SeerLoginResponse.makeLoginResponse(user)
     writer:writeUInt32BE(hasNono and 1 or 0)             -- hasNono (4)
     writer:writeUInt32BE(superNono > 0 and 1 or 0)       -- superNono (4)
     writer:writeUInt32BE(nono.flag or 0xFFFFFFFF)        -- nonoState (32 bits -> 4 bytes)
-    writer:writeUInt32BE(nono.color or user.nonoColor or 0) -- nonoColor (4)
+    writer:writeUInt32BE(nono.color or user.nonoColor or 0xFFFFFF) -- nonoColor (4) - 默认白色
     writer:writeStringFixed(nono.nick or user.nonoNick or "NoNo", 16) -- nonoNick (16)
     
-    -- 9. TeamInfo (24 bytes)
-    writer:writeUInt32BE(0) -- id
-    writer:writeUInt32BE(0) -- priv
-    writer:writeUInt32BE(0) -- superCore
-    writer:writeUInt32BE(0) -- isShow
-    writer:writeUInt32BE(0) -- allContribution
-    writer:writeUInt32BE(0) -- canExContribution
+    -- 9. TeamInfo (24 bytes) - 使用用户实际的战队信息
+    local team = user.teamInfo or {}
+    writer:writeUInt32BE(team.id or 0)           -- id
+    writer:writeUInt32BE(team.priv or 0)         -- priv
+    writer:writeUInt32BE(team.superCore or 0)    -- superCore
+    writer:writeUInt32BE(team.isShow and 1 or 0) -- isShow
+    writer:writeUInt32BE(team.allContribution or 0) -- allContribution
+    writer:writeUInt32BE(team.canExContribution or 0) -- canExContribution
     
     -- 10. TeamPKInfo (8 bytes)
     writer:writeUInt32BE(0) -- groupID

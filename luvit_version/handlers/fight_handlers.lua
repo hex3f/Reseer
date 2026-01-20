@@ -1,15 +1,14 @@
 -- 战斗相关命令处理器
 -- 包括: 挑战BOSS、准备战斗、使用技能、捕捉精灵等
--- Protocol Version: 2026-01-20 (Refactored using BinaryWriter)
+-- Protocol Version: 2026-01-20 (Refactored using BinaryWriter/Reader/ResponseBuilder)
 
-local Utils = require('./utils')
-local BinaryWriter = require('../utils/binary_writer')
-local BinaryReader = require('../utils/binary_reader')
-local Elements = require('../game/seer_elements')
-local SeerPets = require('../game/seer_pets')
-local SeerSkills = require('../game/seer_skills')
-local SeerBattle = require('../game/seer_battle')
-local buildResponse = Utils.buildResponse
+local BinaryWriter = require('utils/binary_writer')
+local BinaryReader = require('utils/binary_reader')
+local ResponseBuilder = require('utils/response_builder')
+local Elements = require('game/seer_elements')
+local SeerPets = require('game/seer_pets')
+local SeerSkills = require('game/seer_skills')
+local SeerBattle = require('game/seer_battle')
 
 local FightHandlers = {}
 
@@ -34,6 +33,10 @@ end
 
 -- 构建 AttackValue (CMD 2505)
 -- 对应: com.robot.core.info.fightInfo.attack.AttackValue
+-- 严格各参数顺序:
+-- userID(4), skillID(4), atkTimes(4), lostHP(4), gainHP(4-int), remainHp(4-int), maxHp(4), state(4)
+-- skillCount(4) + skills...
+-- isCrit(4), status(20), battleLv(6), maxShield(4), curShield(4), petType(4)
 local function buildAttackValue(userId, skillId, atkTimes, lostHP, gainHP, remainHp, maxHp, state, isCrit, status, battleLv, petType)
     local writer = BinaryWriter.new()
     writer:writeUInt32BE(userId)
@@ -45,7 +48,7 @@ local function buildAttackValue(userId, skillId, atkTimes, lostHP, gainHP, remai
     writer:writeUInt32BE(maxHp or 0)
     writer:writeUInt32BE(state or 0)
     
-    writer:writeUInt32BE(0) -- skillListCount (PetSkillInfo list)
+    writer:writeUInt32BE(0) -- skillListCount (PetSkillInfo list) - Currently empty
     -- If we needed to write skills: loop { id(4), pp(4) }
     
     writer:writeUInt32BE(isCrit or 0)
@@ -72,21 +75,16 @@ local function buildAttackValue(userId, skillId, atkTimes, lostHP, gainHP, remai
     
     writer:writeUInt32BE(0)           -- maxShield
     writer:writeUInt32BE(0)           -- curShield
-    writer:writeUInt32BE(petType or 0) -- petType
+    writer:writeUInt32BE(petType or 0) -- petType (Element Type)
     
     return writer:toString()
 end
 
--- 构建 NoteReadyToFightInfo (CMD 2503) 部分
--- 需要: FighetUserInfo + PetInfo(simple)
+-- 构建 NoteReadyToFightInfo (CMD 2503) 相关
 local function buildFighetUserInfo(userId, nick)
     local writer = BinaryWriter.new()
     writer:writeUInt32BE(userId or 0)
     writer:writeStringFixed(nick or "Seer", 16)
-    -- Assuming FighetUserInfo ends here based on generic usage, 
-    -- but usually it matches specific logic. 
-    -- Let's re-verify `FighetUserInfo.as` contents if needed.
-    -- Based on NoteReadyToFightInfo usage: `new FighetUserInfo(param1)`
     return writer:toString()
 end
 
@@ -145,7 +143,7 @@ local function handleChallengeBoss(ctx)
     if catchTime == 0 then catchTime = 0x69686700 + petId end
     
     -- Prepare Data
-    local Config = require('../config/game_config')
+    local Config = require('config/game_config')
     local defaults = Config.PetDefaults or {}
     local defaultLevel = defaults.level or 5
     
@@ -185,7 +183,6 @@ local function handleChallengeBoss(ctx)
     
     writer:writeUInt32BE(1) -- petCount
     -- PetInfo(Simple)
-    -- Need skills
     local playerSkills = {}
     if userPetData and userPetData.skills then
         for _, sid in ipairs(userPetData.skills) do
@@ -220,7 +217,7 @@ local function handleChallengeBoss(ctx)
     end
     writer:writeBytes(buildSimplePetInfo(bossId, bossLevel, bossStats.hp, bossStats.maxHp, 0, bossSkills, 301))
     
-    ctx.sendResponse(buildResponse(2503, ctx.userId, 0, writer:toString()))
+    ctx.sendResponse(ResponseBuilder.build(2503, ctx.userId, 0, writer:toString()))
     return true
 end
 
@@ -235,7 +232,7 @@ local function handleReadyToFight(ctx)
     -- 1. Get Player Data
     local petIdStr = tostring(petId)
     local userPetData = user.pets and user.pets[petIdStr]
-    local Config = require('../config/game_config')
+    local Config = require('config/game_config')
     local defaults = Config.PetDefaults or {}
     local playerLevel = (userPetData and userPetData.level) or defaults.level or 5
     local playerDV = (userPetData and (userPetData.iv or userPetData.dv)) or 31
@@ -264,7 +261,7 @@ local function handleReadyToFight(ctx)
     if #enemySkills == 0 then enemySkills = {10001} end -- Tackle
     
     -- 3. Create Battle Instance
-    local BattleAI = require('../game/seer_battle_ai')
+    local BattleAI = require('game/seer_battle_ai')
     local aiType = BattleAI.getBossAIType(bossId)
     
     local playerBattleData = {
@@ -312,7 +309,7 @@ local function handleReadyToFight(ctx)
     writer:writeBytes(buildFightPetInfo(ctx.userId, petId, catchTime, playerStats.hp, playerStats.maxHp, playerLevel, 0))
     writer:writeBytes(buildFightPetInfo(0, bossId, 0, enemyStats.hp, enemyStats.maxHp, enemyLevel, 1))
     
-    ctx.sendResponse(buildResponse(2504, ctx.userId, 0, writer:toString()))
+    ctx.sendResponse(ResponseBuilder.build(2504, ctx.userId, 0, writer:toString()))
     return true
 end
 
@@ -325,17 +322,14 @@ local function handleUseSkill(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
     local battle = user.battle
     
-    -- Ack
-    ctx.sendResponse(buildResponse(2405, ctx.userId, 0, ""))
+    -- Ack immediately
+    ctx.sendResponse(ResponseBuilder.build(2405, ctx.userId, 0, ""))
     
     if battle and not battle.isOver then
         print(string.format("\27[36m[Handler] USE_SKILL: Turn %d (Skill %d)\27[0m", (battle.turn or 0) + 1, skillId))
         
         local result = SeerBattle.executeTurn(battle, skillId)
         local writer = BinaryWriter.new()
-        
-        local playerPetId = battle.player.id
-        local enemyPetId = battle.enemy.id
         
         -- First Attack
         if result.firstAttack then
@@ -351,7 +345,7 @@ local function handleUseSkill(ctx)
                 atk1.attackerStatus, atk1.attackerBattleLv, petType
             ))
         else
-            -- Empty Placeholder
+            -- Empty Placeholder (Should rarely happen in strict flow)
             writer:writeBytes(buildAttackValue(ctx.userId, 0, 0, 0, 0, battle.player.hp, battle.player.maxHp, 0, 0, 
                 battle.player.status, battle.player.battleLv, 0))
         end
@@ -370,12 +364,13 @@ local function handleUseSkill(ctx)
                 atk2.attackerStatus, atk2.attackerBattleLv, petType
             ))
         else
-             -- Empty Placeholder
+            -- Empty Placeholder
             writer:writeBytes(buildAttackValue(0, 0, 0, 0, 0, battle.enemy.hp, battle.enemy.maxHp, 0, 0, 
                 battle.enemy.status, battle.enemy.battleLv, 0))
         end
         
-        ctx.sendResponse(buildResponse(2505, ctx.userId, 0, writer:toString()))
+        -- Send CMD 2505 (Attack Info)
+        ctx.sendResponse(ResponseBuilder.build(2505, ctx.userId, 0, writer:toString()))
         
         -- Check Is Over
         if result.isOver then
@@ -386,12 +381,13 @@ local function handleUseSkill(ctx)
                  ctx.userDB:recordKill(ctx.userId, bossId)
             end
             
+            -- CMD 2506: Fight Over
             local endWriter = BinaryWriter.new()
             endWriter:writeUInt32BE(reason)
             endWriter:writeUInt32BE(winnerId)
-            endWriter:writeBytes(string.rep("\0", 20))
+            endWriter:writeBytes(string.rep("\0", 20)) -- 5 x 4 bytes stats (twoTimes etc.)
             
-            ctx.sendResponse(buildResponse(2506, ctx.userId, 0, endWriter:toString()))
+            ctx.sendResponse(ResponseBuilder.build(2506, ctx.userId, 0, endWriter:toString()))
             
             user.battle = nil
             user.inFight = false
@@ -404,7 +400,7 @@ local function handleUseSkill(ctx)
         endWriter:writeUInt32BE(0)
         endWriter:writeUInt32BE(0)
         endWriter:writeBytes(string.rep("\0", 20))
-        ctx.sendResponse(buildResponse(2506, ctx.userId, 0, endWriter:toString()))
+        ctx.sendResponse(ResponseBuilder.build(2506, ctx.userId, 0, endWriter:toString()))
     end
     
     ctx.saveUserDB()
@@ -423,7 +419,7 @@ local function handleUsePetItem(ctx)
     writer:writeUInt32BE(100) -- hp
     writer:writeUInt32BE(50)  -- change
     
-    ctx.sendResponse(buildResponse(2406, ctx.userId, 0, writer:toString()))
+    ctx.sendResponse(ResponseBuilder.build(2406, ctx.userId, 0, writer:toString()))
     return true
 end
 
@@ -445,7 +441,7 @@ local function handleChangePet(ctx)
     writer:writeUInt32BE(100)
     writer:writeUInt32BE(catchTime)
     
-    ctx.sendResponse(buildResponse(2407, ctx.userId, 0, writer:toString()))
+    ctx.sendResponse(ResponseBuilder.build(2407, ctx.userId, 0, writer:toString()))
     return true
 end
 
@@ -463,7 +459,7 @@ local function handleCatchMonster(ctx)
     writer:writeUInt32BE(catchTime)
     writer:writeUInt32BE(bossId)
     
-    ctx.sendResponse(buildResponse(2409, ctx.userId, 0, writer:toString()))
+    ctx.sendResponse(ResponseBuilder.build(2409, ctx.userId, 0, writer:toString()))
     return true
 end
 
@@ -472,7 +468,7 @@ local function handleEscapeFight(ctx)
     local writer = BinaryWriter.new()
     writer:writeUInt32BE(1)
     
-    ctx.sendResponse(buildResponse(2410, ctx.userId, 0, writer:toString()))
+    ctx.sendResponse(ResponseBuilder.build(2410, ctx.userId, 0, writer:toString()))
     return true
 end
 

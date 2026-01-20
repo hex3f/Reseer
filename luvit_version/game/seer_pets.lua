@@ -2,7 +2,7 @@
 -- 赛尔号精灵数据加载器
 -- 从 data/spt.xml 加载完整精灵信息，建立与技能的引用关系
 
-local XmlLoader = require("../core/xml_loader")
+local XmlLoader = require("core/xml_loader")
 
 local SeerPets = {}
 SeerPets.pets = {}
@@ -516,9 +516,21 @@ function SeerPets.createStarterPet(petId, level)
         }
     end
     
-    -- 生成随机个体值和性格
-    local iv = math.random(0, 31)
-    local nature = math.random(0, 24)
+    -- 使用配置的默认值
+    local GameConfig = require('config/game_config')
+    local defaults = GameConfig.PetDefaults or {}
+    
+    local iv = 31
+    if defaults.dv then
+         iv = type(defaults.dv) == "function" and defaults.dv() or defaults.dv
+    end
+    
+    local nature = 0
+    if defaults.nature then
+         nature = type(defaults.nature) == "function" and defaults.nature() or defaults.nature
+    else
+         nature = math.random(0, 24)
+    end
     
     -- 计算属性
     local stats = SeerPets.getStats(petId, level, iv, {hp=0, atk=0, def=0, spAtk=0, spDef=0, spd=0})

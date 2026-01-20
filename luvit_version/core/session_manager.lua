@@ -2,7 +2,7 @@
 -- 统一管理所有服务器的会话状态和临时数据
 -- 实现数据与逻辑分离
 
-local Logger = require('./logger')
+local Logger = require('core/logger')
 local tprint = Logger.tprint
 
 local SessionManager = {}

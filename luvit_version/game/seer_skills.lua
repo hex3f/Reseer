@@ -2,7 +2,7 @@
 -- 赛尔号技能数据
 -- 从 data/skills.xml 加载完整技能信息
 
-local XmlLoader = require("../core/xml_loader")
+local XmlLoader = require("core/xml_loader")
 
 local SeerSkills = {}
 SeerSkills.skills = {}
@@ -83,7 +83,7 @@ end
 
 -- 注入官服技能ID 并链接技能效果数据
 function SeerSkills.injectOfficialSkills()
-    local SeerSkillEffects = require('./seer_skill_effects')
+    local SeerSkillEffects = require('game/seer_skill_effects')
     
     -- 确保效果数据已加载
     SeerSkillEffects.load()

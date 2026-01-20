@@ -2,7 +2,15 @@
 -- 负责：游戏逻辑、地图系统、战斗系统、家园系统（已合并）
 
 -- 初始化日志系统
-local Logger = require("./logger")
+local fs = require('fs')
+_G.fs = fs -- WORKAROUND: Global fs to avoid require errors in sub-modules
+local json = require('json')
+_G.json = json
+local net = require('net')
+_G.net = net
+local timer = require('timer')
+_G.timer = timer
+local Logger = require("./core/logger")
 Logger.init()
 
 print("\27[36m╔════════════════════════════════════════════════════════════╗\27[0m")
@@ -22,64 +30,100 @@ local conf = _G.conf or {
 _G.conf = conf
 
 -- 加载 buffer 扩展（必须在其他模块之前）
-require "./buffer_extension"
+require "./utils/buffer_extension"
 
 -- 创建数据客户端（微服务模式）
 print("\27[36m[游戏服务器] 连接数据服务器: " .. conf.dataserver_url .. "\27[0m")
-local DataClient = require "./data_client"
+local DataClient = require "./core/data_client"
 local dataClient = DataClient:new(conf.dataserver_url)
 
 -- 数据预加载
 print("\27[36m[游戏服务器] ========== 数据预加载 ==========\27[0m")
 
--- 1. 加载精灵数据
-print("\27[36m[游戏服务器] 正在加载精灵数据...\27[0m")
-local Pets = require("./seer_pets")
-Pets.load()
-local petCount = 0
-for _ in pairs(Pets.pets) do petCount = petCount + 1 end
-print(string.format("\27[32m[游戏服务器] ✓ 精灵数据加载成功 (%d 个精灵)\27[0m", petCount))
+local status_preload, err_preload = xpcall(function()
+    -- 1. 加载精灵数据
+    print("\27[36m[游戏服务器] 正在加载精灵数据...\27[0m")
+    local Pets = require("./game/seer_pets")
+    Pets.load()
+    local petCount = 0
+    for _ in pairs(Pets.pets) do petCount = petCount + 1 end
+    print(string.format("\27[32m[游戏服务器] ✓ 精灵数据加载成功 (%d 个精灵)\27[0m", petCount))
 
--- 2. 加载物品数据
-print("\27[36m[游戏服务器] 正在加载物品数据...\27[0m")
-local Items = require("./seer_items")
-Items.load()
-print(string.format("\27[32m[游戏服务器] ✓ 物品数据加载成功 (%d 个物品)\27[0m", Items.count))
+    -- 2. 加载物品数据
+    print("\27[36m[游戏服务器] 正在加载物品数据...\27[0m")
+    local Items = require("./game/seer_items")
+    Items.load()
+    print(string.format("\27[32m[游戏服务器] ✓ 物品数据加载成功 (%d 个物品)\27[0m", Items.count))
 
--- 3. 加载技能数据
-print("\27[36m[游戏服务器] 正在加载技能数据...\27[0m")
-local Skills = require("./seer_skills")
-Skills.load()
-local skillCount = 0
-for _ in pairs(Skills.skills) do skillCount = skillCount + 1 end
-print(string.format("\27[32m[游戏服务器] ✓ 技能数据加载成功 (%d 个技能)\27[0m", skillCount))
+    -- 3. 加载技能数据
+    print("\27[36m[游戏服务器] 正在加载技能数据...\27[0m")
+    local Skills = require("./game/seer_skills")
+    Skills.load()
+    local skillCount = 0
+    for _ in pairs(Skills.skills) do skillCount = skillCount + 1 end
+    print(string.format("\27[32m[游戏服务器] ✓ 技能数据加载成功 (%d 个技能)\27[0m", skillCount))
 
--- 4. 加载技能效果数据
-print("\27[36m[游戏服务器] 正在加载技能效果数据...\27[0m")
-local SkillEffects = require("./seer_skill_effects")
-SkillEffects.load()
-print(string.format("\27[32m[游戏服务器] ✓ 技能效果数据加载成功 (%d 个效果)\27[0m", SkillEffects.count))
+    -- 4. 加载技能效果数据
+    print("\27[36m[游戏服务器] 正在加载技能效果数据...\27[0m")
+    local SkillEffects = require("./game/seer_skill_effects")
+    SkillEffects.load()
+    print(string.format("\27[32m[游戏服务器] ✓ 技能效果数据加载成功 (%d 个效果)\27[0m", SkillEffects.count))
+end, debug.traceback)
+
+if not status_preload then
+    print("\n\n[CRITICAL ERROR] DATA PRELOAD FAILED")
+    print("Error: " .. tostring(err_preload))
+    print("Traceback: " .. debug.traceback())
+    os.exit(1)
+end
 
 print("")
 
 -- 创建独立的会话管理器和用户数据库
 print("\27[36m[游戏服务器] 初始化会话管理器...\27[0m")
-local SessionManager = require "./session_manager"
-local sessionManager = SessionManager:new()
-
-print("\27[36m[游戏服务器] 初始化用户数据库...\27[0m")
-local UserDB = require "./userdb"
-local userdb = UserDB
+-- Moved into xpcall
 
 -- 启动游戏服务器
+-- 启动游戏服务器
 print("\27[36m[游戏服务器] 启动游戏服务器...\27[0m")
-local lgs = require "./gameserver/localgameserver"
-local gameServer = lgs.LocalGameServer:new(userdb, sessionManager, dataClient)
+local gameServer
+local status, err = xpcall(function()
+    print("\27[36m[游戏服务器] 初始化会话管理器...\27[0m")
+    local SessionManager = require "core/session_manager"
+    local sessionManager = SessionManager:new()
+
+    print("\27[36m[游戏服务器] 初始化用户数据库...\27[0m")
+    local UserDB = require "core/userdb"
+    local userdb = UserDB
+
+    local lgs = require("servers/gameserver/localgameserver")
+    gameServer = lgs.LocalGameServer:new(userdb, sessionManager, dataClient)
+end, debug.traceback)
+
+if not status then
+    io.write("\n\n[CRITICAL FAILURE] SERVER STARTUP FAILED\n")
+    io.write("Error Message: " .. tostring(err) .. "\n")
+    io.write("Traceback: " .. debug.traceback() .. "\n")
+    io.write("Package Path: " .. package.path .. "\n")
+    io.write("CWD: " .. (fs and fs.cwd and fs.cwd() or "unknown") .. "\n")
+    io.write("\n\n")
+    local f = io.open("server_startup_error.txt", "w")
+    if f then
+        f:write("[CRITICAL ERROR] Failed to start game server:\n")
+        f:write(tostring(err) .. "\n")
+        f:write(debug.traceback() .. "\n")
+        f:close()
+    else
+        print("FAILED TO OPEN ERROR LOG FILE")
+    end
+    
+    os.exit(1)
+end
 
 -- 启动房间代理服务器（用于官服模式）
 print("\27[36m[游戏服务器] 启动房间代理服务器 (端口 5100)...\27[0m")
 local ok, result = pcall(function()
-    local RoomProxy = require "./room_proxy"
+    local RoomProxy = require "./servers/room_proxy"
     return RoomProxy:new(5100)
 end)
 if ok then

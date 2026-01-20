@@ -1,9 +1,9 @@
 -- 精灵信息序列化模块
 -- 用于将精灵数据序列化为客户端期望的格式
 
-local PetCalculator = require('./seer_pet_calculator')
-local SeerSkills = require('./seer_skills')
-local SeerPets = require('./seer_pets')
+local PetCalculator = require('game/seer_pet_calculator')
+local SeerSkills = require('game/seer_skills')
+local SeerPets = require('game/seer_pets')
 
 local PetSerializer = {}
 

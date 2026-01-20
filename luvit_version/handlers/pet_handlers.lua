@@ -2,11 +2,13 @@
 -- 包括: 获取精灵信息、释放精灵、展示精灵、图鉴等
 -- Protocol Version: 2026-01-20 (Refactored for Strict Frontend Compliance)
 
-local Utils = require('./utils')
-local BinaryWriter = require('../utils/binary_writer')
-local BinaryReader = require('../utils/binary_reader')
-local Pets = require('../game/seer_pets')
-local Skills = require('../game/seer_skills')
+local BinaryWriter = require('utils/binary_writer')
+local BinaryReader = require('utils/binary_reader')
+local ResponseBuilder = require('utils/response_builder')
+local Utils = { buildResponse = ResponseBuilder.build } -- Backward compatibility shim
+local Pets = require('game/seer_pets')
+local Skills = require('game/seer_skills')
+local GameConfig = require('config/game_config')
 local buildResponse = Utils.buildResponse
 
 local PetHandlers = {}
@@ -28,7 +30,8 @@ Pets.load()
 -- effectCount(2) + [PetEffectInfo]*count +
 -- skinID(4)
 local function buildFullPetInfo(petId, catchTime, level)
-    level = level or 5
+    local defaults = GameConfig.PetDefaults or {}
+    level = level or defaults.level or 5
     catchTime = catchTime or 0
     
     -- 使用精灵数据库创建实例
@@ -123,7 +126,8 @@ end
 -- 构建简化版 PetInfo (用于战斗准备)
 -- 对应前端: com.robot.core.info.pet.PetInfo (param2 = false)
 local function buildSimplePetInfo(petId, level, hp, maxHp, catchTime)
-    level = level or 5
+    local defaults = GameConfig.PetDefaults or {}
+    level = level or defaults.level or 5
     local pet = Pets.createStarterPet(petId, level)
     hp = hp or pet.hp
     maxHp = maxHp or pet.maxHp

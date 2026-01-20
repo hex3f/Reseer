@@ -1,12 +1,9 @@
 -- 房间系统命令处理器
 -- 包括: 房间登录、家具购买、装饰等
 
-local Utils = require('./utils')
-local writeUInt32BE = Utils.writeUInt32BE
-local writeUInt16BE = Utils.writeUInt16BE
-local readUInt32BE = Utils.readUInt32BE
-local writeFixedString = Utils.writeFixedString
-local buildResponse = Utils.buildResponse
+local BinaryWriter = require('utils/binary_writer')
+local BinaryReader = require('utils/binary_reader')
+local ResponseBuilder = require('utils/response_builder')
 
 local RoomHandlers = {}
 
@@ -15,32 +12,29 @@ local RoomHandlers = {}
 --   session(24 bytes) + catchTime(4) + flag(4) + targetUserId(4) + x(4) + y(4) = 44 bytes
 -- 响应: UserInfo (与 ENTER_MAP 相同的格式)
 -- 注意：由于房间服务器已合并，ROOM_LOGIN 直接完成房间进入，不需要额外的 ENTER_MAP
+-- CMD 10001: ROOM_LOGIN (房间登录)
 local function handleRoomLogin(ctx)
     -- 解析请求
-    local session = ""
-    local catchTime = 0
-    local flag = 0
+    local reader = BinaryReader.new(ctx.body)
+    local session = reader:readBytes(24)
+    local catchTime = reader:readUInt32BE()
+    local flag = reader:readUInt32BE()
     local targetUserId = ctx.userId
+    
+    if reader:getRemaining() ~= "" then
+        targetUserId = reader:readUInt32BE()
+    end
+    
     local x = 300
     local y = 300
+    if reader:getRemaining() ~= "" then
+        x = reader:readUInt32BE()
+        y = reader:readUInt32BE()
+    end
     
-    if #ctx.body >= 24 then
-        session = ctx.body:sub(1, 24)
-    end
-    if #ctx.body >= 28 then
-        catchTime = readUInt32BE(ctx.body, 25)
-    end
-    if #ctx.body >= 32 then
-        flag = readUInt32BE(ctx.body, 29)
-    end
-    if #ctx.body >= 36 then
-        targetUserId = readUInt32BE(ctx.body, 33)
-    end
-    if #ctx.body >= 40 then
-        x = readUInt32BE(ctx.body, 37)
-    end
-    if #ctx.body >= 44 then
-        y = readUInt32BE(ctx.body, 41)
+    if x == 0 and y == 0 then
+        x = 300
+        y = 300
     end
     
     print(string.format("\27[36m[Handler] ROOM_LOGIN: flag=%d, target=%d, catchTime=0x%08X, pos=(%d,%d)\27[0m", 
@@ -77,62 +71,59 @@ local function handleRoomLogin(ctx)
     
     -- 读取 NONO 数据
     local nono = user.nono or {}
-    -- NONO state: 0=不跟随, 1=跟随, 3=在房间但不跟随
-    -- 在房间中，如果 NONO 存在，应该设置为 state=1 (跟随) 才会显示
     local nonoState = 0
     if (nono.hasNono and nono.hasNono > 0) or (nono.flag and nono.flag > 0) then
         -- state=3 (0b11): Bit0=HasNoNo, Bit1=Show/Follow
-        -- 必须设置 Bit1 (Value 2) 才能让客户端正确显示 NoNo
         nonoState = 3
     end
     local nonoColor = nono.color or 0xFFFFFF
-    -- superNono 应该是 0 或 1，不是 vipLevel
     local superNono = (nono.superNono and nono.superNono > 0) and 1 or 0
     
     print(string.format("\27[33m[NONO] hasNono=%d, flag=%d, state=%d, color=0x%X, superNono=%d\27[0m", 
         nono.hasNono or 0, nono.flag or 0, nonoState, nonoColor, superNono))
     
-    local body = ""
-    body = body .. writeUInt32BE(os.time())                     -- sysTime (4)
-    body = body .. writeUInt32BE(ctx.userId)                    -- userID (4)
-    body = body .. writeFixedString(nickname, 16)               -- nick (16)
-    body = body .. writeUInt32BE(user.color or 0xFFFFFF)        -- color (4)
-    body = body .. writeUInt32BE(user.texture or 0)             -- texture (4)
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(os.time())                     -- sysTime (4)
+    writer:writeUInt32BE(ctx.userId)                    -- userID (4)
+    writer:writeStringFixed(nickname, 16)               -- nick (16)
+    writer:writeUInt32BE(user.color or 0xFFFFFF)        -- color (4)
+    writer:writeUInt32BE(user.texture or 0)             -- texture (4)
     local vipFlags = 0
     if user.vip then vipFlags = vipFlags + 1 end
     if user.viped then vipFlags = vipFlags + 2 end
-    body = body .. writeUInt32BE(vipFlags)                      -- vipFlags (4)
-    body = body .. writeUInt32BE(user.vipStage or 0)            -- vipStage (4)
-    -- actionType: 飞行模式(flyMode>0)时为1，否则为0
+    writer:writeUInt32BE(vipFlags)                      -- vipFlags (4)
+    writer:writeUInt32BE(user.vipStage or 0)            -- vipStage (4)
+    
     local actionType = (user.flyMode and user.flyMode > 0) and 1 or 0
-    body = body .. writeUInt32BE(actionType)                             -- actionType (4)
-    body = body .. writeUInt32BE(x)                             -- pos.x (4)
-    body = body .. writeUInt32BE(y)                             -- pos.y (4)
-    body = body .. writeUInt32BE(0)                             -- action (4)
-    body = body .. writeUInt32BE(0)                             -- direction (4)
-    body = body .. writeUInt32BE(0)                             -- changeShape (4)
-    body = body .. writeUInt32BE(catchTime)                     -- spiritTime (4)
-    body = body .. writeUInt32BE(petId)                         -- spiritID (4)
-    body = body .. writeUInt32BE(petDV)                            -- petDV (4)
-    body = body .. writeUInt32BE(0)                             -- petSkin (4)
-    body = body .. writeUInt32BE(0)                             -- fightFlag (4)
-    body = body .. writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
-    body = body .. writeUInt32BE(user.studentID or 0)           -- studentID (4)
-    body = body .. writeUInt32BE(nonoState)                     -- nonoState (4)
-    body = body .. writeUInt32BE(nonoColor)                     -- nonoColor (4)
-    body = body .. writeUInt32BE(superNono)                     -- superNono (4)
-    body = body .. writeUInt32BE(0)                             -- playerForm (4)
-    body = body .. writeUInt32BE(0)                             -- transTime (4)
+    writer:writeUInt32BE(actionType)                             -- actionType (4)
+    writer:writeUInt32BE(x)                             -- pos.x (4)
+    writer:writeUInt32BE(y)                             -- pos.y (4)
+    writer:writeUInt32BE(0)                             -- action (4)
+    writer:writeUInt32BE(0)                             -- direction (4)
+    writer:writeUInt32BE(0)                             -- changeShape (4)
+    writer:writeUInt32BE(catchTime)                     -- spiritTime (4)
+    writer:writeUInt32BE(petId)                         -- spiritID (4)
+    writer:writeUInt32BE(petDV)                            -- petDV (4)
+    writer:writeUInt32BE(0)                             -- petSkin (4)
+    writer:writeUInt32BE(0)                             -- fightFlag (4)
+    writer:writeUInt32BE(user.teacherID or 0)           -- teacherID (4)
+    writer:writeUInt32BE(user.studentID or 0)           -- studentID (4)
+    writer:writeUInt32BE(nonoState)                     -- nonoState (4)
+    writer:writeUInt32BE(nonoColor)                     -- nonoColor (4)
+    writer:writeUInt32BE(superNono)                     -- superNono (4)
+    writer:writeUInt32BE(0)                             -- playerForm (4)
+    writer:writeUInt32BE(0)                             -- transTime (4)
+    
     local teamInfo = user.teamInfo or {}
-    body = body .. writeUInt32BE(teamInfo.id or 0)              -- teamInfo.id (4)
-    body = body .. writeUInt32BE(teamInfo.coreCount or 0)       -- teamInfo.coreCount (4)
-    body = body .. writeUInt32BE(teamInfo.isShow or 0)          -- teamInfo.isShow (4)
-    body = body .. writeUInt16BE(teamInfo.logoBg or 0)          -- teamInfo.logoBg (2)
-    body = body .. writeUInt16BE(teamInfo.logoIcon or 0)        -- teamInfo.logoIcon (2)
-    body = body .. writeUInt16BE(teamInfo.logoColor or 0)       -- teamInfo.logoColor (2)
-    body = body .. writeUInt16BE(teamInfo.txtColor or 0)        -- teamInfo.txtColor (2)
-    body = body .. writeFixedString(teamInfo.logoWord or "", 4) -- teamInfo.logoWord (4)
-    body = body .. writeUInt32BE(clothCount)                    -- clothCount (4)
+    writer:writeUInt32BE(teamInfo.id or 0)              -- teamInfo.id (4)
+    writer:writeUInt32BE(teamInfo.coreCount or 0)       -- teamInfo.coreCount (4)
+    writer:writeUInt32BE(teamInfo.isShow or 0)          -- teamInfo.isShow (4)
+    writer:writeUInt16BE(teamInfo.logoBg or 0)          -- teamInfo.logoBg (2)
+    writer:writeUInt16BE(teamInfo.logoIcon or 0)        -- teamInfo.logoIcon (2)
+    writer:writeUInt16BE(teamInfo.logoColor or 0)       -- teamInfo.logoColor (2)
+    writer:writeUInt16BE(teamInfo.txtColor or 0)        -- teamInfo.txtColor (2)
+    writer:writeStringFixed(teamInfo.logoWord or "", 4) -- teamInfo.logoWord (4)
+    writer:writeUInt32BE(clothCount)                    -- clothCount (4)
     
     for _, cloth in ipairs(clothes) do
         local clothId = cloth
@@ -141,13 +132,13 @@ local function handleRoomLogin(ctx)
             clothId = cloth.id or 0
             clothLevel = cloth.level or 0
         end
-        body = body .. writeUInt32BE(clothId)
-        body = body .. writeUInt32BE(clothLevel)
+        writer:writeUInt32BE(clothId)
+        writer:writeUInt32BE(clothLevel)
     end
-    body = body .. writeUInt32BE(user.curTitle or 0)            -- curTitle (4)
+    writer:writeUInt32BE(user.curTitle or 0)            -- curTitle (4)
     
     -- 发送 ROOM_LOGIN 响应（使用 CMD 2001 ENTER_MAP）
-    ctx.sendResponse(buildResponse(2001, ctx.userId, 0, body))
+    ctx.sendResponse(ResponseBuilder.build(2001, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → ROOM_LOGIN response as ENTER_MAP (room %d at %d,%d)\27[0m", 
         mapId, x, y))
     
@@ -162,81 +153,64 @@ end
 -- 客户端会检测到是同一服务器（isIlk=true），不会创建新连接
 -- 
 -- 重要修改：动态返回客户端当前连接的IP/Port，确保 isIlk=true，避免服务器跳转
+-- CMD 10002: GET_ROOM_ADDRES (获取房间地址)
 local function handleGetRoomAddress(ctx)
+    local reader = BinaryReader.new(ctx.body)
     local targetUserId = ctx.userId
-    if #ctx.body >= 4 then
-        targetUserId = readUInt32BE(ctx.body, 1)
+    if reader:getRemaining() ~= "" then
+        targetUserId = reader:readUInt32BE()
     end
     
     -- 生成 session（24字节，可以为空）
     local session = string.rep("\0", 24)
     
     -- 动态获取服务器 IP 和 Port
-    -- 优先使用 ctx 中的连接信息，否则使用全局配置
     local serverIP = ctx.serverIP or (conf and conf.server_ip) or "127.0.0.1"
     local serverPort = ctx.serverPort or (conf and conf.gameserver_port) or 5000
     
-    -- 如果 ctx 中有 roomSocket 的 IP/Port 信息（客户端当前连接的地址），使用它
-    -- 这样可以确保返回的地址与客户端当前连接一致，isIlk=true
-    if ctx.connectedIP then
-        serverIP = ctx.connectedIP
-    end
-    if ctx.connectedPort then
-        serverPort = ctx.connectedPort
-    end
+    if ctx.connectedIP then serverIP = ctx.connectedIP end
+    if ctx.connectedPort then serverPort = ctx.connectedPort end
     
-    -- 将 IP 转换为 4 字节格式 (大端序)
-    local ip
     local ipParts = {}
     for part in string.gmatch(serverIP, "(%d+)") do
         table.insert(ipParts, tonumber(part))
     end
+    
+    local writer = BinaryWriter.new()
+    writer:writeBytes(session)
     if #ipParts == 4 then
-        ip = string.char(ipParts[1], ipParts[2], ipParts[3], ipParts[4])
+        writer:writeUInt8(ipParts[1])
+        writer:writeUInt8(ipParts[2])
+        writer:writeUInt8(ipParts[3])
+        writer:writeUInt8(ipParts[4])
     else
-        -- 默认 127.0.0.1
-        ip = string.char(0x7F, 0x00, 0x00, 0x01)
+        writer:writeUInt32BE(0x7F000001) -- 127.0.0.1
     end
+    writer:writeUInt16BE(serverPort)
     
-    -- 端口 (大端序)
-    local port = writeUInt16BE(serverPort)
-    
-    -- 构建响应: session(24) + ip(4) + port(2) = 30 bytes
-    local body = session .. ip .. port
-    
-    ctx.sendResponse(buildResponse(10002, ctx.userId, 0, body))
+    ctx.sendResponse(ResponseBuilder.build(10002, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → GET_ROOM_ADDRES response (target=%d, ip=%s:%d, isIlk=true)\27[0m", 
         targetUserId, serverIP, serverPort))
     return true
 end
 
 -- CMD 10003: LEAVE_ROOM (离开房间)
--- 响应：返回空响应，客户端会自动处理离开逻辑
 local function handleLeaveRoom(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
-    
-    -- 更新用户位置到默认地图（如果需要）
     if not user.lastMapId or user.lastMapId == 0 then
         user.lastMapId = 1
     end
-    
-    ctx.sendResponse(buildResponse(10003, ctx.userId, 0, ""))
+    ctx.sendResponse(ResponseBuilder.build(10003, ctx.userId, 0, ""))
     print(string.format("\27[32m[Handler] → LEAVE_ROOM response\27[0m"))
     return true
 end
 
 -- CMD 10004: BUY_FITMENT (购买家具)
--- 请求: itemId(4) + count(4)
--- 响应: coins(4) + itemId(4) + count(4)
 local function handleBuyFitment(ctx)
-    local itemId = 0
-    local count = 1
-    if #ctx.body >= 4 then
-        itemId = readUInt32BE(ctx.body, 1)
-    end
-    if #ctx.body >= 8 then
-        count = readUInt32BE(ctx.body, 5)
-    end
+    local reader = BinaryReader.new(ctx.body)
+    local itemId = reader:readUInt32BE()
+    local count = reader:readUInt32BE()
+    
     if count <= 0 then count = 1 end
     
     local user = ctx.getOrCreateUser(ctx.userId)
@@ -261,31 +235,25 @@ local function handleBuyFitment(ctx)
     end
     user.items[itemKey].count = (user.items[itemKey].count or 0) + count
     
-    -- 保存到数据库
     ctx.saveUserDB()
     
-    -- 响应: coins(4) + itemId(4) + count(4)
-    local body = writeUInt32BE(user.coins) ..
-                 writeUInt32BE(itemId) ..
-                 writeUInt32BE(count)
-    ctx.sendResponse(buildResponse(10004, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(user.coins)
+    writer:writeUInt32BE(itemId)
+    writer:writeUInt32BE(count)
+    
+    ctx.sendResponse(ResponseBuilder.build(10004, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → BUY_FITMENT itemId=%d count=%d coins=%d\27[0m", 
         itemId, count, user.coins))
     return true
 end
 
 -- CMD 10005: BETRAY_FITMENT (出售家具)
--- 请求: itemId(4) + count(4)
--- 响应: coins(4) + itemId(4) + count(4)
 local function handleBetrayFitment(ctx)
-    local itemId = 0
-    local count = 1
-    if #ctx.body >= 4 then
-        itemId = readUInt32BE(ctx.body, 1)
-    end
-    if #ctx.body >= 8 then
-        count = readUInt32BE(ctx.body, 5)
-    end
+    local reader = BinaryReader.new(ctx.body)
+    local itemId = reader:readUInt32BE()
+    local count = reader:readUInt32BE()
+    
     if count <= 0 then count = 1 end
     
     local user = ctx.getOrCreateUser(ctx.userId)
@@ -303,70 +271,61 @@ local function handleBetrayFitment(ctx)
         end
     end
     
-    -- 返还赛尔豆 (出售价格 = 购买价格的一半)
     local sellPrice = 50 * count
     user.coins = (user.coins or 0) + sellPrice
     
-    -- 保存到数据库
     ctx.saveUserDB()
     
-    -- 响应: coins(4) + itemId(4) + count(4)
-    local body = writeUInt32BE(user.coins) ..
-                 writeUInt32BE(itemId) ..
-                 writeUInt32BE(count)
-    ctx.sendResponse(buildResponse(10005, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(user.coins)
+    writer:writeUInt32BE(itemId)
+    writer:writeUInt32BE(count)
+    
+    ctx.sendResponse(ResponseBuilder.build(10005, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → BETRAY_FITMENT itemId=%d count=%d coins=%d\27[0m", 
         itemId, count, user.coins))
     return true
 end
 
 -- CMD 10006: FITMENT_USERING (正在使用的家具)
--- 返回正在使用的家具列表
--- 客户端解析: userID(4) + roomID(4) + count(4) + [FitmentInfo]...
--- FitmentInfo: id(4) + x(4) + y(4) + dir(4) + status(4)
 local function handleFitmentUsering(ctx)
-    -- 从请求中读取目标用户ID (可能是访问别人的家)
+    local reader = BinaryReader.new(ctx.body)
     local targetUserId = ctx.userId
-    if #ctx.body >= 4 then
-        targetUserId = readUInt32BE(ctx.body, 1)
+    if reader:getRemaining() ~= "" then
+        targetUserId = reader:readUInt32BE()
     end
     
-    -- 获取用户的家具数据
     local user = ctx.getOrCreateUser(targetUserId)
     local fitments = user.fitments or {}
-    local roomId = user.roomId or targetUserId  -- 房间ID，默认使用用户ID
+    local roomId = user.roomId or targetUserId
     
-    -- 构建响应 (与客户端 FitmentManager.getUsedInfo 解析一致)
-    local body = writeUInt32BE(targetUserId) ..  -- userID (房主)
-                 writeUInt32BE(roomId) ..         -- roomID (房间ID)
-                 writeUInt32BE(#fitments)         -- count
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(targetUserId)
+    writer:writeUInt32BE(roomId)
+    writer:writeUInt32BE(#fitments)
     
-    -- 添加家具列表
     for _, fitment in ipairs(fitments) do
-        body = body .. writeUInt32BE(fitment.id or 0)
-        body = body .. writeUInt32BE(fitment.x or 0)
-        body = body .. writeUInt32BE(fitment.y or 0)
-        body = body .. writeUInt32BE(fitment.dir or 0)
-        body = body .. writeUInt32BE(fitment.status or 0)
+        writer:writeUInt32BE(fitment.id or 0)
+        writer:writeUInt32BE(fitment.x or 0)
+        writer:writeUInt32BE(fitment.y or 0)
+        writer:writeUInt32BE(fitment.dir or 0)
+        writer:writeUInt32BE(fitment.status or 0)
     end
     
-    ctx.sendResponse(buildResponse(10006, ctx.userId, 0, body))
+    ctx.sendResponse(ResponseBuilder.build(10006, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → FITMENT_USERING response (owner=%d, visitor=%d, count=%d)\27[0m", 
         targetUserId, ctx.userId, #fitments))
     return true
 end
 
 -- CMD 10007: FITMENT_ALL (所有家具)
--- FitmentInfo for 10007: id(4) + usedCount(4) + allCount(4)
 local function handleFitmentAll(ctx)
     local user = ctx.getOrCreateUser(ctx.userId)
     local fitments = user.fitments or {}
     local items = user.items or {}
-    
-    -- 统计数表: id -> {used=0, bag=0}
     local stats = {}
     
-    -- 1. 统计已摆放的家具 (usedCount)
+    -- 1. 统计已摆放的家具
     for _, f in ipairs(fitments) do
         local id = f.id or 0
         if id > 0 then
@@ -375,8 +334,7 @@ local function handleFitmentAll(ctx)
         end
     end
     
-    -- 2. 统计背包里的家具物品 (bagCount)
-    -- 家具物品ID通常 >= 500000 (根据 task_handlers 和 game_config)
+    -- 2. 统计背包里的家具物品
     for itemIdStr, itemData in pairs(items) do
         local id = tonumber(itemIdStr)
         if id and id >= 500000 then
@@ -391,61 +349,42 @@ local function handleFitmentAll(ctx)
     -- 3. 转换为数组并构建响应
     local uniqueFitments = {}
     for id, data in pairs(stats) do
-        -- allCount = usedCount + bagCount
-        -- 官服逻辑: allCount 是总拥有数量，usedCount 是已摆放数量
-        -- 背包里的数量 = allCount - usedCount
         local allCount = data.used + data.bag
         table.insert(uniqueFitments, {id = id, usedCount = data.used, allCount = allCount})
     end
     
-    -- 排序 (可选，方便调试)
     table.sort(uniqueFitments, function(a, b) return a.id < b.id end)
     
-    local body = writeUInt32BE(#uniqueFitments)
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(#uniqueFitments)
     for _, f in ipairs(uniqueFitments) do
-        body = body .. writeUInt32BE(f.id)
-        body = body .. writeUInt32BE(f.usedCount)   -- 已使用数量
-        body = body .. writeUInt32BE(f.allCount)    -- 总数量
+        writer:writeUInt32BE(f.id)
+        writer:writeUInt32BE(f.usedCount)
+        writer:writeUInt32BE(f.allCount)
     end
     
-    ctx.sendResponse(buildResponse(10007, ctx.userId, 0, body))
+    ctx.sendResponse(ResponseBuilder.build(10007, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → FITMENT_ALL response (%d types)\27[0m", #uniqueFitments))
     return true
 end
 
 -- CMD 10008: SET_FITMENT (设置家具/保存家具布局)
--- 请求: roomId(4) + count(4) + [id(4) + x(4) + y(4) + dir(4) + status(4)]...
--- 响应: 空 (客户端不需要响应数据)
 local function handleSetFitment(ctx)
-    local roomId = 0
-    local count = 0
-    local offset = 1
+    local reader = BinaryReader.new(ctx.body)
+    local roomId = reader:readUInt32BE()
+    local count = reader:readUInt32BE()
     
-    -- 解析 roomId
-    if #ctx.body >= 4 then
-        roomId = readUInt32BE(ctx.body, offset)
-        offset = offset + 4
-    end
-    
-    -- 解析家具数量
-    if #ctx.body >= 8 then
-        count = readUInt32BE(ctx.body, offset)
-        offset = offset + 4
-    end
-    
-    -- 解析家具列表
     local newFitments = {}
     for i = 1, count do
-        if #ctx.body >= offset + 19 then  -- 每个 FitmentInfo 是 20 字节
+        if reader:getRemaining() ~= "" then
             local fitment = {
-                id = readUInt32BE(ctx.body, offset),
-                x = readUInt32BE(ctx.body, offset + 4),
-                y = readUInt32BE(ctx.body, offset + 8),
-                dir = readUInt32BE(ctx.body, offset + 12),
-                status = readUInt32BE(ctx.body, offset + 16)
+                id = reader:readUInt32BE(),
+                x = reader:readUInt32BE(),
+                y = reader:readUInt32BE(),
+                dir = reader:readUInt32BE(),
+                status = reader:readUInt32BE()
             }
             table.insert(newFitments, fitment)
-            offset = offset + 20
         else
             break
         end
@@ -456,14 +395,14 @@ local function handleSetFitment(ctx)
     local oldFitments = user.fitments or {}
     if not user.items then user.items = {} end
     
-    -- 统计旧的已放置家具数量 (按ID)
+    -- 统计旧的已放置家具数量
     local oldPlacedCount = {}
     for _, f in ipairs(oldFitments) do
         local id = f.id
         oldPlacedCount[id] = (oldPlacedCount[id] or 0) + 1
     end
     
-    -- 统计新的已放置家具数量 (按ID)
+    -- 统计新的已放置家具数量
     local newPlacedCount = {}
     for _, f in ipairs(newFitments) do
         local id = f.id
@@ -471,7 +410,6 @@ local function handleSetFitment(ctx)
     end
     
     -- 计算变化并更新背包数量
-    -- 合并所有出现过的家具ID
     local allIds = {}
     for id, _ in pairs(oldPlacedCount) do allIds[id] = true end
     for id, _ in pairs(newPlacedCount) do allIds[id] = true end
@@ -479,51 +417,37 @@ local function handleSetFitment(ctx)
     for id, _ in pairs(allIds) do
         local oldCount = oldPlacedCount[id] or 0
         local newCount = newPlacedCount[id] or 0
-        local delta = newCount - oldCount  -- 正数=新放置, 负数=收回背包
+        local delta = newCount - oldCount
         
         if delta ~= 0 then
             local itemKey = tostring(id)
             if not user.items[itemKey] then
                 user.items[itemKey] = { count = 0 }
             end
-            -- 新放置的家具从背包扣除，收回的家具加到背包
             user.items[itemKey].count = (user.items[itemKey].count or 0) - delta
-            
-            -- 确保不会变成负数
             if user.items[itemKey].count < 0 then
                 user.items[itemKey].count = 0
             end
-            
             print(string.format("  [Sync] id=%d: placed %+d, bag now=%d", 
                 id, delta, user.items[itemKey].count))
         end
     end
     
-    -- 保存新的家具布局
     user.fitments = newFitments
     user.roomId = roomId
-    
-    -- 打印调试信息
-    print(string.format("\27[36m[Handler] SET_FITMENT: roomId=%d, count=%d\27[0m", roomId, #newFitments))
-    for i, f in ipairs(newFitments) do
-        print(string.format("  [%d] id=%d pos=(%d,%d) dir=%d status=%d", 
-            i, f.id, f.x, f.y, f.dir, f.status))
-    end
-    
-    -- 保存到数据库
     ctx.saveUserDB()
     
-    -- 发送响应 (空响应)
-    ctx.sendResponse(buildResponse(10008, ctx.userId, 0, ""))
-    print(string.format("\27[32m[Handler] → SET_FITMENT response (saved %d fitments)\27[0m", #fitments))
+    ctx.sendResponse(ResponseBuilder.build(10008, ctx.userId, 0, ""))
+    print(string.format("\27[32m[Handler] → SET_FITMENT response (saved %d fitments)\27[0m", #newFitments))
     return true
 end
 
 -- CMD 10009: ADD_ENERGY (增加能量)
 local function handleAddEnergy(ctx)
-    local body = writeUInt32BE(0) ..      -- ret
-                writeUInt32BE(100)        -- 当前能量
-    ctx.sendResponse(buildResponse(10009, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(0) -- ret
+    writer:writeUInt32BE(100) -- current energy
+    ctx.sendResponse(ResponseBuilder.build(10009, ctx.userId, 0, writer:toString()))
     print("\27[32m[Handler] → ADD_ENERGY response\27[0m")
     return true
 end

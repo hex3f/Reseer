@@ -1,51 +1,56 @@
 -- 本地游戏服务器 - 完整实现
 -- 基于官服协议分析实现
 
-local net = require('net')
-local bit = require('../../utils/bitop_compat')
-local json = require('json')
-local fs = require('fs')
+local success_net, net = pcall(require, 'net')
+if not success_net then net = _G.net end
+local bit = require('utils/bitop_compat')
+local success_json, json = pcall(require, 'json')
+if not success_json then json = _G.json end
+local success_fs, fs = pcall(require, 'fs')
+if not success_fs then fs = _G.fs end
 
 -- 从 Logger 模块获取 tprint
-local Logger = require('../../core/logger')
+
+local Logger = require('core/logger')
 local tprint = Logger.tprint
 
-local ProtocolValidator = require('../../core/protocol_validator')
-local PacketUtils = require('../../core/packet_utils')
+local ProtocolValidator = require('core/protocol_validator')
+local PacketUtils = require('core/packet_utils')
+
 
 local LocalGameServer = {}
 LocalGameServer.__index = LocalGameServer
 
 -- 加载命令映射
-local SeerCommands = require('../../game/seer_commands')
+local SeerCommands = require('game/seer_commands')
 
 -- 加载精灵数据 (Pets via SeerPets)
 -- SeerMonsters logic moved to SeerPets/SeerSkills
--- local SeerMonsters = require('../seer_monsters')
+-- local SeerMonsters = require('./seer_monsters')
 -- if SeerMonsters.load then SeerMonsters.load() end
 
-local SeerPets = require('../../game/seer_pets')
+local SeerPets = require('game/seer_pets')
 if SeerPets.load then SeerPets.load() end
 
 -- 加载技能数据
-local SeerSkills = require('../../game/seer_skills')
+local SeerSkills = require('game/seer_skills')
 
 -- 加载物品数据
-local SeerItems = require('../../game/seer_items')
+local SeerItems = require('game/seer_items')
 if SeerItems.load then SeerItems.load() end
 
 -- 加载技能效果数据
-local SeerSkillEffects = require('../../game/seer_skill_effects')
+local SeerSkillEffects = require('game/seer_skill_effects')
 if SeerSkillEffects.load then SeerSkillEffects.load() end
 
 -- 加载战斗系统
-local SeerBattle = require('../../game/seer_battle')
+local SeerBattle = require('game/seer_battle')
 
 -- 加载协议验证器
-local ProtocolValidator = require('../../core/protocol_validator')
+local ProtocolValidator = require('core/protocol_validator')
 
 -- 加载在线追踪模块
-local OnlineTracker = require('../../handlers/online_tracker')
+local OnlineTracker = require('handlers/online_tracker')
 
 -- ==================== 全局处理器注册系统 ====================
 -- 处理器模块可以注册到这里,由 handleCommand 统一调用
@@ -59,25 +64,25 @@ local GlobalHandlerRegistry = {
 
 -- 加载所有处理器模块
 local handlerModules = {
-    '../../handlers/nono_handlers',
-    '../../handlers/pet_handlers',
-    '../../handlers/pet_advanced_handlers',
-    '../../handlers/task_handlers',
-    '../../handlers/fight_handlers',
-    '../../handlers/item_handlers',
-    '../../handlers/friend_handlers',
-    '../../handlers/mail_handlers',
-    '../../handlers/map_handlers',
-    '../../handlers/room_handlers',
-    '../../handlers/team_handlers',
-    '../../handlers/teampk_handlers',
-    '../../handlers/arena_handlers',
-    '../../handlers/exchange_handlers',
-    '../../handlers/game_handlers',
-    '../../handlers/misc_handlers',
-    '../../handlers/special_handlers',
-    '../../handlers/system_handlers',
-    '../../handlers/teacher_handlers',
+    'handlers/nono_handlers',
+    'handlers/pet_handlers',
+    'handlers/pet_advanced_handlers',
+    'handlers/task_handlers',
+    'handlers/fight_handlers',
+    'handlers/item_handlers',
+    'handlers/friend_handlers',
+    'handlers/mail_handlers',
+    'handlers/map_handlers',
+    'handlers/room_handlers',
+    'handlers/team_handlers',
+    'handlers/teampk_handlers',
+    'handlers/arena_handlers',
+    'handlers/exchange_handlers',
+    'handlers/game_handlers',
+    'handlers/misc_handlers',
+    'handlers/special_handlers',
+    'handlers/system_handlers',
+    'handlers/teacher_handlers',
 }
 
 for _, modulePath in ipairs(handlerModules) do
@@ -93,9 +98,9 @@ end
 tprint(string.format("\27[32m[LocalGame] 共注册 %d 个全局命令处理器\27[0m", (function() local n=0 for _ in pairs(GlobalHandlers) do n=n+1 end return n end)()))
 
 -- 加载配置
-local GameConfig = require('../../config/game_config')
-local SeerLoginResponse = require('./seer_login_response')
-local SeerTaskConfig = require('../../data/seer_task_config')
+local GameConfig = require('config/game_config')
+local SeerLoginResponse = require('game/seer_login_response')
+local SeerTaskConfig = require('data/seer_task_config')
 
 local function getCmdName(cmdId)
     return SeerCommands.getName(cmdId)
@@ -124,6 +129,7 @@ function LocalGameServer:new(userdb, sessionManager, dataClient)
         cryptoMap = {}, -- map<client, crypto>
         sessionManager = sessionManager,  -- 会话管理器引用
         dataClient = dataClient,  -- 数据客户端（微服务模式）
+        userdb = userdb, -- 用户数据库引用
         -- 移除 nonoFollowingStates，改用 sessionManager
     }
     setmetatable(obj, LocalGameServer)
@@ -134,9 +140,9 @@ function LocalGameServer:new(userdb, sessionManager, dataClient)
 end
 
 function LocalGameServer:loadUserData()
-    -- 从 userdb 加载用户数据
-    local userdb = require('../../core/userdb')
-    self.userdb = userdb
+    -- 从 userdb 加载用户数据 (已注入)
+    -- local userdb = require('core/userdb')
+    -- self.userdb = userdb
     tprint("\27[36m[LocalGame] 用户数据库已加载\27[0m")
 end
 
@@ -155,7 +161,8 @@ function LocalGameServer:initServerList()
 end
 
 function LocalGameServer:start()
-    local timer = require('timer')
+    local success_timer, timer = pcall(require, 'timer')
+    if not success_timer then timer = _G.timer end
     
     local server = net.createServer(function(client)
         local addr = client:address()
@@ -496,7 +503,7 @@ function LocalGameServer:sendResponse(clientData, cmdId, userId, result, body)
     
     if not shouldHideCmd(cmdId) then
         tprint(string.format("\27[32m[LocalGame] 发送 CMD=%d (%s) RESULT=%d LEN=%d\27[0m", 
-            cmdId, getCmdName(cmdId), result, length))
+            cmdId, getCmdName(cmdId), result, #packet))
         
         -- 调试增强: 关键协议强制 Hex Dump
         -- 1001: 登录 (检查 nonoNick/nonoState)

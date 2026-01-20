@@ -1,8 +1,18 @@
 -- 统一的 XML 加载器
 -- 处理文件读取、BOM 移除和解析
 
-local fs = require('fs')
-local xml_parser = require('./xml_parser')
+local status_fs, fs = pcall(require, 'fs')
+if not status_fs then
+    if _G.fs then
+        fs = _G.fs
+    else
+        print("[XmlLoader] WARNING: fs module not found, file loading disabled.")
+        fs = {
+            readFileSync = function() return nil end
+        }
+    end
+end
+local xml_parser = require('core/xml_parser')
 
 local XmlLoader = {}
 

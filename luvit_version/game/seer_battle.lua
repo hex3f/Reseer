@@ -3,8 +3,8 @@
 -- 基于前端 PetFightDLL 代码分析
 
 -- local SeerMonsters = require('./seer_monsters') -- Deprecated
-local SeerSkills = require('./seer_skills')
-local SkillEffects = require('./seer_skill_effects')
+local SeerSkills = require('game/seer_skills')
+local SkillEffects = require('game/seer_skill_effects')
 
 local SeerBattle = {}
 
@@ -609,7 +609,7 @@ function SeerBattle.executeTurn(battle, playerSkillId)
     -- 使用 BattleAI 模块选择敌人技能
     local enemySkillId
     if battle.aiType then
-        local BattleAI = require('./seer_battle_ai')
+        local BattleAI = require('game/seer_battle_ai')
         enemySkillId = BattleAI.selectSkill(battle.aiType, battle.enemy, battle.player, {turn = battle.turn})
     else
         -- 默认AI

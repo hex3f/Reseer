@@ -2,7 +2,7 @@
 -- 赛尔号技能效果数据
 -- 从 data/skill_effects.xml 加载完整效果信息
 
-local XmlLoader = require("../core/xml_loader")
+local XmlLoader = require("core/xml_loader")
 
 local SeerSkillEffects = {}
 local effectsMap = {}

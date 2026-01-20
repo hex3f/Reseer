@@ -2,7 +2,16 @@
 -- 记录所有请求和交互到统一的日志文件
 -- 提供带时间戳的 tprint 函数供所有模块使用
 
-local fs = require('fs')
+local status_fs, fs = pcall(require, 'fs')
+if not status_fs then
+    print("[Logger] WARNING: fs module not found, logging to file disabled.")
+    fs = {
+        mkdirSync = function() end,
+        writeFileSync = function() end,
+        appendFileSync = function() end,
+    }
+    -- io.open will be mocked later if needed
+end
 local os = require('os')
 
 local Logger = {}

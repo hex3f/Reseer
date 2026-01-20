@@ -1,53 +1,58 @@
 -- 邮件/通知相关命令处理器
 -- 包括: 邮件列表、未读邮件、通知等
 
-local Utils = require('./utils')
-local writeUInt32BE = Utils.writeUInt32BE
-local writeFixedString = Utils.writeFixedString
-local buildResponse = Utils.buildResponse
+local BinaryWriter = require('utils/binary_writer')
+local ResponseBuilder = require('utils/response_builder')
 
 local MailHandlers = {}
 
 -- CMD 2751: MAIL_GET_LIST (获取邮件列表)
 -- MailListInfo: total(4) + count(4) + [SingleMailInfo]...
+-- CMD 2751: MAIL_GET_LIST (获取邮件列表)
 local function handleMailGetList(ctx)
-    local body = writeUInt32BE(0) .. writeUInt32BE(0)  -- total=0, count=0
-    ctx.sendResponse(buildResponse(2751, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(0) -- total
+    writer:writeUInt32BE(0) -- count
+    ctx.sendResponse(ResponseBuilder.build(2751, ctx.userId, 0, writer:toString()))
     print("\27[32m[Handler] → MAIL_GET_LIST response\27[0m")
     return true
 end
 
 -- CMD 2757: MAIL_GET_UNREAD (获取未读邮件)
 local function handleMailGetUnread(ctx)
-    ctx.sendResponse(buildResponse(2757, ctx.userId, 0, writeUInt32BE(0)))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(0)
+    ctx.sendResponse(ResponseBuilder.build(2757, ctx.userId, 0, writer:toString()))
     print("\27[32m[Handler] → MAIL_GET_UNREAD response\27[0m")
     return true
 end
 
 -- CMD 8001: INFORM (通知)
--- InformInfo: type(4) + userID(4) + nick(16) + accept(4) + serverID(4) + mapType(4) + mapID(4) + mapName(64)
 local function handleInform(ctx)
-    local body = writeUInt32BE(0) ..
-                writeUInt32BE(ctx.userId) ..
-                writeFixedString("", 16) ..
-                writeUInt32BE(0) ..
-                writeUInt32BE(1) ..
-                writeUInt32BE(0) ..
-                writeUInt32BE(301) ..
-                writeFixedString("", 64)
-    ctx.sendResponse(buildResponse(8001, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(0) -- type
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeStringFixed("", 16)
+    writer:writeUInt32BE(0) -- accept
+    writer:writeUInt32BE(1) -- serverID
+    writer:writeUInt32BE(0) -- mapType
+    writer:writeUInt32BE(301) -- mapID
+    writer:writeStringFixed("", 64) -- mapName
+    
+    ctx.sendResponse(ResponseBuilder.build(8001, ctx.userId, 0, writer:toString()))
     print("\27[32m[Handler] → INFORM response\27[0m")
     return true
 end
 
 -- CMD 8004: GET_BOSS_MONSTER (获取BOSS怪物)
--- BossMonsterInfo: bonusID(4) + petID(4) + captureTm(4) + itemCount(4) + [itemID(4) + itemCnt(4)]...
 local function handleGetBossMonster(ctx)
-    local body = writeUInt32BE(0) ..
-                writeUInt32BE(0) ..
-                writeUInt32BE(0) ..
-                writeUInt32BE(0)
-    ctx.sendResponse(buildResponse(8004, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(0) -- bonusID
+    writer:writeUInt32BE(0) -- petID
+    writer:writeUInt32BE(0) -- captureTm
+    writer:writeUInt32BE(0) -- itemCount
+    
+    ctx.sendResponse(ResponseBuilder.build(8004, ctx.userId, 0, writer:toString()))
     print("\27[32m[Handler] → GET_BOSS_MONSTER response\27[0m")
     return true
 end

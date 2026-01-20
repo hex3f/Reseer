@@ -1,0 +1,30 @@
+[CRITICAL ERROR] Failed to start game server:
+.\servers/gameserver/localgameserver.lua:164: module 'timer' not found:
+	no field package.preload['timer']
+	no file '.\timer.lua'
+	no file 'D:\GithubProject\Reseer\luvit_version\lua\timer.lua'
+	no file 'D:\GithubProject\Reseer\luvit_version\lua\timer\init.lua'
+	no file '.\timer.dll'
+	no file 'D:\GithubProject\Reseer\luvit_version\timer.dll'
+	no file 'D:\GithubProject\Reseer\luvit_version\loadall.dll'
+stack traceback:
+	[C]: in function 'require'
+	.\servers/gameserver/localgameserver.lua:164: in function 'start'
+	.\servers/gameserver/localgameserver.lua:138: in function 'new'
+	D:/GithubProject/Reseer/luvit_version/start_gameserver.lua:98: in function <D:/GithubProject/Reseer/luvit_version/start_gameserver.lua:88>
+	[C]: in function 'xpcall'
+	D:/GithubProject/Reseer/luvit_version/start_gameserver.lua:88: in function 'fn'
+	[string "bundle:deps/require.lua"]:309: in function 'require'
+	D:\GithubProject\Reseer\luvit_version\debug_entry.lua:3: in function <D:\GithubProject\Reseer\luvit_version\debug_entry.lua:2>
+	[C]: in function 'xpcall'
+	D:\GithubProject\Reseer\luvit_version\debug_entry.lua:22: in function 'fn'
+	[string "bundle:deps/require.lua"]:309: in function 'require'
+	[string "bundle:/main.lua"]:128: in function <[string "bundle:/main.lua"]:20>
+stack traceback:
+	D:/GithubProject/Reseer/luvit_version/start_gameserver.lua:112: in function 'fn'
+	[string "bundle:deps/require.lua"]:309: in function 'require'
+	D:\GithubProject\Reseer\luvit_version\debug_entry.lua:3: in function <D:\GithubProject\Reseer\luvit_version\debug_entry.lua:2>
+	[C]: in function 'xpcall'
+	D:\GithubProject\Reseer\luvit_version\debug_entry.lua:22: in function 'fn'
+	[string "bundle:deps/require.lua"]:309: in function 'require'
+	[string "bundle:/main.lua"]:128: in function <[string "bundle:/main.lua"]:20>

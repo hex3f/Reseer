@@ -1,10 +1,11 @@
 -- 物品相关命令处理器
 -- 包括: 购买物品、物品列表、更换服装等
 
-local Utils = require('./utils')
-local writeUInt32BE = Utils.writeUInt32BE
-local readUInt32BE = Utils.readUInt32BE
-local buildResponse = Utils.buildResponse
+local BinaryWriter = require('utils/binary_writer')
+local BinaryReader = require('utils/binary_reader')
+local ResponseBuilder = require('utils/response_builder')
+local buildResponse = ResponseBuilder.build
+local Utils = { buildResponse = buildResponse }
 
 local ItemHandlers = {}
 
@@ -18,8 +19,9 @@ local ITEM_TYPE = {
     NONO_ITEM_END = 299999,    -- NONO道具结束
 }
 
-local GameConfig = require('../config/game_config')
-local fs = require('fs')
+local GameConfig = require('config/game_config')
+local success_fs, fs = pcall(require, 'fs')
+if not success_fs then fs = _G.fs end
 
 -- 缓存物品价格表
 local ItemPrices = {}
@@ -95,13 +97,15 @@ end
 -- CMD 2601: ITEM_BUY (购买物品)
 -- 前端 BuyItemInfo 解析顺序: cash(4) + itemID(4) + itemNum(4) + itemLevel(4)
 local function handleItemBuy(ctx)
+    local reader = BinaryReader.new(ctx.body)
     local itemId = 0
     local count = 1
-    if #ctx.body >= 4 then
-        itemId = readUInt32BE(ctx.body, 1)
+    
+    if reader:getRemaining() ~= "" then
+        itemId = reader:readUInt32BE()
     end
-    if #ctx.body >= 8 then
-        count = readUInt32BE(ctx.body, 5)
+    if reader:getRemaining() ~= "" then
+        count = reader:readUInt32BE()
     end
     
     -- 获取用户数据
@@ -115,7 +119,6 @@ local function handleItemBuy(ctx)
     if isUniqueItem(itemId) and user.items[itemKey] then
         print(string.format("\27[33m[Handler] ITEM_BUY: 物品 %d 是唯一物品且用户已拥有，返回错误码 103203\27[0m", itemId))
         -- 返回错误码 103203 (你不能拥有过多此物品！)
-        -- 对应 ParseSocketError.as case 103203
         ctx.sendResponse(buildResponse(2601, ctx.userId, 103203, ""))
         return true
     end
@@ -126,9 +129,7 @@ local function handleItemBuy(ctx)
     
     if user.coins < totalCost then
         print(string.format("\27[31m[Handler] ITEM_BUY: 金币不足! 需要 %d, 拥有 %d\27[0m", totalCost, user.coins))
-        -- 应该返回错误码？暂时不做任何操作或返回失败
-        -- 这里的 0 可能是错误码位置？暂时还是返回成功包但金币不变，客户端可能会显示购买失败
-        -- 或者发送专门的错误包
+        -- 返回错误码？暂时不做任何操作或返回失败
         return true
     end
     
@@ -149,24 +150,28 @@ local function handleItemBuy(ctx)
     ctx.saveUser(ctx.userId, user)
     
     -- 返回成功
-    local body = writeUInt32BE(user.coins) ..     -- cash (剩余金币)
-                writeUInt32BE(itemId) ..          -- itemID
-                writeUInt32BE(count) ..           -- itemNum
-                writeUInt32BE(0)                  -- itemLevel
-    ctx.sendResponse(buildResponse(2601, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(user.coins)     -- cash (剩余金币)
+    writer:writeUInt32BE(itemId)          -- itemID
+    writer:writeUInt32BE(count)           -- itemNum
+    writer:writeUInt32BE(0)               -- itemLevel
+    
+    ctx.sendResponse(buildResponse(2601, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → ITEM_BUY %d x%d response (coins=%d)\27[0m", itemId, count, user.coins))
     return true
 end
 
 -- CMD 2602: ITEM_SALE (出售物品)
 local function handleItemSale(ctx)
+    local reader = BinaryReader.new(ctx.body)
     local itemId = 0
     local count = 1
-    if #ctx.body >= 4 then
-        itemId = readUInt32BE(ctx.body, 1)
+    
+    if reader:getRemaining() ~= "" then
+        itemId = reader:readUInt32BE()
     end
-    if #ctx.body >= 8 then
-        count = readUInt32BE(ctx.body, 5)
+    if reader:getRemaining() ~= "" then
+        count = reader:readUInt32BE()
     end
     
     -- 获取用户数据并移除物品
@@ -193,15 +198,15 @@ end
 -- 需要广播给同地图其他玩家
 local function handleChangeCloth(ctx)
     -- 解析请求
+    local reader = BinaryReader.new(ctx.body)
     local clothCount = 0
     local clothIds = {}
     
-    if #ctx.body >= 4 then
-        clothCount = readUInt32BE(ctx.body, 1)
+    if reader:getRemaining() ~= "" then
+        clothCount = reader:readUInt32BE()
         for i = 1, clothCount do
-            local offset = 5 + (i - 1) * 4
-            if #ctx.body >= offset + 3 then
-                local clothId = readUInt32BE(ctx.body, offset)
+            if reader:getRemaining() ~= "" then
+                local clothId = reader:readUInt32BE()
                 table.insert(clothIds, clothId)
             end
         end
@@ -213,11 +218,16 @@ local function handleChangeCloth(ctx)
     ctx.saveUser(ctx.userId, user)
     
     -- 构建响应体
-    local body = writeUInt32BE(ctx.userId) .. writeUInt32BE(#clothIds)
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(ctx.userId)
+    writer:writeUInt32BE(#clothIds)
+    
     for _, clothId in ipairs(clothIds) do
-        body = body .. writeUInt32BE(clothId)
-        body = body .. writeUInt32BE(0)  -- clothType (从XML获取，这里简化为0)
+        writer:writeUInt32BE(clothId)
+        writer:writeUInt32BE(0)  -- clothType (从XML获取，这里简化为0)
     end
+    
+    local body = writer:toString()
     
     -- 发送响应给请求者
     ctx.sendResponse(buildResponse(2604, ctx.userId, 0, body))
@@ -233,13 +243,15 @@ end
 
 -- CMD 2607: ITEM_EXPEND (消耗物品)
 local function handleItemExpend(ctx)
+    local reader = BinaryReader.new(ctx.body)
     local itemId = 0
     local count = 1
-    if #ctx.body >= 4 then
-        itemId = readUInt32BE(ctx.body, 1)
+    
+    if reader:getRemaining() ~= "" then
+        itemId = reader:readUInt32BE()
     end
-    if #ctx.body >= 8 then
-        count = readUInt32BE(ctx.body, 5)
+    if reader:getRemaining() ~= "" then
+        count = reader:readUInt32BE()
     end
     
     -- 获取用户数据并消耗物品
@@ -264,12 +276,14 @@ end
 -- 请求: itemType1(4) + itemType2(4) + itemType3(4)
 -- 响应: itemCount(4) + [itemId(4) + count(4) + expireTime(4) + unknown(4)]...
 local function handleItemList(ctx)
+    local reader = BinaryReader.new(ctx.body)
+    
     -- 解析请求的物品类型范围
     local itemType1, itemType2, itemType3 = 0, 0, 0
-    if #ctx.body >= 12 then
-        itemType1 = readUInt32BE(ctx.body, 1)
-        itemType2 = readUInt32BE(ctx.body, 5)
-        itemType3 = readUInt32BE(ctx.body, 9)
+    if reader:getRemaining() ~= "" then
+        itemType1 = reader:readUInt32BE()
+        itemType2 = reader:readUInt32BE()
+        itemType3 = reader:readUInt32BE()
     end
     
     print(string.format("\27[36m[Handler] ITEM_LIST 查询范围: %d-%d, %d\27[0m", itemType1, itemType2, itemType3))
@@ -280,18 +294,19 @@ local function handleItemList(ctx)
     
     -- 构建物品列表响应
     local itemCount = 0
-    local itemData = ""
+    local writer = BinaryWriter.new()
     local addedItems = {}  -- 防止重复添加
     
     -- 辅助函数: 添加物品
     local function addItem(itemId, count, expireTime)
         if addedItems[itemId] then return end
         addedItems[itemId] = true
-        itemData = itemData ..
-            writeUInt32BE(itemId) ..
-            writeUInt32BE(count) ..
-            writeUInt32BE(expireTime or 0x057E40) ..
-            writeUInt32BE(0)
+        
+        writer:writeUInt32BE(itemId)
+        writer:writeUInt32BE(count)
+        writer:writeUInt32BE(expireTime or 0x057E40)
+        writer:writeUInt32BE(0)
+        
         itemCount = itemCount + 1
     end
     
@@ -308,10 +323,12 @@ local function handleItemList(ctx)
         end
     end
     
-    -- 注意: 不再自动添加默认服装，只返回用户实际拥有的物品
-
-    local body = writeUInt32BE(itemCount) .. itemData
-    ctx.sendResponse(buildResponse(2605, ctx.userId, 0, body))
+    -- 构建最终包体: count + itemData
+    local finalWriter = BinaryWriter.new()
+    finalWriter:writeUInt32BE(itemCount)
+    finalWriter:writeBytes(writer:toString())
+    
+    ctx.sendResponse(buildResponse(2605, ctx.userId, 0, finalWriter:toString()))
     print(string.format("\27[32m[Handler] → ITEM_LIST response (%d items)\27[0m", itemCount))
     return true
 end
@@ -320,18 +337,18 @@ end
 -- 请求格式: itemCount(4) + [itemId(4)]...
 -- 官服响应格式: result(4) + remainCoins(4)
 local function handleMultiItemBuy(ctx)
+    local reader = BinaryReader.new(ctx.body)
     local itemCount = 0
     local itemIds = {}
     
-    if #ctx.body >= 4 then
-        itemCount = readUInt32BE(ctx.body, 1)
+    if reader:getRemaining() ~= "" then
+        itemCount = reader:readUInt32BE()
     end
     
     -- 解析所有物品ID
     for i = 1, itemCount do
-        local offset = 5 + (i - 1) * 4
-        if #ctx.body >= offset + 3 then
-            local itemId = readUInt32BE(ctx.body, offset)
+        if reader:getRemaining() ~= "" then
+            local itemId = reader:readUInt32BE()
             table.insert(itemIds, itemId)
         end
     end
@@ -362,8 +379,10 @@ local function handleMultiItemBuy(ctx)
     if user.coins < totalCost then
         print(string.format("\27[31m[Handler] MULTI_ITEM_BUY: 金币不足! 需要 %d, 拥有 %d\27[0m", totalCost, user.coins))
         -- 返回错误码: 赛尔豆余额不足 (10016 或 103107)
-        local body = writeUInt32BE(10016) .. writeUInt32BE(user.coins)
-        ctx.sendResponse(buildResponse(2606, ctx.userId, 0, body))
+        local writer = BinaryWriter.new()
+        writer:writeUInt32BE(10016)
+        writer:writeUInt32BE(user.coins)
+        ctx.sendResponse(buildResponse(2606, ctx.userId, 0, writer:toString()))
         return true
     end
     
@@ -392,10 +411,11 @@ local function handleMultiItemBuy(ctx)
     
     -- 返回成功 (匹配官服格式: result + remainCoins)
     -- 注意: 这里第一个 writeUInt32BE 是 result code，不是 result 字段（buildResponse里有result参数）
-    -- 官服通常把业务结果放在 body 里，buildResponse 的 result 参数设为 0
-    local body = writeUInt32BE(0) ..              -- result (0=成功)
-                writeUInt32BE(user.coins)         -- 剩余金币
-    ctx.sendResponse(buildResponse(2606, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(0)              -- result (0=成功)
+    writer:writeUInt32BE(user.coins)     -- 剩余金币
+    
+    ctx.sendResponse(buildResponse(2606, ctx.userId, 0, writer:toString()))
     
     local itemIdsStr = table.concat(itemIds, ",")
     print(string.format("\27[32m[Handler] → MULTI_ITEM_BUY %d items [%s] response (added=%d, new_coins=%d)\27[0m", 
@@ -412,16 +432,20 @@ end
 
 -- CMD 2901: EXCHANGE_CLOTH_COMPLETE (兑换服装完成)
 local function handleExchangeClothComplete(ctx)
+    local reader = BinaryReader.new(ctx.body)
     local exchangeId = 0
-    if #ctx.body >= 4 then
-        exchangeId = readUInt32BE(ctx.body, 1)
+    
+    if reader:getRemaining() ~= "" then
+        exchangeId = reader:readUInt32BE()
     end
     
     -- 返回成功 (实际应该根据exchangeId给予对应物品)
-    local body = writeUInt32BE(0) ..      -- ret
-                writeUInt32BE(0) ..       -- itemId (获得的物品)
-                writeUInt32BE(1)          -- count
-    ctx.sendResponse(buildResponse(2901, ctx.userId, 0, body))
+    local writer = BinaryWriter.new()
+    writer:writeUInt32BE(0)      -- ret
+    writer:writeUInt32BE(0)       -- itemId (获得的物品)
+    writer:writeUInt32BE(1)          -- count
+    
+    ctx.sendResponse(buildResponse(2901, ctx.userId, 0, writer:toString()))
     print(string.format("\27[32m[Handler] → EXCHANGE_CLOTH_COMPLETE %d response\27[0m", exchangeId))
     return true
 end

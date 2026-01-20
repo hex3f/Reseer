@@ -2,11 +2,12 @@
 -- 包括: 登录、时间、服务器列表等
 -- Protocol Version: 2026-01-20 (Refactored using BinaryWriter)
 
-local Utils = require('./utils')
-local BinaryWriter = require('../utils/binary_writer')
-local BinaryReader = require('../utils/binary_reader')
-local buildResponse = Utils.buildResponse
-local OnlineTracker = require('./online_tracker')
+local BinaryWriter = require('utils/binary_writer')
+local BinaryReader = require('utils/binary_reader')
+local ResponseBuilder = require('utils/response_builder')
+local buildResponse = ResponseBuilder.build
+local Utils = { buildResponse = buildResponse }
+local OnlineTracker = require('handlers/online_tracker')
 
 local SystemHandlers = {}
 
@@ -118,7 +119,7 @@ local function handleLoginIn(ctx)
     user.mapID = user.mapID or 1
     
     -- 生成登录响应
-    local SeerLoginResponse = require('../servers/gameserver/seer_login_response')
+    local SeerLoginResponse = require('game/seer_login_response')
     local responseBody, keySeed = SeerLoginResponse.makeLoginResponse(user)
     
     -- Update Crypto Key

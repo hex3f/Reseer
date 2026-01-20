@@ -1,4 +1,4 @@
-local XmlLoader = require("../core/xml_loader")
+local XmlLoader = require("core/xml_loader")
 
 local SeerItems = {}
 local itemsMap = {}

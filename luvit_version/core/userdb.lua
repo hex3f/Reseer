@@ -5,8 +5,13 @@
 -- gameData: 游戏数据 (游戏内使用)
 --   - coins, energy, pets, items, tasks, clothes, petBook, nono, mapId, posX, posY
 
-local fs = require "fs"
-local json = require "json"
+local success, fs = pcall(require, 'fs')
+if not success then fs = _G.fs end
+local json = _G.json
+if not json then
+    local success_json, j = pcall(require, "json")
+    if success_json then json = j end
+end
 
 local UserDB = {}
 UserDB.__index = UserDB
@@ -258,6 +263,11 @@ function UserDB:getOrCreateGameData(userId)
             
             -- 精灵背包
             pets = {},
+            currentPetId = 0,  -- 当前出战精灵ID (task_handlers使用)
+            catchId = 0,       -- 当前精灵捕获时间 (task_handlers使用)
+            
+            -- NONO芯片 (nono_handlers使用)
+            nonoChips = {},
             
             -- 物品背包
             items = {},
@@ -265,8 +275,23 @@ function UserDB:getOrCreateGameData(userId)
             -- 服装
             clothes = {},
             
-            -- 任务状态
-            tasks = {},
+            -- 任务状态 (task_handlers 使用 taskList 和 taskBufs)
+            taskList = {},  -- 任务状态: taskId -> status (1=accepted, 3=complete)
+            taskBufs = {},  -- 任务缓存: taskId -> {index=value, ...}
+            
+            -- 好友系统 (friend_handlers 使用)
+            friends = {},    -- 好友列表: [{userID, timePoke}, ...]
+            blacklist = {},  -- 黑名单: [{userID}, ...]
+            
+            -- 师徒系统 (teacher_handlers 使用)
+            studentIDs = {}, -- 徒弟列表: [userId, ...]
+            -- teacherID 已在下面定义
+            
+            -- 战队系统 (team_handlers 使用)
+            teamInfo = {},   -- 战队信息: {id, priv, isShow, ...}
+            
+            -- 经验池 (pet_advanced_handlers 使用)
+            expPool = 0,     -- 经验池
             
             -- 精灵图鉴
             petBook = {},

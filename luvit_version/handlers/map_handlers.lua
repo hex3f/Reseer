@@ -2,11 +2,14 @@
 -- 包括: 进入/离开地图、玩家列表、移动、聊天等
 -- Protocol Version: 2026-01-20 (Refactored using BinaryWriter)
 
-local Utils = require('./utils')
-local BinaryWriter = require('../utils/binary_writer')
-local BinaryReader = require('../utils/binary_reader')
-local buildResponse = Utils.buildResponse
-local OnlineTracker = require('./online_tracker')
+local BinaryWriter = require('utils/binary_writer')
+local BinaryReader = require('utils/binary_reader')
+local ResponseBuilder = require('utils/response_builder')
+local buildResponse = ResponseBuilder.build
+local Utils = { buildResponse = buildResponse }
+local OnlineTracker = require('handlers/online_tracker')
+local GameConfig = require('config/game_config')
+local InitialPlayer = GameConfig.InitialPlayer or {}
 
 local MapHandlers = {}
 
@@ -25,8 +28,10 @@ local function buildPeopleInfo(userId, user, sysTime)
     writer:writeUInt32BE(userId)                -- userID (4)
     local nickname = user.nick or user.nickname or ("Seer" .. userId)
     writer:writeStringFixed(nickname, 16)       -- nick (16)
-    writer:writeUInt32BE(user.color or 0xFFFFFF)-- color (4)
-    writer:writeUInt32BE(user.texture or 0)     -- texture (4)
+    
+    writer:writeUInt32BE(user.color or InitialPlayer.color or 0x66CCFF)-- color (4)
+    
+    writer:writeUInt32BE(user.texture or InitialPlayer.texture or 0)     -- texture (4)
     
     -- 2. VIP Flags (bit 0=vip, bit 1=viped)
     local vipFlags = 0
@@ -43,8 +48,8 @@ local function buildPeopleInfo(userId, user, sysTime)
     writer:writeUInt32BE(actionType)            -- actionType (4)
     
     -- 3. Pos & Action
-    writer:writeUInt32BE(user.x or 500)         -- pos.x (4)
-    writer:writeUInt32BE(user.y or 300)         -- pos.y (4)
+    writer:writeUInt32BE(user.x or InitialPlayer.posX or 300)         -- pos.x (4)
+    writer:writeUInt32BE(user.y or InitialPlayer.posY or 270)         -- pos.y (4)
     writer:writeUInt32BE(0)                     -- action (4)
     writer:writeUInt32BE(0)                     -- direction (4)
     writer:writeUInt32BE(0)                     -- changeShape (4)
@@ -79,7 +84,7 @@ local function buildPeopleInfo(userId, user, sysTime)
     -- 逻辑修正: 如果 actionType=1 (Fly)，则 nonoState 不应该显示跟随(bit 1)?
     -- 前端 setForPeoleInfo 直接读取通过 BitUtil.getBit 解析 bits
     writer:writeUInt32BE(nonoState)             -- nonoState (4)
-    writer:writeUInt32BE(nono.color or 0)       -- nonoColor (4)
+    writer:writeUInt32BE(nono.color or 0xFFFFFF) -- nonoColor (4) - 默认白色
     writer:writeUInt32BE(superNono > 0 and 1 or 0) -- superNono (4) (Boolean)
     
     writer:writeUInt32BE(0)                     -- playerForm (4) (Boolean)
@@ -188,7 +193,9 @@ local function handleEnterMap(ctx)
             nw:writeUInt32BE(1) -- state=1 (NONO在家)
             nw:writeStringFixed(nono.nick or "NoNo", 16)
             nw:writeUInt32BE(nono.superNono or 0)
-            nw:writeUInt32BE(nono.color or 0)
+            
+            nw:writeUInt32BE(nono.color or 0xFFFFFF)
+            
             nw:writeUInt32BE(nono.power or 100)
             nw:writeUInt32BE(nono.mate or 100)
             nw:writeUInt32BE(nono.iq or 0)
@@ -279,8 +286,10 @@ local function handleGetSimUserInfo(ctx)
     local nickname = user.nick or user.nickname or ("Seer" .. targetId)
     writer:writeUInt32BE(targetId)
     writer:writeStringFixed(nickname, 16)
-    writer:writeUInt32BE(user.color or 0x3399FF)
-    writer:writeUInt32BE(user.texture or 0)
+    
+    writer:writeUInt32BE(user.color or InitialPlayer.color or 0x66CCFF)
+    
+    writer:writeUInt32BE(user.texture or InitialPlayer.texture or 0)
     writer:writeUInt32BE(user.vip or 0)
     writer:writeUInt32BE(0) -- status
     writer:writeUInt32BE(user.mapType or 0)

@@ -1,18 +1,36 @@
 -- 任务相关命令处理器
 -- 包括: 接受任务、完成任务、任务缓存等
 
-local Utils = require('./utils')
+local BinaryWriter = require('utils/binary_writer')
+local BinaryReader = require('utils/binary_reader')
+local ResponseBuilder = require('utils/response_builder')
+local buildResponse = ResponseBuilder.build
+local Utils = { 
+    writeUInt32BE = function(val) 
+        local w = BinaryWriter.new()
+        w:writeUInt32BE(val)
+        return w:toString()
+    end,
+    readUInt32BE = function(str, off) 
+        if off and off > 1 then
+            str = string.sub(str, off)
+        end
+        return BinaryReader.new(str):readUInt32BE() 
+    end,
+    buildResponse = ResponseBuilder.build 
+}
 local writeUInt32BE = Utils.writeUInt32BE
 local readUInt32BE = Utils.readUInt32BE
-local buildResponse = Utils.buildResponse
-local SeerPets = require('../game/seer_pets')
+
+local SeerPets = require('game/seer_pets')
+local GameConfig = require('config/game_config')
 
 local TaskHandlers = {}
 
 -- ==================== 新手任务处理 ====================
 
 -- 新手任务ID定义
-local SeerTaskConfig = require('../data/seer_task_config')
+local SeerTaskConfig = require('data/seer_task_config')
 
 -- 新手任务ID定义
 local NOVICE_TASK = {
@@ -67,16 +85,29 @@ local function buildTaskCompleteResponse(taskId, param, user)
         
         -- ★ 关键修复：创建完整精灵对象并添加到 user.pets 数组
         -- 这样登录响应才能正确序列化发送给客户端
-        local starterLevel = 5
+        local defaults = GameConfig.PetDefaults or {}
+        local starterLevel = defaults.level or 5
+        local dv = 31
+        if defaults.dv then
+             dv = type(defaults.dv) == "function" and defaults.dv() or defaults.dv
+        end
+        
+        local nature = 0
+        if defaults.nature then
+             nature = type(defaults.nature) == "function" and defaults.nature() or defaults.nature
+        else
+             nature = math.random(0, 24)
+        end
+        
         local petData = SeerPets.get(petId)
-        local stats = SeerPets.getStats(petId, starterLevel, 31, {hp=0, atk=0, def=0, spAtk=0, spDef=0, spd=0})
+        local stats = SeerPets.getStats(petId, starterLevel, dv, {hp=0, atk=0, def=0, spAtk=0, spDef=0, spd=0})
         local skills = SeerPets.getSkillsForLevel(petId, starterLevel)
         
         local newPet = {
             id = petId,
             name = petData and petData.defName or "",
-            dv = 31,  -- 个体值
-            nature = math.random(0, 24),  -- 随机性格
+            dv = dv,  -- 个体值
+            nature = nature,  -- 性格
             level = starterLevel,
             exp = 0,
             catchTime = captureTm,

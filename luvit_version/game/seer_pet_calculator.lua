@@ -1,7 +1,7 @@
 -- 精灵属性计算模块
 -- 用于计算精灵的各项属性值
 
-local SeerPets = require('./seer_pets')
+local SeerPets = require('game/seer_pets')
 
 local PetCalculator = {}
 

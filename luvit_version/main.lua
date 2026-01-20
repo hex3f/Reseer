@@ -2,6 +2,8 @@
 -- 改自 RecMole (摩尔庄园私服)
 
 -- 初始化日志系统
+local fs = require('fs')
+_G.fs = fs -- WORKAROUND: Global fs to avoid require errors in sub-modules
 local Logger = require("./core/logger")
 Logger.init()
 
